@@ -70,8 +70,11 @@ async function init() {
 
 function handleInboxMessage(msg) {
   if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
-  if (activeConversationId === msg.conversation_id) {
-    renderMessages(getMessages(activeConversationId));
+  const partnerUid = String(msg.sender_id);
+  const canonicalId = getConvId(currentUser.uid, partnerUid);
+  if (activePartner?.uid === partnerUid || activeConversationId === canonicalId) {
+    activeConversationId = canonicalId;
+    renderMessages(getMessages(activeConversationId, currentUser.uid));
     markConversationRead(activeConversationId, currentUser.uid);
   }
   loadConversations();
@@ -119,8 +122,9 @@ function renderConvList(conversations, unreadMap = {}) {
     const otherId   = partner?.uid  || (isMine ? m.receiver_id   : m.sender_id);
     const preview   = getPreviewText(m.content || "");
     const time      = formatTime(m.created_at);
-    const unread    = unreadMap[m.conversation_id] || 0;
-    const isActive  = activeConversationId === m.conversation_id;
+    const canonicalId = getConvId(currentUser.uid, otherId);
+    const unread    = unreadMap[canonicalId] || unreadMap[m.conversation_id] || 0;
+    const isActive  = activeConversationId === canonicalId;
 
     return `
       <div class="conv-item ${isActive ? "active" : ""}" onclick="openConversation('${otherId}')">
@@ -164,7 +168,7 @@ async function resolvePartner(otherUid) {
 window.openConversation = async function (otherUid) {
   activeConversationId = getConvId(currentUser.uid, otherUid);
   activePartner        = await resolvePartner(otherUid);
-  setConversationPartner(activeConversationId, activePartner);
+  setConversationPartner(activeConversationId, activePartner, currentUser.uid);
 
   document.getElementById("chatEmptyState").style.display = "none";
   document.getElementById("chatHeader").style.display     = "flex";
@@ -187,7 +191,7 @@ window.openConversation = async function (otherUid) {
    LOAD & RENDER MESSAGES
 ───────────────────────────────────────────── */
 function loadMessages() {
-  renderMessages(getMessages(activeConversationId));
+  renderMessages(getMessages(activeConversationId, currentUser.uid));
 }
 
 function renderMessages(msgs) {
@@ -541,7 +545,7 @@ function handleIncomingCall(msg) {
   if (!activePartner || activePartner.uid !== msg.sender_id) {
     activePartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "user" };
     activeConversationId = getConvId(currentUser.uid, msg.sender_id);
-    setConversationPartner(activeConversationId, activePartner);
+    setConversationPartner(activeConversationId, activePartner, currentUser.uid);
   }
 
   const type = isVideo ? "video" : "voice";

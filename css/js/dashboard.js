@@ -49,6 +49,10 @@ let shopperCallType    = null;
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
+function getShopperChatUserId() {
+  return String(currentProfile?.uid || currentUser?.id || "");
+}
+
 /* ─── INIT ─── */
 document.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -74,12 +78,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   initShopperVideoUpload();
   updateNotifDot();
   initRealtimeOrders();
-  subscribeInbox(supabase, currentUser.id, {
+  subscribeInbox(supabase, getShopperChatUserId(), {
     onMessage: handleShopperInboxMessage,
     onCallInvite: payload => handleShopperIncomingCall({
       sender_id: payload.sender_id,
       sender_name: payload.sender_name,
-      receiver_id: currentUser.id,
+      receiver_id: getShopperChatUserId(),
       content: payload.callType === "video" ? "[videocall]incoming" : "[voicecall]incoming",
     }),
   });
@@ -699,9 +703,13 @@ function initAvatarUpload() {
 
 function handleShopperInboxMessage(msg) {
   if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
+  const myId = getShopperChatUserId();
+  const partnerUid = String(msg.sender_id);
+  const canonicalId = getConvId(myId, partnerUid);
   showToast(`💬 New message from ${msg.sender_name}`);
   addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
-  if (activeChatConvId === msg.conversation_id) {
+  if (activeChatPartner?.uid === partnerUid || activeChatConvId === canonicalId) {
+    activeChatConvId = canonicalId;
     loadShopperMessages();
     markShopperRead();
   }
@@ -713,7 +721,7 @@ async function renderShopperChatList() {
   const list = document.getElementById("msgConvList");
   if (!list) return;
 
-  allShopperConvs = getConversationSummaries(currentUser.id);
+  allShopperConvs = getConversationSummaries(getShopperChatUserId());
 
   if (allShopperConvs.length === 0) {
     list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.<br><small style="opacity:0.8">Chats are saved on this device only.</small></div>`;
@@ -721,7 +729,7 @@ async function renderShopperChatList() {
     return;
   }
 
-  const unreadMap = getUnreadMap(currentUser.id);
+  const unreadMap = getUnreadMap(getShopperChatUserId());
   const total = Object.values(unreadMap).reduce((a, b) => a + b, 0);
   updateMsgBadge(total);
   renderShopperConvItems(allShopperConvs, unreadMap);
@@ -734,14 +742,15 @@ function renderShopperConvItems(convs, unreadMap = {}) {
     list.innerHTML = `<div class="msg-conv-empty">No conversations found.</div>`; return;
   }
   list.innerHTML = convs.map(m => {
-    const isMine    = m.sender_id === currentUser.id;
+    const isMine    = String(m.sender_id) === getShopperChatUserId();
     const partner   = m._partner;
     const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
     const otherId   = partner?.uid  || (isMine ? m.receiver_id   : m.sender_id);
     const preview   = getPreviewText(m.content || "");
     const time      = formatTime(m.created_at);
-    const unread    = unreadMap[m.conversation_id] || 0;
-    const isActive  = activeChatConvId === m.conversation_id;
+    const canonicalId = getConvId(getShopperChatUserId(), otherId);
+    const unread    = unreadMap[canonicalId] || unreadMap[m.conversation_id] || 0;
+    const isActive  = activeChatConvId === canonicalId;
     return `
       <div class="msg-conv-item ${isActive?"active":""}" onclick="openShopperChat('${otherId}','${escapeHtml(otherName)}')">
         <div class="msg-conv-avatar">${(otherName||"?")[0].toUpperCase()}</div>
@@ -767,9 +776,10 @@ function updateMsgBadge(count) {
 }
 
 window.openShopperChat = async function (otherUid, otherName) {
-  activeChatConvId  = getConvId(currentUser.id, otherUid);
+  const myId = getShopperChatUserId();
+  activeChatConvId  = getConvId(myId, otherUid);
   activeChatPartner = { uid: otherUid, name: otherName, role: "buyer" };
-  setConversationPartner(activeChatConvId, activeChatPartner);
+  setConversationPartner(activeChatConvId, activeChatPartner, myId);
   document.getElementById("msgThreadEmpty").style.display    = "none";
   document.getElementById("msgThreadHeader").style.display   = "flex";
   document.getElementById("msgThreadMessages").style.display = "flex";
@@ -782,7 +792,7 @@ window.openShopperChat = async function (otherUid, otherName) {
 };
 
 function loadShopperMessages() {
-  const msgs = getMessages(activeChatConvId);
+  const msgs = getMessages(activeChatConvId, getShopperChatUserId());
   const container = document.getElementById("msgThreadMessages");
   if (!container) return;
   if (msgs.length === 0) {
@@ -792,7 +802,7 @@ function loadShopperMessages() {
   let lastDate = null;
   container.innerHTML = msgs.map(m => {
     if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return "";
-    const isMine  = m.sender_id === currentUser.id;
+    const isMine  = String(m.sender_id) === getShopperChatUserId();
     const time    = new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
     const read    = isMine ? (m.is_read?" ✓✓":" ✓") : "";
     const msgDate = new Date(m.created_at).toLocaleDateString();
@@ -841,7 +851,7 @@ window.sendShopperMessage = async function () {
   appendShopperOptimistic(content);
   const msg = buildMessage({
     conversation_id: activeChatConvId,
-    sender_id:       currentUser.id,
+    sender_id:       getShopperChatUserId(),
     sender_name:     currentProfile.name,
     sender_role:     "shopper",
     receiver_id:     activeChatPartner.uid,
@@ -874,7 +884,7 @@ window.handleShopperImageUpload = async function (e) {
   appendShopperOptimistic(content);
   const msg = buildMessage({
     conversation_id: activeChatConvId,
-    sender_id: currentUser.id,
+    sender_id: getShopperChatUserId(),
     sender_name: currentProfile.name,
     sender_role: "shopper",
     receiver_id: activeChatPartner.uid,
@@ -927,7 +937,7 @@ async function uploadShopperAudio(blob) {
   appendShopperOptimistic(content);
   const msg = buildMessage({
     conversation_id: activeChatConvId,
-    sender_id: currentUser.id,
+    sender_id: getShopperChatUserId(),
     sender_name: currentProfile.name,
     sender_role: "shopper",
     receiver_id: activeChatPartner.uid,
@@ -1000,7 +1010,7 @@ async function openShopperCallUI(type, isCaller) {
         shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});};
         const offer=await shopperPeerConn.createOffer(); await shopperPeerConn.setLocalDescription(offer); sendShopperSignal({type:"offer",sdp:offer});
         await sendCallInvite(supabase, {
-          sender_id: currentUser.id,
+          sender_id: getShopperChatUserId(),
           sender_name: currentProfile.name,
           receiver_id: activeChatPartner.uid,
           callType: type,
@@ -1017,12 +1027,13 @@ function handleShopperIncomingCall(msg) {
   const isVideo = msg.content==="[videocall]incoming";
   const isVoice = msg.content==="[voicecall]incoming";
   if (!isVideo&&!isVoice) return;
-  if (msg.receiver_id!==currentUser.id) return;
+  const myId = getShopperChatUserId();
+  if (String(msg.receiver_id) !== myId) return;
 
   if (!activeChatPartner || activeChatPartner.uid !== msg.sender_id) {
     activeChatPartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "buyer" };
-    activeChatConvId = getConvId(currentUser.id, msg.sender_id);
-    setConversationPartner(activeChatConvId, activeChatPartner);
+    activeChatConvId = getConvId(myId, msg.sender_id);
+    setConversationPartner(activeChatConvId, activeChatPartner, myId);
   }
 
   document.getElementById("shopperIncomingBanner")?.remove();
@@ -1039,7 +1050,7 @@ function handleShopperIncomingCall(msg) {
 
 function markShopperRead() {
   if (!activeChatConvId) return;
-  markConversationRead(activeChatConvId, currentUser.id);
+  markConversationRead(activeChatConvId, getShopperChatUserId());
   loadShopperMessages();
 }
 
@@ -1047,7 +1058,7 @@ window.filterShopperConversations = function (query) {
   if (!query) { renderShopperConvItems(allShopperConvs); return; }
   const q = query.toLowerCase();
   const filtered = allShopperConvs.filter(m => {
-    const isMine = m.sender_id === currentUser.id;
+    const isMine = String(m.sender_id) === getShopperChatUserId();
     const partner = m._partner;
     const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
     return (otherName || "").toLowerCase().includes(q) || (m.content || "").toLowerCase().includes(q);

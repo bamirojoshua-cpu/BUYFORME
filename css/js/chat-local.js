@@ -1,8 +1,7 @@
 /* =============================================================
    BuyForMe — chat-local.js
-   Chat history lives in the browser (localStorage).
-   Supabase Realtime broadcast delivers messages live only —
-   nothing is written to the messages table or chat-media bucket.
+   One conversation per person (WhatsApp-style), keyed by user pair.
+   Chat history lives in localStorage; realtime broadcast for live delivery.
    ============================================================= */
 
 export const CHAT_STORAGE_KEY = "buyforme_chat_v1";
@@ -10,7 +9,7 @@ export const INBOX_EVENT_MSG  = "chat_msg";
 export const INBOX_EVENT_CALL = "call_invite";
 
 export function getConvId(uid1, uid2) {
-  return [uid1, uid2].sort().join("_");
+  return [String(uid1), String(uid2)].sort().join("_");
 }
 
 function loadStore() {
@@ -30,6 +29,66 @@ function saveStore(store) {
   }
 }
 
+function inferPartnerUid(conv, convId, myUserId, messages) {
+  if (conv.partner?.uid) return String(conv.partner.uid);
+  const parts = String(convId).split("_");
+  const other = parts.find(p => p && p !== String(myUserId));
+  if (other) return other;
+  const m = (messages || []).find(msg => msg.sender_id !== myUserId) || (messages || [])[0];
+  if (!m) return null;
+  return String(m.sender_id) === String(myUserId) ? String(m.receiver_id) : String(m.sender_id);
+}
+
+/** Merge duplicate threads into one chat per other user. */
+export function consolidateConversations(myUserId) {
+  if (!myUserId) return;
+  const store = loadStore();
+  const byPartner = new Map();
+
+  for (const [convId, conv] of Object.entries(store.conversations)) {
+    const msgs = [...(conv.messages || [])];
+    const partnerUid = inferPartnerUid(conv, convId, myUserId, msgs);
+
+    if (!partnerUid) {
+      if (msgs.length === 0) delete store.conversations[convId];
+      continue;
+    }
+
+    if (!byPartner.has(partnerUid)) {
+      byPartner.set(partnerUid, {
+        partner: {
+          uid: partnerUid,
+          name: conv.partner?.name || "User",
+          role: conv.partner?.role || "user",
+        },
+        messages: [],
+      });
+    }
+
+    const bucket = byPartner.get(partnerUid);
+    if (conv.partner?.name) {
+      bucket.partner.name = conv.partner.name;
+      if (conv.partner.role) bucket.partner.role = conv.partner.role;
+    }
+
+    const canonicalId = getConvId(myUserId, partnerUid);
+    for (const m of msgs) {
+      const copy = { ...m, conversation_id: canonicalId };
+      if (!bucket.messages.some(x => x.id === copy.id)) bucket.messages.push(copy);
+    }
+  }
+
+  const next = {};
+  for (const [partnerUid, { partner, messages }] of byPartner) {
+    messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const canonicalId = getConvId(myUserId, partnerUid);
+    next[canonicalId] = { partner, messages };
+  }
+
+  store.conversations = next;
+  saveStore(store);
+}
+
 export function buildMessage(fields) {
   return {
     id: crypto.randomUUID(),
@@ -40,34 +99,41 @@ export function buildMessage(fields) {
 }
 
 export function saveMessage(message, myUserId = null) {
+  const me = String(myUserId || message.receiver_id || message.sender_id);
+  const partnerUid = String(message.sender_id) === me
+    ? String(message.receiver_id)
+    : String(message.sender_id);
+  const canonicalId = getConvId(me, partnerUid);
+
+  message.conversation_id = canonicalId;
+
+  consolidateConversations(me);
+
   const store = loadStore();
-  const convId = message.conversation_id;
-  if (!store.conversations[convId]) {
-    store.conversations[convId] = { partner: null, messages: [] };
+  if (!store.conversations[canonicalId]) {
+    store.conversations[canonicalId] = { partner: null, messages: [] };
   }
-  const conv = store.conversations[convId];
+  const conv = store.conversations[canonicalId];
 
   if (!conv.partner) {
-    if (myUserId) {
-      const otherUid = message.sender_id === myUserId ? message.receiver_id : message.sender_id;
-      conv.partner = {
-        uid: otherUid,
-        name: message.sender_id === myUserId ? message.receiver_name : message.sender_name,
-        role: message.sender_id === myUserId ? (message.receiver_role || "user") : (message.sender_role || "user"),
-      };
-    } else {
-      conv.partner = {
-        uid: message.sender_id,
-        name: message.sender_name || "User",
-        role: message.sender_role || "user",
-      };
-    }
+    conv.partner = {
+      uid: partnerUid,
+      name: message.sender_id === me ? message.receiver_name : message.sender_name,
+      role: message.sender_id === me ? (message.receiver_role || "user") : (message.sender_role || "user"),
+    };
   } else {
+    conv.partner.uid = partnerUid;
     if (message.receiver_name && conv.partner.uid === message.receiver_id)
       conv.partner.name = message.receiver_name;
     if (message.sender_name && conv.partner.uid === message.sender_id)
       conv.partner.name = message.sender_name;
+    if (message.sender_role && conv.partner.uid === message.sender_id)
+      conv.partner.role = message.sender_role;
+    if (message.receiver_role && conv.partner.uid === message.receiver_id)
+      conv.partner.role = message.receiver_role;
   }
+
+  if (!conv.partner.name) conv.partner.name = "User";
 
   const exists = conv.messages.some(m => m.id === message.id);
   if (!exists) conv.messages.push(message);
@@ -75,54 +141,90 @@ export function saveMessage(message, myUserId = null) {
   saveStore(store);
 }
 
-export function setConversationPartner(convId, partner) {
+export function setConversationPartner(convId, partner, myUserId) {
+  if (!myUserId || !partner?.uid) return;
+  const canonicalId = getConvId(myUserId, partner.uid);
+  consolidateConversations(myUserId);
+
   const store = loadStore();
-  if (!store.conversations[convId]) {
-    store.conversations[convId] = { partner, messages: [] };
+  if (!store.conversations[canonicalId]) {
+    store.conversations[canonicalId] = { partner, messages: [] };
   } else {
-    store.conversations[convId].partner = partner;
+    store.conversations[canonicalId].partner = { ...store.conversations[canonicalId].partner, ...partner, uid: String(partner.uid) };
   }
   saveStore(store);
 }
 
-export function getMessages(convId) {
+export function getMessages(convId, myUserId) {
+  if (myUserId) consolidateConversations(myUserId);
   return loadStore().conversations[convId]?.messages || [];
 }
 
+/** One row per other user (most recent message). */
 export function getConversationSummaries(myUserId) {
+  consolidateConversations(myUserId);
+
   const store = loadStore();
-  const summaries = [];
+  const byPartner = new Map();
 
   for (const [convId, conv] of Object.entries(store.conversations)) {
     const msgs = conv.messages || [];
     if (msgs.length === 0) continue;
+
+    const partnerUid = conv.partner?.uid || inferPartnerUid(conv, convId, myUserId, msgs);
+    if (!partnerUid) continue;
+
     const last = msgs[msgs.length - 1];
-    summaries.push({ ...last, conversation_id: convId, _partner: conv.partner });
+    const canonicalId = getConvId(myUserId, partnerUid);
+    const row = {
+      ...last,
+      conversation_id: canonicalId,
+      _partner: {
+        uid: partnerUid,
+        name: conv.partner?.name || last.sender_name || last.receiver_name || "User",
+        role: conv.partner?.role || "user",
+      },
+    };
+
+    const prev = byPartner.get(partnerUid);
+    if (!prev || new Date(row.created_at) > new Date(prev.created_at)) {
+      byPartner.set(partnerUid, row);
+    }
   }
 
-  summaries.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  return summaries;
+  return [...byPartner.values()].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  );
 }
 
 export function getUnreadMap(myUserId) {
+  consolidateConversations(myUserId);
+
   const store = loadStore();
   const map = {};
+
   for (const [convId, conv] of Object.entries(store.conversations)) {
+    const partnerUid = conv.partner?.uid || inferPartnerUid(conv, convId, myUserId, conv.messages);
+    const canonicalId = partnerUid ? getConvId(myUserId, partnerUid) : convId;
     const n = (conv.messages || []).filter(
-      m => m.receiver_id === myUserId && !m.is_read
+      m => String(m.receiver_id) === String(myUserId) && !m.is_read
     ).length;
-    if (n > 0) map[convId] = n;
+    if (n > 0) map[canonicalId] = (map[canonicalId] || 0) + n;
   }
+
   return map;
 }
 
 export function markConversationRead(convId, myUserId) {
+  consolidateConversations(myUserId);
+
   const store = loadStore();
   const conv = store.conversations[convId];
   if (!conv) return;
+
   let changed = false;
   for (const m of conv.messages) {
-    if (m.receiver_id === myUserId && !m.is_read) {
+    if (String(m.receiver_id) === String(myUserId) && !m.is_read) {
       m.is_read = true;
       changed = true;
     }
@@ -185,12 +287,12 @@ export function subscribeInbox(supabase, userId, { onMessage, onCallInvite }) {
   inboxChannelRef = supabase
     .channel(`chat_inbox_${userId}`)
     .on("broadcast", { event: INBOX_EVENT_MSG }, ({ payload }) => {
-      if (!payload || payload.sender_id === userId) return;
-      saveMessage(payload);
+      if (!payload || String(payload.sender_id) === String(userId)) return;
+      saveMessage(payload, userId);
       onMessage?.(payload);
     })
     .on("broadcast", { event: INBOX_EVENT_CALL }, ({ payload }) => {
-      if (!payload || payload.sender_id === userId) return;
+      if (!payload || String(payload.sender_id) === String(userId)) return;
       onCallInvite?.(payload);
     })
     .subscribe();
@@ -238,9 +340,13 @@ export async function broadcastToUser(supabase, receiverId, event, payload) {
 }
 
 export async function sendChatMessage(supabase, message) {
-  saveMessage(message, message.sender_id);
+  const senderId = String(message.sender_id);
+  const receiverId = String(message.receiver_id);
+  message.conversation_id = getConvId(senderId, receiverId);
+  saveMessage(message, senderId);
   try {
-    await broadcastToUser(supabase, message.receiver_id, INBOX_EVENT_MSG, message);
+    const outbound = { ...message, conversation_id: getConvId(senderId, receiverId) };
+    await broadcastToUser(supabase, receiverId, INBOX_EVENT_MSG, outbound);
   } catch (e) {
     console.warn("Live delivery failed (saved locally):", e.message);
   }
