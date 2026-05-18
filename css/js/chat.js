@@ -6,7 +6,8 @@
 import { supabase } from "./supabase.js";
 import {
   getConvId,
-  getMessages,
+  getMessagesForPartner,
+  getPartnerUidFromMessage,
   getConversationSummaries,
   getUnreadMap,
   getPreviewText,
@@ -36,6 +37,13 @@ let activeCall           = null;
 let mediaRecorder = null;
 let audioChunks   = [];
 let isRecording   = false;
+let threadMessageIds = new Set();
+let refreshConvTimer = null;
+
+function scheduleRefreshConversations() {
+  clearTimeout(refreshConvTimer);
+  refreshConvTimer = setTimeout(() => loadConversations(), 120);
+}
 
 async function init() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -61,18 +69,21 @@ async function init() {
 }
 
 async function handleInboxMessage(msg) {
-  if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
-  const partnerUid = String(msg.sender_id) === String(currentUser.uid)
-    ? String(msg.receiver_id)
-    : String(msg.sender_id);
+  const partnerUid = getPartnerUidFromMessage(msg, currentUser.uid);
   const canonicalId = getConvId(currentUser.uid, partnerUid);
 
-  if (activePartner?.uid === partnerUid || activeConversationId === canonicalId) {
+  if (
+    activePartner &&
+    (String(activePartner.uid) === partnerUid || activeConversationId === canonicalId)
+  ) {
     activeConversationId = canonicalId;
-    await loadMessages();
-    await markConversationRead(activeConversationId, currentUser.uid);
+    appendMessageToThread(msg);
+    if (String(msg.receiver_id) === String(currentUser.uid) && !msg.is_read) {
+      await markConversationRead(canonicalId, currentUser.uid, partnerUid);
+    }
   }
-  await loadConversations();
+
+  scheduleRefreshConversations();
 }
 
 function handleInboxCallInvite(payload) {
@@ -175,19 +186,23 @@ window.openConversation = async function (otherUid) {
   const sidebar = document.getElementById("convSidebar");
   if (window.innerWidth <= 640 && sidebar) sidebar.classList.add("hidden");
 
+  threadMessageIds = new Set();
   await loadMessages();
   await markAsRead();
   await loadConversations();
 };
 
 async function loadMessages() {
-  const msgs = await getMessages(activeConversationId);
+  if (!activePartner?.uid) return;
+  const msgs = await getMessagesForPartner(currentUser.uid, activePartner.uid);
   renderMessages(msgs);
 }
 
 function renderMessages(msgs) {
   const container = document.getElementById("chatMessages");
   if (!container) return;
+
+  threadMessageIds = new Set((msgs || []).map(m => m.id).filter(Boolean));
 
   if (msgs.length === 0) {
     container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin:auto;padding:40px">No messages yet.<br>Say hello! 👋</div>`;
@@ -216,6 +231,34 @@ function renderMessages(msgs) {
       </div>`;
   }).join("");
 
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendMessageToThread(m) {
+  if (!m?.id || threadMessageIds.has(m.id)) return;
+  if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return;
+
+  const container = document.getElementById("chatMessages");
+  if (!container || container.style.display === "none") return;
+
+  threadMessageIds.add(m.id);
+
+  const empty = container.querySelector("div[style*='padding:40px']");
+  if (empty) empty.remove();
+
+  const isMine = String(m.sender_id) === String(currentUser.uid);
+  const time   = formatTime(m.created_at);
+  const read   = isMine ? (m.is_read ? " ✓✓" : " ✓") : "";
+  const row    = document.createElement("div");
+  row.className = `msg-row ${isMine ? "mine" : "theirs"}`;
+  row.dataset.msgId = m.id;
+  row.innerHTML = `
+    ${!isMine ? `<div class="msg-avatar">${(m.sender_name || "?")[0].toUpperCase()}</div>` : ""}
+    <div class="msg-bubble ${isMine ? "bubble-mine" : "bubble-theirs"}">
+      <div class="msg-content">${renderMessageContent(m.content)}</div>
+      <div class="msg-time">${time}${read}</div>
+    </div>`;
+  container.appendChild(row);
   container.scrollTop = container.scrollHeight;
 }
 
@@ -257,7 +300,6 @@ window.sendMessage = async function () {
   if (!content || !activeConversationId || !activePartner) return;
 
   input.value = "";
-  appendOptimisticMessage(content);
 
   const msg = buildMessage({
     conversation_id: activeConversationId,
@@ -270,9 +312,9 @@ window.sendMessage = async function () {
   });
 
   try {
-    await sendChatMessage(supabase, msg);
-    await loadMessages();
-    await loadConversations();
+    const saved = await sendChatMessage(supabase, msg);
+    appendMessageToThread(saved);
+    scheduleRefreshConversations();
   } catch (e) {
     alert(e.message || "Failed to send message.");
   }
@@ -308,9 +350,9 @@ window.handleImageUpload = async function (e) {
       content: "[img]" + url,
     });
 
-    await sendChatMessage(supabase, msg);
+    const saved = await sendChatMessage(supabase, msg);
     await loadMessages();
-    await loadConversations();
+    scheduleRefreshConversations();
   } catch (err) {
     alert(err.message || "Failed to send image.");
   }
@@ -363,9 +405,9 @@ async function uploadAndSendAudio(blob) {
       receiver_name:   activePartner.name,
       content: "[audio]" + url,
     });
-    await sendChatMessage(supabase, msg);
+    const saved = await sendChatMessage(supabase, msg);
     await loadMessages();
-    await loadConversations();
+    scheduleRefreshConversations();
   } catch (e) {
     alert(e.message || "Failed to send voice note.");
   }
@@ -475,9 +517,8 @@ async function handleIncomingCall({ sender_id, sender_name, callType }) {
 }
 
 async function markAsRead() {
-  if (!activeConversationId) return;
-  await markConversationRead(activeConversationId, currentUser.uid);
-  await loadMessages();
+  if (!activeConversationId || !activePartner?.uid) return;
+  await markConversationRead(activeConversationId, currentUser.uid, activePartner.uid);
 }
 
 function filterConversations(query) {

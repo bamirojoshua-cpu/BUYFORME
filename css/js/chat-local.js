@@ -1,18 +1,33 @@
 /* =============================================================
    BuyForMe — chat-local.js
-   Chat persisted in Supabase (messages table + chat-media storage).
-   Realtime via postgres_changes; call invites via broadcast.
+   One thread per user pair (WhatsApp-style). Supabase + realtime.
    ============================================================= */
 
 import { supabase } from "./supabase.js";
 
+export const INBOX_EVENT_MSG  = "chat_msg";
 export const INBOX_EVENT_CALL = "call_invite";
 
 const partnerCache = {};
 let messagesChannelRef = null;
+let inboxChannelRef = null;
 
 export function getConvId(uid1, uid2) {
   return [String(uid1), String(uid2)].sort().join("_");
+}
+
+export function getPartnerUidFromConvId(convId, myUserId) {
+  const me = String(myUserId);
+  for (const part of String(convId).split("_")) {
+    if (part && part !== me) return part;
+  }
+  return null;
+}
+
+export function getPartnerUidFromMessage(msg, myUserId) {
+  const me = String(myUserId);
+  if (String(msg.sender_id) === me) return String(msg.receiver_id);
+  return String(msg.sender_id);
 }
 
 export function buildMessage(fields) {
@@ -34,10 +49,11 @@ export function getPreviewText(content) {
 }
 
 function partnerFromRow(m, myUserId) {
+  const partnerUid = getPartnerUidFromMessage(m, myUserId);
   const me = String(myUserId);
   const isMine = String(m.sender_id) === me;
   return {
-    uid: isMine ? String(m.receiver_id) : String(m.sender_id),
+    uid: partnerUid,
     name: isMine ? (m.receiver_name || "User") : (m.sender_name || "User"),
     role: isMine ? "user" : (m.sender_role || "user"),
   };
@@ -53,13 +69,42 @@ export function setConversationPartner(convId, partner, myUserId) {
   };
 }
 
-export async function getMessages(convId) {
+/** All messages between me and one other user (ignores stale conversation_id in DB). */
+export async function getMessagesForPartner(myUserId, partnerUid) {
+  const me = String(myUserId);
+  const partner = String(partnerUid);
+  const canonicalId = getConvId(me, partner);
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .or(
+      `and(sender_id.eq.${me},receiver_id.eq.${partner}),and(sender_id.eq.${partner},receiver_id.eq.${me})`
+    )
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("getMessagesForPartner:", error);
+    return [];
+  }
+
+  return (data || []).map(m => ({
+    ...m,
+    conversation_id: canonicalId,
+  }));
+}
+
+/** @param convId canonical id OR pass partner via getPartnerUidFromConvId */
+export async function getMessages(convId, myUserId = null) {
+  if (myUserId) {
+    const partner = getPartnerUidFromConvId(convId, myUserId);
+    if (partner) return getMessagesForPartner(myUserId, partner);
+  }
   const { data, error } = await supabase
     .from("messages")
     .select("*")
     .eq("conversation_id", convId)
     .order("created_at", { ascending: true });
-
   if (error) {
     console.error("getMessages:", error);
     return [];
@@ -74,7 +119,7 @@ export async function getConversationSummaries(myUserId) {
     .select("*")
     .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
     .order("created_at", { ascending: false })
-    .limit(400);
+    .limit(500);
 
   if (error) {
     console.error("getConversationSummaries:", error);
@@ -84,6 +129,8 @@ export async function getConversationSummaries(myUserId) {
   const byPartner = new Map();
   for (const m of data || []) {
     const partner = partnerFromRow(m, me);
+    if (!partner.uid || partner.uid === me) continue;
+
     const canonicalId = getConvId(me, partner.uid);
     const cached = partnerCache[canonicalId];
     const row = {
@@ -91,7 +138,11 @@ export async function getConversationSummaries(myUserId) {
       conversation_id: canonicalId,
       _partner: cached || partner,
     };
-    if (!byPartner.has(partner.uid)) byPartner.set(partner.uid, row);
+
+    const prev = byPartner.get(partner.uid);
+    if (!prev || new Date(row.created_at) > new Date(prev.created_at)) {
+      byPartner.set(partner.uid, row);
+    }
   }
 
   return [...byPartner.values()].sort(
@@ -103,7 +154,7 @@ export async function getUnreadMap(myUserId) {
   const me = String(myUserId);
   const { data, error } = await supabase
     .from("messages")
-    .select("conversation_id, receiver_id, is_read")
+    .select("sender_id, receiver_id, is_read")
     .eq("receiver_id", me)
     .eq("is_read", false);
 
@@ -111,20 +162,26 @@ export async function getUnreadMap(myUserId) {
 
   const map = {};
   for (const m of data || []) {
-    map[m.conversation_id] = (map[m.conversation_id] || 0) + 1;
+    const partnerUid = String(m.sender_id);
+    const canonicalId = getConvId(me, partnerUid);
+    map[canonicalId] = (map[canonicalId] || 0) + 1;
   }
   return map;
 }
 
-export async function markConversationRead(convId, myUserId) {
+export async function markConversationRead(convId, myUserId, partnerUid = null) {
   const me = String(myUserId);
-  const { error } = await supabase
-    .from("messages")
-    .update({ is_read: true })
-    .eq("conversation_id", convId)
-    .eq("receiver_id", me)
-    .eq("is_read", false);
+  const partner = partnerUid
+    ? String(partnerUid)
+    : getPartnerUidFromConvId(convId, me);
 
+  let q = supabase.from("messages").update({ is_read: true }).eq("receiver_id", me).eq("is_read", false);
+  if (partner) {
+    q = q.eq("sender_id", partner);
+  } else {
+    q = q.eq("conversation_id", convId);
+  }
+  const { error } = await q;
   if (error) console.error("markConversationRead:", error);
 }
 
@@ -144,8 +201,7 @@ export async function uploadChatBlob(blob, { userId, convId, ext }) {
 export async function prepareMessageContent(message) {
   const content = message.content || "";
   if (content.startsWith("[img]") && content.length > 500 && content[5] !== "h") {
-    const dataUrl = content.slice(5);
-    const blob = await dataUrlToBlob(dataUrl);
+    const blob = await dataUrlToBlob(content.slice(5));
     const url = await uploadChatBlob(blob, {
       userId: message.sender_id,
       convId: message.conversation_id,
@@ -154,8 +210,7 @@ export async function prepareMessageContent(message) {
     return "[img]" + url;
   }
   if (content.startsWith("[audio]") && content.length > 500 && content[7] !== "h") {
-    const dataUrl = content.slice(7);
-    const blob = await dataUrlToBlob(dataUrl);
+    const blob = await dataUrlToBlob(content.slice(7));
     const url = await uploadChatBlob(blob, {
       userId: message.sender_id,
       convId: message.conversation_id,
@@ -172,13 +227,16 @@ async function dataUrlToBlob(dataUrl) {
 }
 
 export async function insertMessage(message) {
-  // Do not send client `id` — DB may use uuid default or bigint serial; wrong type causes errors.
+  const senderId = String(message.sender_id);
+  const receiverId = String(message.receiver_id);
+  const conversationId = getConvId(senderId, receiverId);
+
   const row = {
-    conversation_id: message.conversation_id,
-    sender_id: String(message.sender_id),
+    conversation_id: conversationId,
+    sender_id: senderId,
     sender_name: message.sender_name || null,
     sender_role: message.sender_role || null,
-    receiver_id: String(message.receiver_id),
+    receiver_id: receiverId,
     receiver_name: message.receiver_name || null,
     content: message.content,
     is_read: !!message.is_read,
@@ -192,50 +250,61 @@ export async function insertMessage(message) {
         : "";
     throw new Error((error.message || "Could not save message.") + hint);
   }
-  return data;
+  return { ...data, conversation_id: conversationId };
 }
 
-export async function sendChatMessage(_supabaseClient, message) {
+function dispatchInboxMessage(row, myUserId, onMessage) {
+  if (!row?.content) return;
+  if (row.content === "[videocall]incoming" || row.content === "[voicecall]incoming") return;
+  const me = String(myUserId);
+  if (String(row.sender_id) !== me && String(row.receiver_id) !== me) return;
+  onMessage?.({
+    ...row,
+    conversation_id: getConvId(me, getPartnerUidFromMessage(row, me)),
+  });
+}
+
+export async function sendChatMessage(supabaseClient, message) {
   const senderId = String(message.sender_id);
   const receiverId = String(message.receiver_id);
   message.conversation_id = getConvId(senderId, receiverId);
-
   message.content = await prepareMessageContent(message);
-  await insertMessage(message);
-}
 
-let inboxChannelRef = null;
+  const saved = await insertMessage(message);
+
+  try {
+    await broadcastToUser(supabaseClient, receiverId, INBOX_EVENT_MSG, saved);
+  } catch (e) {
+    console.warn("Live message notify:", e.message);
+  }
+
+  return saved;
+}
 
 export function subscribeInbox(supabaseClient, userId, { onMessage, onCallInvite }) {
   unsubscribeInbox(supabaseClient);
   const me = String(userId);
 
+  const onRow = row => dispatchInboxMessage(row, me, onMessage);
+
   messagesChannelRef = supabaseClient
-    .channel(`chat_db_${me}`)
+    .channel(`chat_db_${me}`, { config: { broadcast: { self: false } } })
     .on(
       "postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${me}` },
-      ({ new: row }) => {
-        if (!row || String(row.sender_id) === me) return;
-        onMessage?.(row);
-      }
+      { event: "INSERT", schema: "public", table: "messages" },
+      ({ new: row }) => onRow(row)
     )
     .on(
       "postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `sender_id=eq.${me}` },
-      ({ new: row }) => {
-        if (!row) return;
-        onMessage?.(row);
-      }
+      { event: "UPDATE", schema: "public", table: "messages" },
+      ({ new: row }) => onRow(row)
     )
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "messages", filter: `sender_id=eq.${me}` },
-      ({ new: row }) => {
-        if (row) onMessage?.(row);
+    .on("broadcast", { event: INBOX_EVENT_MSG }, ({ payload }) => onRow(payload))
+    .subscribe(status => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.warn("Chat realtime channel:", status);
       }
-    )
-    .subscribe();
+    });
 
   inboxChannelRef = supabaseClient
     .channel(`chat_inbox_${me}`)
@@ -243,6 +312,7 @@ export function subscribeInbox(supabaseClient, userId, { onMessage, onCallInvite
       if (!payload || String(payload.sender_id) === me) return;
       onCallInvite?.(payload);
     })
+    .on("broadcast", { event: INBOX_EVENT_MSG }, ({ payload }) => onRow(payload))
     .subscribe();
 
   return { messages: messagesChannelRef, inbox: inboxChannelRef };
@@ -341,5 +411,4 @@ export function readBlobAsDataUrl(blob) {
   });
 }
 
-/** @deprecated local-only helper — no-op for DB chat */
 export function consolidateConversations() {}

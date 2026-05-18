@@ -11,7 +11,8 @@
 import { supabase } from "./supabase.js";
 import {
   getConvId,
-  getMessages,
+  getMessagesForPartner,
+  getPartnerUidFromMessage,
   getConversationSummaries,
   getUnreadMap,
   getPreviewText,
@@ -49,6 +50,13 @@ let shopperAudioChunks   = [];
 let shopperIsRecording   = false;
 
 let shopperActiveCall = null;
+let shopperThreadIds  = new Set();
+let shopperRefreshTimer = null;
+
+function scheduleShopperRefreshList() {
+  clearTimeout(shopperRefreshTimer);
+  shopperRefreshTimer = setTimeout(() => renderShopperChatList(), 120);
+}
 
 function getShopperChatUserId() {
   return String(currentProfile?.uid || currentUser?.id || "");
@@ -703,18 +711,27 @@ function initAvatarUpload() {
 }
 
 async function handleShopperInboxMessage(msg) {
-  if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
   const myId = getShopperChatUserId();
-  const partnerUid = String(msg.sender_id) === myId ? String(msg.receiver_id) : String(msg.sender_id);
+  const partnerUid = getPartnerUidFromMessage(msg, myId);
   const canonicalId = getConvId(myId, partnerUid);
-  showToast(`💬 New message from ${msg.sender_name}`);
-  addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
-  if (activeChatPartner?.uid === partnerUid || activeChatConvId === canonicalId) {
-    activeChatConvId = canonicalId;
-    await loadShopperMessages();
-    await markShopperRead();
+
+  if (String(msg.sender_id) !== myId) {
+    showToast(`💬 New message from ${msg.sender_name || "Buyer"}`);
+    addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
   }
-  await renderShopperChatList();
+
+  if (
+    activeChatPartner &&
+    (String(activeChatPartner.uid) === partnerUid || activeChatConvId === canonicalId)
+  ) {
+    activeChatConvId = canonicalId;
+    appendShopperMessageToThread(msg);
+    if (String(msg.receiver_id) === myId && !msg.is_read) {
+      await markConversationRead(canonicalId, myId, partnerUid);
+    }
+  }
+
+  scheduleShopperRefreshList();
 }
 
 /* ─── CHAT (Supabase) ─── */
@@ -787,15 +804,18 @@ window.openShopperChat = async function (otherUid, otherName) {
   document.getElementById("msgThreadInput").style.display    = "flex";
   document.getElementById("msgThreadHav").textContent   = (otherName||"?")[0].toUpperCase();
   document.getElementById("msgThreadHname").textContent = otherName;
+  shopperThreadIds = new Set();
   await loadShopperMessages();
   await markShopperRead();
   await renderShopperChatList();
 };
 
 async function loadShopperMessages() {
-  const msgs = await getMessages(activeChatConvId);
+  if (!activeChatPartner?.uid) return;
+  const msgs = await getMessagesForPartner(getShopperChatUserId(), activeChatPartner.uid);
   const container = document.getElementById("msgThreadMessages");
   if (!container) return;
+  shopperThreadIds = new Set((msgs || []).map(m => m.id).filter(Boolean));
   if (msgs.length === 0) {
     container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin:auto;padding:30px">No messages yet</div>`;
     return;
@@ -815,6 +835,29 @@ async function loadShopperMessages() {
         <div class="msg-time">${time}${read}</div>
       </div>`;
   }).join("");
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendShopperMessageToThread(m) {
+  if (!m?.id || shopperThreadIds.has(m.id)) return;
+  if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return;
+
+  const container = document.getElementById("msgThreadMessages");
+  if (!container || container.style.display === "none") return;
+
+  shopperThreadIds.add(m.id);
+  const empty = container.querySelector("div[style*='padding:30px']");
+  if (empty) empty.remove();
+
+  const myId   = getShopperChatUserId();
+  const isMine = String(m.sender_id) === myId;
+  const time   = new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const read   = isMine ? (m.is_read ? " ✓✓" : " ✓") : "";
+  const el     = document.createElement("div");
+  el.className = `message ${isMine ? "shopper-message" : "buyer-message"}`;
+  el.dataset.msgId = m.id;
+  el.innerHTML = `<div>${renderShopperMsgContent(m.content)}</div><div class="msg-time">${time}${read}</div>`;
+  container.appendChild(el);
   container.scrollTop = container.scrollHeight;
 }
 
@@ -849,7 +892,6 @@ window.sendShopperMessage = async function () {
   const content = input?.value.trim();
   if (!content || !activeChatConvId || !activeChatPartner) return;
   input.value = "";
-  appendShopperOptimistic(content);
   const msg = buildMessage({
     conversation_id: activeChatConvId,
     sender_id:       getShopperChatUserId(),
@@ -860,9 +902,9 @@ window.sendShopperMessage = async function () {
     content,
   });
   try {
-    await sendChatMessage(supabase, msg);
-    await loadShopperMessages();
-    await renderShopperChatList();
+    const saved = await sendChatMessage(supabase, msg);
+    appendShopperMessageToThread(saved);
+    scheduleShopperRefreshList();
   } catch (e) {
     console.error("Send error:", e);
     showToast("Failed to send.", "error");
@@ -894,7 +936,7 @@ window.handleShopperImageUpload = async function (e) {
     });
     await sendChatMessage(supabase, msg);
     await loadShopperMessages();
-    await renderShopperChatList();
+    scheduleShopperRefreshList();
   } catch (err) {
     showToast(err.message || "Failed to send image.", "error");
   }
@@ -945,7 +987,7 @@ async function uploadShopperAudio(blob) {
     });
     await sendChatMessage(supabase, msg);
     await loadShopperMessages();
-    await renderShopperChatList();
+    scheduleShopperRefreshList();
   } catch (e) {
     showToast(e.message || "Failed to send voice note.", "error");
   }
@@ -1053,9 +1095,8 @@ async function handleShopperIncomingCall(msg) {
 }
 
 async function markShopperRead() {
-  if (!activeChatConvId) return;
-  await markConversationRead(activeChatConvId, getShopperChatUserId());
-  await loadShopperMessages();
+  if (!activeChatConvId || !activeChatPartner?.uid) return;
+  await markConversationRead(activeChatConvId, getShopperChatUserId(), activeChatPartner.uid);
 }
 
 window.filterShopperConversations = function (query) {
