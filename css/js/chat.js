@@ -24,6 +24,7 @@ import {
   acceptIncomingCall,
   prepareIncomingCallSignaling,
   clearIncomingCallPrep,
+  rejectIncomingCall,
 } from "./call-webrtc.js";
 
 let currentUser          = null;
@@ -414,7 +415,10 @@ window.acceptVoiceCall = async function () {
 };
 
 async function acceptCall(callType) {
-  endActiveCall();
+  if (activeCall) {
+    activeCall.end();
+    activeCall = null;
+  }
   try {
     activeCall = await acceptIncomingCall({
       supabase,
@@ -431,7 +435,7 @@ async function acceptCall(callType) {
 
 window.rejectCall = async function () {
   if (activeCall) await activeCall.rejectRemote?.();
-  clearIncomingCallPrep();
+  else await rejectIncomingCall();
   document.getElementById("incomingCallBanner")?.remove();
 };
 
@@ -450,7 +454,7 @@ async function handleIncomingCall({ sender_id, sender_name, callType }) {
   const type = callType || "video";
   const isVideo = type === "video";
 
-  if (!activePartner || activePartner.uid !== sender_id) {
+  if (!activePartner || String(activePartner.uid) !== String(sender_id)) {
     activePartner = { uid: sender_id, name: sender_name || "User", role: "user" };
     activeConversationId = getConvId(currentUser.uid, sender_id);
     setConversationPartner(activeConversationId, activePartner, currentUser.uid);

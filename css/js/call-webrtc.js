@@ -31,6 +31,7 @@ export class WebRTCCall {
     this.channel = null;
     this.channelReady = false;
     this.signalQueue = [];
+    this.iceQueue = [];
     this.overlay = null;
     this.ended = false;
   }
@@ -57,14 +58,16 @@ export class WebRTCCall {
     if (this.isCaller) {
       await this._waitChannelReady();
       this.pc.onicecandidate = e => {
-        if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate });
+        if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
       };
+      // Brief delay so callee can subscribe after the call-invite broadcast
+      await new Promise(r => setTimeout(r, 800));
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
       await this._sendSignal({ type: "offer", sdp: offer });
     } else {
       this.pc.onicecandidate = e => {
-        if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate });
+        if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
       };
       await this._drainQueue();
     }
@@ -128,15 +131,20 @@ export class WebRTCCall {
 
     if (payload.type === "offer" && !this.isCaller) {
       await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+      await this._flushIceQueue();
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
       await this._sendSignal({ type: "answer", sdp: answer });
     } else if (payload.type === "answer" && this.isCaller) {
       await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+      await this._flushIceQueue();
     } else if (payload.type === "ice" && payload.candidate) {
-      try {
-        await this.pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-      } catch {}
+      const candidate = new RTCIceCandidate(payload.candidate);
+      if (this.pc.remoteDescription) {
+        try { await this.pc.addIceCandidate(candidate); } catch {}
+      } else {
+        this.iceQueue.push(candidate);
+      }
     } else if (payload.type === "reject") {
       alert(`${this.partnerName} declined the call.`);
       this.end();
@@ -147,6 +155,13 @@ export class WebRTCCall {
     const q = [...this.signalQueue];
     this.signalQueue = [];
     for (const p of q) await this._handleSignal(p);
+  }
+
+  async _flushIceQueue() {
+    while (this.iceQueue.length && this.pc) {
+      const c = this.iceQueue.shift();
+      try { await this.pc.addIceCandidate(c); } catch {}
+    }
   }
 
   async _sendSignal(payload) {
@@ -201,6 +216,7 @@ export class WebRTCCall {
     }
     this.channelReady = false;
     this.signalQueue = [];
+    this.iceQueue = [];
     document.getElementById("bfmCallOverlay")?.remove();
     this.overlay = null;
   }
@@ -229,6 +245,14 @@ export async function prepareIncomingCallSignaling(supabase, myUserId, partnerUs
 export function clearIncomingCallPrep() {
   incomingPrep?.end();
   incomingPrep = null;
+}
+
+export async function rejectIncomingCall() {
+  if (incomingPrep) {
+    try { await incomingPrep.rejectRemote(); } catch {}
+    incomingPrep.end();
+    incomingPrep = null;
+  }
 }
 
 export async function startOutgoingCall(opts) {

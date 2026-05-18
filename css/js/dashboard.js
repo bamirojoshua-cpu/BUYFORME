@@ -29,6 +29,7 @@ import {
   acceptIncomingCall,
   prepareIncomingCallSignaling,
   clearIncomingCallPrep,
+  rejectIncomingCall,
 } from "./call-webrtc.js";
 
 /* ─── STATE ─── */
@@ -969,7 +970,7 @@ window.acceptShopperVoiceCall = async function () {
 };
 window.rejectShopperCall = async function () {
   if (shopperActiveCall) await shopperActiveCall.rejectRemote?.();
-  clearIncomingCallPrep();
+  else await rejectIncomingCall();
   document.getElementById("shopperIncomingBanner")?.remove();
 };
 window.endShopperCall = function () {
@@ -1003,7 +1004,10 @@ async function startShopperCall(callType) {
 }
 
 async function acceptShopperCall(callType) {
-  window.endShopperCall();
+  if (shopperActiveCall) {
+    shopperActiveCall.end();
+    shopperActiveCall = null;
+  }
   try {
     shopperActiveCall = await acceptIncomingCall({
       supabase,
