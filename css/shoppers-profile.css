@@ -498,6 +498,22 @@ body {
     .action-card {
         position: static;
     }
+
+    .profile-videos-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+
+    .navbar {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 56px;
+    }
 }
 
 /* ── Profile videos (buyer view) ── */

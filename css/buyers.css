@@ -594,6 +594,16 @@ body {
 }
 
 /* ── RESPONSIVE ── */
+@media (max-width: 1024px) {
+    .shopper-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .filters-bar {
+        flex-wrap: wrap;
+    }
+}
+
 @media (max-width: 768px) {
     .welcome-banner {
         flex-direction: column;
@@ -603,6 +613,8 @@ body {
 
     .navbar {
         padding: 0 16px;
+        height: auto;
+        min-height: 56px;
     }
 
     .container {
@@ -615,5 +627,25 @@ body {
 
     .settings-panel {
         width: 100%;
+        max-width: none;
+        right: 0;
+        left: 0;
+    }
+
+    .nav-right {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .shopper-card {
+        min-width: 0;
+    }
+
+    .filters-bar input,
+    .filters-bar select {
+        width: 100%;
+        min-width: 0;
     }
 }

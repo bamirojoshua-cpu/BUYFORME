@@ -10,6 +10,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="css/brand.css">
+    <link rel="stylesheet" href="css/responsive.css">
     <link rel="icon" href="images/logo.png" type="image/png">
     <style>
         *,
@@ -1160,10 +1161,6 @@
                 grid-template-columns: 1fr
             }
 
-            .sidebar {
-                display: none
-            }
-
             .stats-cards {
                 grid-template-columns: 1fr 1fr
             }
@@ -1215,6 +1212,11 @@
             <div class="sidebar-logout">
                 <button class="btn-logout" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Log Out</button>
             </div>
+        </div>
+
+        <div class="mobile-dash-bar">
+            <button type="button" class="menu-btn" data-nav-toggle=".sidebar" aria-label="Open menu">☰</button>
+            <span>Shopper Dashboard</span>
         </div>
 
         <!-- MAIN -->
@@ -1528,6 +1530,7 @@
 
     <div class="toast" id="toast"></div>
 
+    <script src="css/responsive-nav.js"></script>
     <script type="module" src="css/js/dashboard.js"></script>
 </body>
 
