@@ -172,22 +172,27 @@ async function dataUrlToBlob(dataUrl) {
 }
 
 export async function insertMessage(message) {
+  // Do not send client `id` — DB may use uuid default or bigint serial; wrong type causes errors.
   const row = {
-    id: message.id,
     conversation_id: message.conversation_id,
-    sender_id: message.sender_id,
-    sender_name: message.sender_name,
-    sender_role: message.sender_role,
-    receiver_id: message.receiver_id,
-    receiver_name: message.receiver_name,
+    sender_id: String(message.sender_id),
+    sender_name: message.sender_name || null,
+    sender_role: message.sender_role || null,
+    receiver_id: String(message.receiver_id),
+    receiver_name: message.receiver_name || null,
     content: message.content,
     is_read: !!message.is_read,
-    created_at: message.created_at,
   };
 
-  const { error } = await supabase.from("messages").insert(row);
-  if (error) throw new Error(error.message || "Could not save message.");
-  return row;
+  const { data, error } = await supabase.from("messages").insert(row).select().single();
+  if (error) {
+    const hint =
+      error.message?.includes("bigint") && error.message?.includes("-")
+        ? " Run supabase-messages-fix.sql in Supabase (messages.sender_id must be uuid, not bigint)."
+        : "";
+    throw new Error((error.message || "Could not save message.") + hint);
+  }
+  return data;
 }
 
 export async function sendChatMessage(_supabaseClient, message) {
