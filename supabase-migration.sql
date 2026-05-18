@@ -48,6 +48,7 @@ create table if not exists public.users (
   response_time text,
   phone text,
   trips jsonb,
+  profile_videos jsonb default '[]'::jsonb,
 
   -- buyer profile fields
   address text,
@@ -94,6 +95,7 @@ alter table public.users add column if not exists years_active integer;
 alter table public.users add column if not exists response_time text;
 alter table public.users add column if not exists phone text;
 alter table public.users add column if not exists trips jsonb;
+alter table public.users add column if not exists profile_videos jsonb default '[]'::jsonb;
 alter table public.users add column if not exists address text;
 alter table public.users add column if not exists city text;
 alter table public.users add column if not exists country text;
@@ -260,13 +262,16 @@ on conflict (id) do nothing;
 -- ─────────────────────────────────────────────────────────────
 -- 8) Public shopper directory view (use this in buyers/profile pages)
 -- ─────────────────────────────────────────────────────────────
-create or replace view public.public_shoppers as
+drop view if exists public.public_shoppers;
+
+create view public.public_shoppers as
 select
   uid,
   name,
   avatar_url,
   location,
   about,
+  profile_videos,
   tags,
   fee,
   rating,

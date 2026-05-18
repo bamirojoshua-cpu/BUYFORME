@@ -503,3 +503,38 @@ body {
         position: static;
     }
 }
+
+/* ── Profile videos (buyer view) ── */
+.profile-videos-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: -4px 0 16px;
+}
+
+.profile-videos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.profile-video-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.profile-video-item video {
+    width: 100%;
+    display: block;
+    aspect-ratio: 16 / 9;
+    background: #0f1c18;
+    object-fit: cover;
+}
+
+.profile-video-caption {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+}

@@ -53,6 +53,8 @@ async function renderProfile(shopper) {
   document.getElementById("statYears").textContent     = shopper.years_active   || "—";
   document.getElementById("profileAbout").textContent  = shopper.about          || `${shopper.name} hasn't added a bio yet.`;
 
+  renderProfileVideos(shopper.profile_videos);
+
   // Tags
   const tags = shopper.tags
     ? (typeof shopper.tags === "string" ? shopper.tags.split(",") : shopper.tags) : [];
@@ -116,6 +118,35 @@ window.handleMessage = function () {
 };
 
 /* ─── HELPERS ─── */
+function parseProfileVideos(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
+function renderProfileVideos(raw) {
+  const card = document.getElementById("profileVideosCard");
+  const grid = document.getElementById("profileVideos");
+  if (!card || !grid) return;
+
+  const videos = parseProfileVideos(raw).filter(v => v && v.url);
+  if (videos.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "block";
+  grid.innerHTML = videos.map(v => `
+    <div class="profile-video-item">
+      <video controls playsinline preload="metadata" src="${v.url}"></video>
+      ${v.title ? `<p class="profile-video-caption">${escapeHtml(v.title)}</p>` : ""}
+    </div>`).join("");
+}
+
+function escapeHtml(text) {
+  return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function renderStars(count) {
   let html = "";
   for (let i = 1; i <= 5; i++) {

@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadSettingsIntoForm();
   initTabs();
   initAvatarUpload();
+  initShopperVideoUpload();
   updateNotifDot();
   initRealtimeOrders();
   subscribeInbox(supabase, currentUser.id, {
@@ -417,7 +418,209 @@ function loadSettingsIntoForm() {
   if (currentProfile.avatar_url)
     document.getElementById("avatarPreview").innerHTML =
       `<img src="${currentProfile.avatar_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover">`;
+
+  renderShopperVideosManager();
 }
+
+/* ─── PROFILE VIDEOS ─── */
+const MAX_PROFILE_VIDEOS = 6;
+const MAX_VIDEO_BYTES    = 300 * 1024 * 1024; // ~4–5 min phone video
+const VIDEO_BUCKET       = "shopper-videos";
+const VIDEO_UPLOAD_MS    = 15 * 60 * 1000;  // 15 min for large uploads on slow Wi‑Fi
+const VIDEO_EXTENSIONS   = new Set(["mp4", "webm", "mov", "m4v", "avi", "mkv", "3gp"]);
+
+function mimeFromExt(ext) {
+  const map = {
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    avi: "video/x-msvideo",
+    mkv: "video/x-matroska",
+    "3gp": "video/3gpp",
+  };
+  return map[ext] || "video/mp4";
+}
+
+function isVideoFile(file, ext) {
+  if (file.type && file.type.startsWith("video/")) return true;
+  return VIDEO_EXTENSIONS.has(ext);
+}
+
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise
+      .then(v => { clearTimeout(timer); resolve(v); })
+      .catch(e => { clearTimeout(timer); reject(e); });
+  });
+}
+
+function parseProfileVideos(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
+function renderShopperVideosManager() {
+  const list = document.getElementById("shopperVideosList");
+  const btn  = document.getElementById("btnUploadVideo");
+  if (!list) return;
+
+  const videos = parseProfileVideos(currentProfile.profile_videos);
+
+  if (videos.length === 0) {
+    list.innerHTML = `<p class="shopper-videos-empty">No videos yet. Upload your first clip.</p>`;
+  } else {
+    list.innerHTML = videos.map(v => `
+      <div class="shopper-video-item" data-id="${v.id}">
+        <video src="${v.url}" muted playsinline preload="metadata"></video>
+        <div class="shopper-video-meta">
+          <span class="shopper-video-title">${escapeHtml(v.title || "Video")}</span>
+          <button type="button" class="shopper-video-delete" onclick="deleteShopperVideo('${v.id}')" title="Remove">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>`).join("");
+  }
+
+  if (btn) btn.disabled = videos.length >= MAX_PROFILE_VIDEOS;
+}
+
+function setVideoUploadStatus(text, isError = false) {
+  const el = document.getElementById("shopperVideoUploadStatus");
+  if (!el) return;
+  el.textContent = text || "";
+  el.style.color = isError ? "var(--red)" : "var(--text-muted)";
+}
+
+async function persistProfileVideos(videos) {
+  const { error } = await supabase
+    .from("users")
+    .update({ profile_videos: videos })
+    .eq("uid", currentUser.id);
+  if (error) throw error;
+  currentProfile.profile_videos = videos;
+}
+
+function resetVideoUploadUi() {
+  const btn = document.getElementById("btnUploadVideo");
+  const videos = parseProfileVideos(currentProfile.profile_videos);
+  if (btn) btn.disabled = videos.length >= MAX_PROFILE_VIDEOS;
+}
+
+function initShopperVideoUpload() {
+  const input = document.getElementById("shopperVideoInput");
+  if (!input) return;
+
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    const videos = parseProfileVideos(currentProfile.profile_videos);
+    if (videos.length >= MAX_PROFILE_VIDEOS) {
+      showToast(`Maximum ${MAX_PROFILE_VIDEOS} videos allowed.`, "error");
+      return;
+    }
+
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+    if (!isVideoFile(file, ext)) {
+      showToast("Please choose a video file (MP4, MOV, WebM, etc.).", "error");
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      showToast("Video must be under 300 MB (about 4–5 minutes).", "error");
+      return;
+    }
+
+    const defaultTitle = file.name.replace(/\.[^.]+$/, "").slice(0, 60) || "My video";
+    const title = window.prompt("Video title (shown to buyers):", defaultTitle);
+    if (title === null) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      showToast("Session expired. Please log in again.", "error");
+      return;
+    }
+
+    const id           = crypto.randomUUID();
+    const path         = `${session.user.id}/${id}.${ext}`;
+    const contentType  = (file.type && file.type.startsWith("video/")) ? file.type : mimeFromExt(ext);
+    const uploadBtn    = document.getElementById("btnUploadVideo");
+
+    setVideoUploadStatus("Uploading… 4–5 min videos may take several minutes.");
+    if (uploadBtn) uploadBtn.disabled = true;
+
+    let uploadedPath = null;
+
+    try {
+      const { error: upErr } = await withTimeout(
+        supabase.storage.from(VIDEO_BUCKET).upload(path, file, {
+          upsert: true,
+          contentType,
+          cacheControl: "3600",
+        }),
+        VIDEO_UPLOAD_MS,
+        "Upload timed out. Try MP4, a stronger Wi‑Fi connection, or a slightly shorter clip."
+      );
+
+      if (upErr) {
+        const hint = upErr.message?.includes("mime")
+          ? " In Supabase: Storage → shopper-videos → allow all video types, or use MP4."
+          : "";
+        throw new Error((upErr.message || "Storage upload failed.") + hint);
+      }
+
+      uploadedPath = path;
+      setVideoUploadStatus("Saving to your profile…");
+
+      const { data: urlData } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path);
+      const entry = {
+        id,
+        url: urlData.publicUrl,
+        path,
+        title: (title || defaultTitle).trim().slice(0, 80),
+        created_at: new Date().toISOString(),
+      };
+
+      await persistProfileVideos([...videos, entry]);
+      renderShopperVideosManager();
+      setVideoUploadStatus("");
+      showToast("Video uploaded! Buyers can see it on your profile.");
+    } catch (e) {
+      console.error("Profile video upload:", e);
+      if (uploadedPath) {
+        await supabase.storage.from(VIDEO_BUCKET).remove([uploadedPath]);
+      }
+      const msg = e?.message || "Upload failed.";
+      setVideoUploadStatus(msg, true);
+      showToast(msg, "error");
+    } finally {
+      resetVideoUploadUi();
+    }
+  });
+}
+
+window.deleteShopperVideo = async function (videoId) {
+  if (!confirm("Remove this video from your profile?")) return;
+
+  const videos = parseProfileVideos(currentProfile.profile_videos);
+  const target = videos.find(v => v.id === videoId);
+  if (!target) return;
+
+  if (target.path) {
+    await supabase.storage.from(VIDEO_BUCKET).remove([target.path]);
+  }
+
+  try {
+    await persistProfileVideos(videos.filter(v => v.id !== videoId));
+    renderShopperVideosManager();
+    showToast("Video removed.");
+  } catch (e) {
+    showToast("Could not remove video: " + e.message, "error");
+  }
+};
 
 /* Toggle which payout fields show based on method */
 window.togglePayoutFields = function(method) {
