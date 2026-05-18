@@ -89,12 +89,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initRealtimeOrders();
   subscribeInbox(supabase, getShopperChatUserId(), {
     onMessage: handleShopperInboxMessage,
-    onCallInvite: payload => handleShopperIncomingCall({
-      sender_id: payload.sender_id,
-      sender_name: payload.sender_name,
-      receiver_id: getShopperChatUserId(),
-      content: payload.callType === "video" ? "[videocall]incoming" : "[voicecall]incoming",
-    }),
+    onCallInvite: payload => handleShopperIncomingCall(payload),
   });
   await renderShopperChatList();
 
@@ -1028,10 +1023,13 @@ async function startShopperCall(callType) {
     await sendCallInvite(supabase, {
       sender_id: getShopperChatUserId(),
       sender_name: currentProfile.name,
+      sender_role: "shopper",
       receiver_id: activeChatPartner.uid,
+      receiver_name: activeChatPartner.name,
       callType,
       conversation_id: activeChatConvId,
     });
+    await new Promise(r => setTimeout(r, 400));
     shopperActiveCall = await startOutgoingCall({
       supabase,
       myUserId: getShopperChatUserId(),
@@ -1065,29 +1063,30 @@ async function acceptShopperCall(callType) {
 }
 
 
-async function handleShopperIncomingCall(msg) {
-  const isVideo = msg.content==="[videocall]incoming";
-  const isVoice = msg.content==="[voicecall]incoming";
-  if (!isVideo&&!isVoice) return;
+async function handleShopperIncomingCall(payload) {
   const myId = getShopperChatUserId();
-  if (String(msg.receiver_id) !== myId) return;
+  if (payload.receiver_id && String(payload.receiver_id) !== myId) return;
 
-  const callType = isVideo ? "video" : "voice";
+  const callType = payload.callType === "voice" ? "voice" : "video";
+  const isVideo = callType === "video";
+  const senderId = String(payload.sender_id);
 
-  if (!activeChatPartner || activeChatPartner.uid !== msg.sender_id) {
-    activeChatPartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "buyer" };
-    activeChatConvId = getConvId(myId, msg.sender_id);
+  if (!activeChatPartner || String(activeChatPartner.uid) !== senderId) {
+    activeChatPartner = { uid: senderId, name: payload.sender_name || "User", role: "buyer" };
+    activeChatConvId = getConvId(myId, senderId);
     setConversationPartner(activeChatConvId, activeChatPartner, myId);
   }
 
-  await prepareIncomingCallSignaling(supabase, myId, msg.sender_id, callType);
+  showToast(`📞 Incoming ${isVideo ? "video" : "voice"} call from ${payload.sender_name || "Buyer"}`);
+
+  await prepareIncomingCallSignaling(supabase, myId, senderId, callType);
 
   document.getElementById("shopperIncomingBanner")?.remove();
   const banner = document.createElement("div");
   banner.id = "shopperIncomingBanner";
   banner.innerHTML = `
     <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a9e6e;color:#fff;padding:16px 24px;border-radius:16px;z-index:9998;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,0.2)">
-      <span>${isVideo?"📹":"📞"} Incoming ${isVideo?"video":"voice"} call from <strong>${msg.sender_name}</strong></span>
+      <span>${isVideo?"📹":"📞"} Incoming ${isVideo?"video":"voice"} call from <strong>${payload.sender_name || "Buyer"}</strong></span>
       <button onclick="${isVideo?"acceptShopperVideoCall":"acceptShopperVoiceCall"}()" style="background:#fff;color:#1a9e6e;border:none;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer">Accept</button>
       <button onclick="rejectShopperCall()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer">Decline</button>
     </div>`;

@@ -39,10 +39,19 @@ export function buildMessage(fields) {
   };
 }
 
+export function isCallSignalContent(content) {
+  return /^\[(video|voice)call\](ring|incoming)$/.test(content || "");
+}
+
+export function callTypeFromContent(content) {
+  return String(content || "").includes("video") ? "video" : "voice";
+}
+
 export function getPreviewText(content) {
   if (!content) return "";
   if (content.startsWith("[img]"))       return "📷 Photo";
   if (content.startsWith("[audio]"))     return "🎤 Voice note";
+  if (isCallSignalContent(content))      return content.includes("video") ? "📹 Incoming video call" : "📞 Incoming voice call";
   if (content.startsWith("[videocall]")) return "📹 Video call";
   if (content.startsWith("[voicecall]")) return "📞 Voice call";
   return content.length > 36 ? content.substring(0, 36) + "..." : content;
@@ -88,10 +97,12 @@ export async function getMessagesForPartner(myUserId, partnerUid) {
     return [];
   }
 
-  return (data || []).map(m => ({
-    ...m,
-    conversation_id: canonicalId,
-  }));
+  return (data || [])
+    .filter(m => !isCallSignalContent(m.content))
+    .map(m => ({
+      ...m,
+      conversation_id: canonicalId,
+    }));
 }
 
 /** @param convId canonical id OR pass partner via getPartnerUidFromConvId */
@@ -128,6 +139,7 @@ export async function getConversationSummaries(myUserId) {
 
   const byPartner = new Map();
   for (const m of data || []) {
+    if (isCallSignalContent(m.content)) continue;
     const partner = partnerFromRow(m, me);
     if (!partner.uid || partner.uid === me) continue;
 
@@ -162,6 +174,7 @@ export async function getUnreadMap(myUserId) {
 
   const map = {};
   for (const m of data || []) {
+    if (isCallSignalContent(m.content)) continue;
     const partnerUid = String(m.sender_id);
     const canonicalId = getConvId(me, partnerUid);
     map[canonicalId] = (map[canonicalId] || 0) + 1;
@@ -253,11 +266,23 @@ export async function insertMessage(message) {
   return { ...data, conversation_id: conversationId };
 }
 
-function dispatchInboxMessage(row, myUserId, onMessage) {
-  if (!row?.content) return;
-  if (row.content === "[videocall]incoming" || row.content === "[voicecall]incoming") return;
+function dispatchInboxRow(row, myUserId, { onMessage, onCallInvite }) {
+  if (!row) return;
   const me = String(myUserId);
   if (String(row.sender_id) !== me && String(row.receiver_id) !== me) return;
+
+  if (isCallSignalContent(row.content)) {
+    if (String(row.sender_id) === me) return;
+    onCallInvite?.({
+      sender_id: row.sender_id,
+      sender_name: row.sender_name,
+      receiver_id: row.receiver_id,
+      callType: callTypeFromContent(row.content),
+    });
+    return;
+  }
+
+  if (!row.content) return;
   onMessage?.({
     ...row,
     conversation_id: getConvId(me, getPartnerUidFromMessage(row, me)),
@@ -285,7 +310,8 @@ export function subscribeInbox(supabaseClient, userId, { onMessage, onCallInvite
   unsubscribeInbox(supabaseClient);
   const me = String(userId);
 
-  const onRow = row => dispatchInboxMessage(row, me, onMessage);
+  const handlers = { onMessage, onCallInvite };
+  const onRow = row => dispatchInboxRow(row, me, handlers);
 
   messagesChannelRef = supabaseClient
     .channel(`chat_db_${me}`, { config: { broadcast: { self: false } } })
@@ -329,13 +355,20 @@ export function unsubscribeInbox(supabaseClient) {
   }
 }
 
+/** Broadcast on the same channel the receiver listens to: chat_inbox_{userId} */
 export async function broadcastToUser(supabaseClient, receiverId, event, payload) {
-  const ch = supabaseClient.channel(`chat_inbox_${receiverId}_tx_${Date.now()}`);
+  const targetId = String(receiverId);
+  const channelName = `chat_inbox_${targetId}`;
+
+  const ch = supabaseClient.channel(channelName, {
+    config: { broadcast: { ack: false } },
+  });
+
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       supabaseClient.removeChannel(ch);
-      reject(new Error("Could not reach the other user right now."));
-    }, 8000);
+      reject(new Error("Could not reach the other user — are they online with chat open?"));
+    }, 10000);
 
     ch.subscribe(status => {
       if (status === "SUBSCRIBED") {
@@ -345,7 +378,7 @@ export async function broadcastToUser(supabaseClient, receiverId, event, payload
             setTimeout(() => {
               supabaseClient.removeChannel(ch);
               resolve();
-            }, 80);
+            }, 150);
           })
           .catch(err => {
             clearTimeout(timeout);
@@ -355,18 +388,58 @@ export async function broadcastToUser(supabaseClient, receiverId, event, payload
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         clearTimeout(timeout);
         supabaseClient.removeChannel(ch);
-        reject(new Error("Could not reach the other user right now."));
+        reject(new Error("Realtime connection failed. Check Supabase Realtime is enabled."));
       }
     });
   });
 }
 
 export async function sendCallInvite(supabaseClient, payload) {
+  const senderId = String(payload.sender_id);
+  const receiverId = String(payload.receiver_id);
+  const callType = payload.callType === "voice" ? "voice" : "video";
+  const ringContent = callType === "video" ? "[videocall]ring" : "[voicecall]ring";
+
+  const invite = {
+    sender_id: senderId,
+    sender_name: payload.sender_name || "User",
+    receiver_id: receiverId,
+    receiver_name: payload.receiver_name || null,
+    callType,
+    conversation_id: getConvId(senderId, receiverId),
+  };
+
+  let broadcastOk = false;
+  let dbOk = false;
+
   try {
-    await broadcastToUser(supabaseClient, payload.receiver_id, INBOX_EVENT_CALL, payload);
+    await broadcastToUser(supabaseClient, receiverId, INBOX_EVENT_CALL, invite);
+    broadcastOk = true;
   } catch (e) {
-    console.warn("Call invite delivery:", e.message);
+    console.warn("Call invite broadcast:", e.message);
   }
+
+  try {
+    const { error } = await supabaseClient.from("messages").insert({
+      conversation_id: invite.conversation_id,
+      sender_id: senderId,
+      sender_name: invite.sender_name,
+      sender_role: payload.sender_role || null,
+      receiver_id: receiverId,
+      receiver_name: invite.receiver_name,
+      content: ringContent,
+      is_read: false,
+    });
+    if (!error) dbOk = true;
+  } catch (e) {
+    console.warn("Call invite db ping:", e);
+  }
+
+  if (!broadcastOk && !dbOk) {
+    throw new Error("Could not notify the other user. They may be offline or Realtime is disabled.");
+  }
+
+  return invite;
 }
 
 export function readFileAsDataUrl(file) {

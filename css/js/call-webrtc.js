@@ -60,11 +60,12 @@ export class WebRTCCall {
       this.pc.onicecandidate = e => {
         if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
       };
-      // Brief delay so callee can subscribe after the call-invite broadcast
-      await new Promise(r => setTimeout(r, 800));
+      // Let callee receive invite and join signaling channel
+      await new Promise(r => setTimeout(r, 1500));
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
       await this._sendSignal({ type: "offer", sdp: offer });
+      this._startRingingTimeout();
     } else {
       this.pc.onicecandidate = e => {
         if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
@@ -138,6 +139,9 @@ export class WebRTCCall {
     } else if (payload.type === "answer" && this.isCaller) {
       await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
       await this._flushIceQueue();
+      clearTimeout(this._ringTimer);
+      const status = document.getElementById("bfmCallStatus");
+      if (status) status.textContent = "Connected";
     } else if (payload.type === "ice" && payload.candidate) {
       const candidate = new RTCIceCandidate(payload.candidate);
       if (this.pc.remoteDescription) {
@@ -165,12 +169,26 @@ export class WebRTCCall {
   }
 
   async _sendSignal(payload) {
-    if (!this.channel || !this.channelReady) return;
+    if (!this.channel || !this.channelReady) {
+      console.warn("Call signal skipped — channel not ready", payload?.type);
+      return;
+    }
     await this.channel.send({
       type: "broadcast",
       event: "signal",
       payload: { ...payload, from: this.myUserId },
     });
+  }
+
+  _startRingingTimeout() {
+    clearTimeout(this._ringTimer);
+    this._ringTimer = setTimeout(() => {
+      if (this.ended || !this.isCaller) return;
+      const status = document.getElementById("bfmCallStatus");
+      if (status && this.pc && !this.pc.currentRemoteDescription) {
+        status.textContent = "No answer — ask them to open chat and accept the call";
+      }
+    }, 25000);
   }
 
   async rejectRemote() {
@@ -206,6 +224,7 @@ export class WebRTCCall {
   end() {
     if (this.ended) return;
     this.ended = true;
+    clearTimeout(this._ringTimer);
     this.pc?.close();
     this.pc = null;
     this.localStream?.getTracks().forEach(t => t.stop());

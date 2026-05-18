@@ -33,6 +33,7 @@ let activeConversationId = null;
 let activePartner        = null;
 let allConversations     = [];
 let activeCall           = null;
+let pendingIncomingCallType = "video";
 
 let mediaRecorder = null;
 let audioChunks   = [];
@@ -61,6 +62,10 @@ async function init() {
     onMessage: handleInboxMessage,
     onCallInvite: handleInboxCallInvite,
   });
+
+  if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
 
   await loadConversations();
 
@@ -429,10 +434,13 @@ async function startCall(callType) {
     await sendCallInvite(supabase, {
       sender_id:   currentUser.uid,
       sender_name: currentUser.name,
+      sender_role: currentUser.role,
       receiver_id: activePartner.uid,
+      receiver_name: activePartner.name,
       callType,
       conversation_id: activeConversationId,
     });
+    await new Promise(r => setTimeout(r, 400));
     activeCall = await startOutgoingCall({
       supabase,
       myUserId: currentUser.uid,
@@ -494,7 +502,16 @@ function endActiveCall() {
 
 async function handleIncomingCall({ sender_id, sender_name, callType }) {
   const type = callType || "video";
+  pendingIncomingCallType = type;
   const isVideo = type === "video";
+
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try {
+      new Notification(`Incoming ${isVideo ? "video" : "voice"} call`, {
+        body: `${sender_name || "Someone"} is calling you`,
+      });
+    } catch {}
+  }
 
   if (!activePartner || String(activePartner.uid) !== String(sender_id)) {
     activePartner = { uid: sender_id, name: sender_name || "User", role: "user" };
