@@ -9,6 +9,8 @@
         href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="css/brand.css">
+    <link rel="icon" href="images/logo.png" type="image/png">
     <style>
         *,
         *::before,
@@ -156,6 +158,13 @@
             border-radius: 10px;
             min-width: 18px;
             text-align: center
+        }
+
+        .sidebar-brand {
+            padding: 16px 12px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 8px;
         }
 
         .sidebar-logout {
@@ -1184,6 +1193,9 @@
 
         <!-- SIDEBAR -->
         <div class="sidebar">
+            <div class="sidebar-brand">
+                <a href="index.html" class="brand-link"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
+            </div>
             <div class="sidebar-profile">
                 <div class="avatar-large" id="sidebarAvatar">A</div>
                 <h3 id="sidebarName">Shopper</h3>

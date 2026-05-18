@@ -47,12 +47,8 @@ body {
     z-index: 100;
 }
 
-.logo {
-    font-family: 'Sora', sans-serif;
-    font-weight: 700;
-    font-size: 1.2rem;
-    color: var(--green);
-    letter-spacing: -0.5px;
+.logo,
+.brand-link.logo {
     text-decoration: none;
 }
 
