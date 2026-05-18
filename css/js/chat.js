@@ -1,10 +1,6 @@
 /* =============================================================
    BuyForMe — chat.js
-   ✅ Real-time fix (optimistic send)
-   ✅ Image sharing
-   ✅ Voice notes
-   ✅ Video calling (WebRTC)
-   ✅ Voice calling (WebRTC, audio only)
+   Messages stored in Supabase; voice/video via WebRTC
    ============================================================= */
 
 import { supabase } from "./supabase.js";
@@ -19,32 +15,27 @@ import {
   sendCallInvite,
   markConversationRead,
   setConversationPartner,
-  compressImageFile,
-  readBlobAsDataUrl,
+  compressImageToBlob,
+  uploadChatBlob,
   subscribeInbox,
 } from "./chat-local.js";
+import {
+  startOutgoingCall,
+  acceptIncomingCall,
+  prepareIncomingCallSignaling,
+  clearIncomingCallPrep,
+} from "./call-webrtc.js";
 
 let currentUser          = null;
 let activeConversationId = null;
 let activePartner        = null;
 let allConversations     = [];
+let activeCall           = null;
 
-/* ── Voice note state ── */
-let mediaRecorder    = null;
-let audioChunks      = [];
-let isRecording      = false;
+let mediaRecorder = null;
+let audioChunks   = [];
+let isRecording   = false;
 
-/* ── WebRTC state (shared for both voice & video calls) ── */
-let peerConnection   = null;
-let localStream      = null;
-let signalingChannel = null;
-let activeCallType   = null; // "video" or "voice"
-
-const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-
-/* ─────────────────────────────────────────────
-   INIT
-───────────────────────────────────────────── */
 async function init() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) { window.location.href = "auth.html"; return; }
@@ -68,16 +59,19 @@ async function init() {
   if (withUid) await openConversation(withUid);
 }
 
-function handleInboxMessage(msg) {
+async function handleInboxMessage(msg) {
   if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
-  const partnerUid = String(msg.sender_id);
+  const partnerUid = String(msg.sender_id) === String(currentUser.uid)
+    ? String(msg.receiver_id)
+    : String(msg.sender_id);
   const canonicalId = getConvId(currentUser.uid, partnerUid);
+
   if (activePartner?.uid === partnerUid || activeConversationId === canonicalId) {
     activeConversationId = canonicalId;
-    renderMessages(getMessages(activeConversationId, currentUser.uid));
-    markConversationRead(activeConversationId, currentUser.uid);
+    await loadMessages();
+    await markConversationRead(activeConversationId, currentUser.uid);
   }
-  loadConversations();
+  await loadConversations();
 }
 
 function handleInboxCallInvite(payload) {
@@ -85,25 +79,23 @@ function handleInboxCallInvite(payload) {
     sender_id: payload.sender_id,
     sender_name: payload.sender_name,
     receiver_id: currentUser.uid,
-    content: payload.callType === "video" ? "[videocall]incoming" : "[voicecall]incoming",
+    callType: payload.callType || "video",
   });
 }
 
-/* ─────────────────────────────────────────────
-   LOAD CONVERSATIONS
-───────────────────────────────────────────── */
 async function loadConversations() {
   const list = document.getElementById("convList");
   if (!list) return;
 
-  allConversations = getConversationSummaries(currentUser.uid);
+  allConversations = await getConversationSummaries(currentUser.uid);
 
   if (allConversations.length === 0) {
-    list.innerHTML = `<div class="conv-empty">No conversations yet.<br><br>Go to a shopper's profile and click <strong>Send Message</strong> to start chatting.<br><small style="opacity:0.8">Chats are saved on this device only.</small></div>`;
+    list.innerHTML = `<div class="conv-empty">No conversations yet.<br><br>Go to a shopper's profile and click <strong>Send Message</strong> to start chatting.</div>`;
     return;
   }
 
-  renderConvList(allConversations, getUnreadMap(currentUser.uid));
+  const unreadMap = await getUnreadMap(currentUser.uid);
+  renderConvList(allConversations, unreadMap);
 }
 
 function renderConvList(conversations, unreadMap = {}) {
@@ -116,7 +108,7 @@ function renderConvList(conversations, unreadMap = {}) {
   }
 
   list.innerHTML = conversations.map(m => {
-    const isMine    = m.sender_id === currentUser.uid;
+    const isMine    = String(m.sender_id) === String(currentUser.uid);
     const partner   = m._partner;
     const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
     const otherId   = partner?.uid  || (isMine ? m.receiver_id   : m.sender_id);
@@ -143,13 +135,10 @@ function renderConvList(conversations, unreadMap = {}) {
   }).join("");
 }
 
-/* ─────────────────────────────────────────────
-   OPEN A CONVERSATION
-───────────────────────────────────────────── */
 async function resolvePartner(otherUid) {
   const known = allConversations.find(m => {
     const pid = m._partner?.uid || (m.sender_id === currentUser.uid ? m.receiver_id : m.sender_id);
-    return pid === otherUid;
+    return String(pid) === String(otherUid);
   });
   if (known?._partner?.name) return known._partner;
 
@@ -161,6 +150,9 @@ async function resolvePartner(otherUid) {
   const { data } = await supabase
     .from("public_shoppers").select("uid, name").eq("uid", otherUid).maybeSingle();
   if (data?.name) return { uid: otherUid, name: data.name, role: "shopper" };
+
+  const { data: user } = await supabase.from("users").select("uid, name, role").eq("uid", otherUid).maybeSingle();
+  if (user) return { uid: otherUid, name: user.name, role: user.role };
 
   return { uid: otherUid, name: "User", role: "shopper" };
 }
@@ -182,16 +174,14 @@ window.openConversation = async function (otherUid) {
   const sidebar = document.getElementById("convSidebar");
   if (window.innerWidth <= 640 && sidebar) sidebar.classList.add("hidden");
 
-  loadMessages();
-  markAsRead();
+  await loadMessages();
+  await markAsRead();
   await loadConversations();
 };
 
-/* ─────────────────────────────────────────────
-   LOAD & RENDER MESSAGES
-───────────────────────────────────────────── */
-function loadMessages() {
-  renderMessages(getMessages(activeConversationId, currentUser.uid));
+async function loadMessages() {
+  const msgs = await getMessages(activeConversationId);
+  renderMessages(msgs);
 }
 
 function renderMessages(msgs) {
@@ -207,10 +197,10 @@ function renderMessages(msgs) {
   container.innerHTML = msgs.map(m => {
     if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return "";
 
-    const isMine    = m.sender_id === currentUser.uid;
-    const time      = formatTime(m.created_at);
-    const read      = isMine ? (m.is_read ? " ✓✓" : " ✓") : "";
-    const msgDate   = new Date(m.created_at).toLocaleDateString();
+    const isMine  = String(m.sender_id) === String(currentUser.uid);
+    const time    = formatTime(m.created_at);
+    const read    = isMine ? (m.is_read ? " ✓✓" : " ✓") : "";
+    const msgDate = new Date(m.created_at).toLocaleDateString();
     let dateDivider = "";
     if (msgDate !== lastDate) { lastDate = msgDate; dateDivider = `<div class="msg-date-divider">${msgDate}</div>`; }
 
@@ -232,18 +222,15 @@ function renderMessageContent(content) {
   if (!content) return "";
   if (content.startsWith("[img]")) {
     const url = content.slice(5);
-    return `<img src="${url}" style="max-width:220px;max-height:220px;border-radius:10px;cursor:pointer;display:block" onclick="window.open('${url}','_blank')" loading="lazy">`;
+    return `<img src="${escapeHtml(url)}" style="max-width:220px;max-height:220px;border-radius:10px;cursor:pointer;display:block" onclick="window.open('${escapeHtml(url)}','_blank')" loading="lazy">`;
   }
   if (content.startsWith("[audio]")) {
     const url = content.slice(7);
-    return `<audio controls style="max-width:200px;height:36px"><source src="${url}"></audio>`;
+    return `<audio controls style="max-width:200px;height:36px"><source src="${escapeHtml(url)}"></audio>`;
   }
   return escapeHtml(content);
 }
 
-/* ─────────────────────────────────────────────
-   OPTIMISTIC SEND
-───────────────────────────────────────────── */
 function appendOptimisticMessage(content) {
   const container = document.getElementById("chatMessages");
   if (!container) return;
@@ -263,9 +250,6 @@ function appendOptimisticMessage(content) {
   container.scrollTop = container.scrollHeight;
 }
 
-/* ─────────────────────────────────────────────
-   SEND TEXT
-───────────────────────────────────────────── */
 window.sendMessage = async function () {
   const input   = document.getElementById("messageInput");
   const content = input?.value.trim();
@@ -286,15 +270,13 @@ window.sendMessage = async function () {
 
   try {
     await sendChatMessage(supabase, msg);
+    await loadMessages();
     await loadConversations();
   } catch (e) {
-    console.error("Send error:", e);
+    alert(e.message || "Failed to send message.");
   }
 };
 
-/* ─────────────────────────────────────────────
-   IMAGE UPLOAD
-───────────────────────────────────────────── */
 window.triggerImageUpload = function () {
   document.getElementById("imageFileInput")?.click();
 };
@@ -304,38 +286,35 @@ window.handleImageUpload = async function (e) {
   if (!file || !activeConversationId || !activePartner) return;
   e.target.value = "";
 
-  let dataUrl;
   try {
-    dataUrl = await compressImageFile(file);
-  } catch (e) {
-    alert(e.message || "Could not process image.");
-    return;
-  }
+    const blob = await compressImageToBlob(file);
+    const previewUrl = URL.createObjectURL(blob);
+    appendOptimisticMessage("[img]" + previewUrl);
 
-  const content = "[img]" + dataUrl;
-  appendOptimisticMessage(content);
+    const url = await uploadChatBlob(blob, {
+      userId: currentUser.uid,
+      convId: activeConversationId,
+      ext: "jpg",
+    });
 
-  const msg = buildMessage({
-    conversation_id: activeConversationId,
-    sender_id:       currentUser.uid,
-    sender_name:     currentUser.name,
-    sender_role:     currentUser.role,
-    receiver_id:     activePartner.uid,
-    receiver_name:   activePartner.name,
-    content,
-  });
+    const msg = buildMessage({
+      conversation_id: activeConversationId,
+      sender_id:       currentUser.uid,
+      sender_name:     currentUser.name,
+      sender_role:     currentUser.role,
+      receiver_id:     activePartner.uid,
+      receiver_name:   activePartner.name,
+      content: "[img]" + url,
+    });
 
-  try {
     await sendChatMessage(supabase, msg);
+    await loadMessages();
     await loadConversations();
-  } catch (e) {
-    alert(e.message || "Failed to send image.");
+  } catch (err) {
+    alert(err.message || "Failed to send image.");
   }
 };
 
-/* ─────────────────────────────────────────────
-   VOICE NOTE
-───────────────────────────────────────────── */
 window.toggleVoiceRecord = async function () {
   if (isRecording) {
     mediaRecorder?.stop();
@@ -347,7 +326,7 @@ window.toggleVoiceRecord = async function () {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks  = [];
       mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.ondataavailable = ev => audioChunks.push(ev.data);
       mediaRecorder.onstop = async () => {
         const blob = new Blob(audioChunks, { type: "audio/webm" });
         stream.getTracks().forEach(t => t.stop());
@@ -357,7 +336,7 @@ window.toggleVoiceRecord = async function () {
       isRecording = true;
       const btn = document.getElementById("voiceBtn");
       if (btn) { btn.style.background = "#e74c3c"; btn.style.color = "#fff"; btn.title = "Click to stop recording"; }
-    } catch (err) {
+    } catch {
       alert("Microphone access denied.");
     }
   }
@@ -366,230 +345,142 @@ window.toggleVoiceRecord = async function () {
 async function uploadAndSendAudio(blob) {
   if (!activeConversationId || !activePartner) return;
 
-  let dataUrl;
-  try {
-    dataUrl = await readBlobAsDataUrl(blob);
-  } catch {
-    alert("Could not save voice note.");
-    return;
-  }
-
-  const content = "[audio]" + dataUrl;
-  appendOptimisticMessage(content);
-
-  const msg = buildMessage({
-    conversation_id: activeConversationId,
-    sender_id:       currentUser.uid,
-    sender_name:     currentUser.name,
-    sender_role:     currentUser.role,
-    receiver_id:     activePartner.uid,
-    receiver_name:   activePartner.name,
-    content,
-  });
+  appendOptimisticMessage("[audio]…");
 
   try {
+    const url = await uploadChatBlob(blob, {
+      userId: currentUser.uid,
+      convId: activeConversationId,
+      ext: "webm",
+    });
+    const msg = buildMessage({
+      conversation_id: activeConversationId,
+      sender_id:       currentUser.uid,
+      sender_name:     currentUser.name,
+      sender_role:     currentUser.role,
+      receiver_id:     activePartner.uid,
+      receiver_name:   activePartner.name,
+      content: "[audio]" + url,
+    });
     await sendChatMessage(supabase, msg);
+    await loadMessages();
     await loadConversations();
   } catch (e) {
     alert(e.message || "Failed to send voice note.");
   }
 }
 
-/* ─────────────────────────────────────────────
-   SHARED CALL LOGIC (video + voice)
-───────────────────────────────────────────── */
 window.startVideoCall = async function () {
   if (!activePartner) return;
-  await openCallUI("video", true);
+  await startCall("video");
 };
 
 window.startVoiceCall = async function () {
   if (!activePartner) return;
-  await openCallUI("voice", true);
+  await startCall("voice");
 };
+
+async function startCall(callType) {
+  endActiveCall();
+  try {
+    await sendCallInvite(supabase, {
+      sender_id:   currentUser.uid,
+      sender_name: currentUser.name,
+      receiver_id: activePartner.uid,
+      callType,
+      conversation_id: activeConversationId,
+    });
+    activeCall = await startOutgoingCall({
+      supabase,
+      myUserId: currentUser.uid,
+      partnerUserId: activePartner.uid,
+      partnerName: activePartner.name,
+      callType,
+    });
+  } catch (e) {
+    alert(e.message || "Could not start call.");
+    endActiveCall();
+  }
+}
 
 window.acceptVideoCall = async function () {
   document.getElementById("incomingCallBanner")?.remove();
-  await openCallUI("video", false);
+  await acceptCall("video");
 };
 
 window.acceptVoiceCall = async function () {
   document.getElementById("incomingCallBanner")?.remove();
-  await openCallUI("voice", false);
+  await acceptCall("voice");
 };
 
-window.rejectCall = function () {
-  sendSignal({ type: "reject" });
+async function acceptCall(callType) {
+  endActiveCall();
+  try {
+    activeCall = await acceptIncomingCall({
+      supabase,
+      myUserId: currentUser.uid,
+      partnerUserId: activePartner.uid,
+      partnerName: activePartner.name,
+      callType,
+    });
+  } catch (e) {
+    alert(e.message || "Could not connect call.");
+    endActiveCall();
+  }
+}
+
+window.rejectCall = async function () {
+  if (activeCall) await activeCall.rejectRemote?.();
+  clearIncomingCallPrep();
   document.getElementById("incomingCallBanner")?.remove();
 };
 
 window.endCall = function () {
-  peerConnection?.close(); peerConnection = null;
-  localStream?.getTracks().forEach(t => t.stop()); localStream = null;
-  if (signalingChannel) { supabase.removeChannel(signalingChannel); signalingChannel = null; }
-  document.getElementById("callOverlay")?.remove();
-  activeCallType = null;
+  endActiveCall();
 };
 
-async function openCallUI(type, isCaller) {
-  activeCallType = type;
-  const isVideo  = type === "video";
-
-  const overlay = document.createElement("div");
-  overlay.id = "callOverlay";
-  overlay.innerHTML = `
-    <div style="position:fixed;inset:0;background:#111;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
-      <p style="color:#fff;font-family:'Sora',sans-serif;font-size:1.1rem">${isVideo ? "📹" : "📞"} ${isVideo ? "Video" : "Voice"} Call — ${activePartner.name}</p>
-      ${isVideo ? `
-      <div style="display:flex;gap:16px">
-        <video id="localVideo"  autoplay muted playsinline style="width:200px;border-radius:12px;background:#222"></video>
-        <video id="remoteVideo" autoplay       playsinline style="width:320px;border-radius:12px;background:#222"></video>
-      </div>` : `
-      <div style="width:100px;height:100px;border-radius:50%;background:#1a9e6e;display:flex;align-items:center;justify-content:center;font-size:2.5rem">
-        ${(activePartner.name || "?")[0].toUpperCase()}
-      </div>
-      <p style="color:#aaa;font-size:0.9rem" id="callStatus">${isCaller ? "Calling…" : "Connected"}</p>
-      <audio id="remoteAudio" autoplay></audio>`}
-      <button onclick="endCall()" style="padding:12px 32px;background:#e74c3c;color:#fff;border:none;border-radius:24px;font-size:0.95rem;cursor:pointer;margin-top:8px">
-        ${isVideo ? "End Call" : "🔴 End Call"}
-      </button>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia(
-      isVideo ? { video: true, audio: true } : { audio: true }
-    );
-    if (isVideo) document.getElementById("localVideo").srcObject = localStream;
-  } catch (err) {
-    alert(`${isVideo ? "Camera/" : ""}Microphone access denied.`);
-    window.endCall(); return;
-  }
-
-  peerConnection = new RTCPeerConnection(ICE_SERVERS);
-  localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
-
-  peerConnection.ontrack = e => {
-    if (isVideo) {
-      const v = document.getElementById("remoteVideo");
-      if (v) v.srcObject = e.streams[0];
-    } else {
-      const a = document.getElementById("remoteAudio");
-      if (a) a.srcObject = e.streams[0];
-      const status = document.getElementById("callStatus");
-      if (status) status.textContent = "Connected";
-    }
-  };
-
-  const sigKey = `vc_${activeConversationId}_${type}`;
-  if (signalingChannel) supabase.removeChannel(signalingChannel);
-
-  signalingChannel = supabase.channel(sigKey)
-    .on("broadcast", { event: "signal" }, async ({ payload }) => {
-      if (payload.from === currentUser.uid) return;
-
-      if (payload.type === "offer" && !isCaller) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        sendSignal({ type: "answer", sdp: answer });
-      } else if (payload.type === "answer" && isCaller) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-      } else if (payload.type === "ice") {
-        try { await peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate)); } catch {}
-      } else if (payload.type === "reject") {
-        alert(`${activePartner.name} rejected the call.`);
-        window.endCall();
-      }
-    })
-    .subscribe(async (status) => {
-      if (status === "SUBSCRIBED" && isCaller) {
-        peerConnection.onicecandidate = e => {
-          if (e.candidate) sendSignal({ type: "ice", candidate: e.candidate });
-        };
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        sendSignal({ type: "offer", sdp: offer });
-
-        await sendCallInvite(supabase, {
-          sender_id:   currentUser.uid,
-          sender_name: currentUser.name,
-          receiver_id: activePartner.uid,
-          callType:    type,
-          conversation_id: activeConversationId,
-        });
-      }
-    });
-
-  if (!isCaller) {
-    peerConnection.onicecandidate = e => {
-      if (e.candidate) sendSignal({ type: "ice", candidate: e.candidate });
-    };
-  }
+function endActiveCall() {
+  activeCall?.end();
+  activeCall = null;
+  clearIncomingCallPrep();
+  document.getElementById("incomingCallBanner")?.remove();
 }
 
-function sendSignal(payload) {
-  signalingChannel?.send({
-    type: "broadcast",
-    event: "signal",
-    payload: { ...payload, from: currentUser.uid }
-  });
-}
+async function handleIncomingCall({ sender_id, sender_name, callType }) {
+  const type = callType || "video";
+  const isVideo = type === "video";
 
-function handleIncomingCall(msg) {
-  const isVideo = msg.content === "[videocall]incoming";
-  const isVoice = msg.content === "[voicecall]incoming";
-  if (!isVideo && !isVoice) return;
-  if (msg.receiver_id !== currentUser.uid) return;
-
-  if (!activePartner || activePartner.uid !== msg.sender_id) {
-    activePartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "user" };
-    activeConversationId = getConvId(currentUser.uid, msg.sender_id);
+  if (!activePartner || activePartner.uid !== sender_id) {
+    activePartner = { uid: sender_id, name: sender_name || "User", role: "user" };
+    activeConversationId = getConvId(currentUser.uid, sender_id);
     setConversationPartner(activeConversationId, activePartner, currentUser.uid);
   }
 
-  const type = isVideo ? "video" : "voice";
-
-  // Subscribe to signaling channel ready for when user accepts
-  const sigKey = `vc_${getConvId(currentUser.uid, msg.sender_id)}_${type}`;
-  if (!signalingChannel) {
-    signalingChannel = supabase.channel(sigKey)
-      .on("broadcast", { event: "signal" }, ({ payload }) => {
-        if (payload.from === currentUser.uid) return;
-        if (payload.type === "offer") signalingChannel._pendingOffer = payload;
-      }).subscribe();
-  }
+  await prepareIncomingCallSignaling(supabase, currentUser.uid, sender_id, type);
 
   document.getElementById("incomingCallBanner")?.remove();
-
   const banner = document.createElement("div");
   banner.id = "incomingCallBanner";
   banner.innerHTML = `
-    <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a9e6e;color:#fff;padding:16px 24px;border-radius:16px;z-index:9998;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,0.2)">
-      <span>${isVideo ? "📹" : "📞"} Incoming ${isVideo ? "video" : "voice"} call from <strong>${msg.sender_name}</strong></span>
-      <button onclick="${isVideo ? "acceptVideoCall" : "acceptVoiceCall"}()" style="background:#fff;color:#1a9e6e;border:none;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer">Accept</button>
-      <button onclick="rejectCall()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer">Decline</button>
+    <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a9e6e;color:#fff;padding:16px 24px;border-radius:16px;z-index:9998;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-width:95vw;flex-wrap:wrap">
+      <span>${isVideo ? "📹" : "📞"} Incoming ${isVideo ? "video" : "voice"} call from <strong>${escapeHtml(sender_name)}</strong></span>
+      <button type="button" onclick="${isVideo ? "acceptVideoCall" : "acceptVoiceCall"}()" style="background:#fff;color:#1a9e6e;border:none;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer">Accept</button>
+      <button type="button" onclick="rejectCall()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer">Decline</button>
     </div>`;
   document.body.appendChild(banner);
 }
 
-/* ─────────────────────────────────────────────
-   MARK AS READ
-───────────────────────────────────────────── */
-function markAsRead() {
+async function markAsRead() {
   if (!activeConversationId) return;
-  markConversationRead(activeConversationId, currentUser.uid);
-  loadMessages();
+  await markConversationRead(activeConversationId, currentUser.uid);
+  await loadMessages();
 }
 
-/* ─────────────────────────────────────────────
-   SEARCH
-───────────────────────────────────────────── */
 function filterConversations(query) {
   if (!query) { renderConvList(allConversations); return; }
   const q = query.toLowerCase();
   const filtered = allConversations.filter(m => {
-    const isMine    = m.sender_id === currentUser.uid;
+    const isMine    = String(m.sender_id) === String(currentUser.uid);
     const partner   = m._partner;
     const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
     return (otherName || "").toLowerCase().includes(q) || (m.content || "").toLowerCase().includes(q);
@@ -597,16 +488,10 @@ function filterConversations(query) {
   renderConvList(filtered);
 }
 
-/* ─────────────────────────────────────────────
-   MOBILE
-───────────────────────────────────────────── */
 window.showConvList = function () {
   document.getElementById("convSidebar")?.classList.remove("hidden");
 };
 
-/* ─────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────── */
 function formatTime(ts) {
   const d = new Date(ts), now = new Date();
   return d.toDateString() === now.toDateString()
@@ -618,9 +503,6 @@ function escapeHtml(text) {
   return (text || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-/* ─────────────────────────────────────────────
-   DOM READY
-───────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
   init();
 

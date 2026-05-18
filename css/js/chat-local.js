@@ -1,92 +1,18 @@
 /* =============================================================
    BuyForMe — chat-local.js
-   One conversation per person (WhatsApp-style), keyed by user pair.
-   Chat history lives in localStorage; realtime broadcast for live delivery.
+   Chat persisted in Supabase (messages table + chat-media storage).
+   Realtime via postgres_changes; call invites via broadcast.
    ============================================================= */
 
-export const CHAT_STORAGE_KEY = "buyforme_chat_v1";
-export const INBOX_EVENT_MSG  = "chat_msg";
+import { supabase } from "./supabase.js";
+
 export const INBOX_EVENT_CALL = "call_invite";
+
+const partnerCache = {};
+let messagesChannelRef = null;
 
 export function getConvId(uid1, uid2) {
   return [String(uid1), String(uid2)].sort().join("_");
-}
-
-function loadStore() {
-  try {
-    return JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY)) || { conversations: {} };
-  } catch {
-    return { conversations: {} };
-  }
-}
-
-function saveStore(store) {
-  try {
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(store));
-  } catch (e) {
-    console.error("Chat storage full or unavailable:", e);
-    throw new Error("Could not save message — browser storage may be full. Try clearing old chats or using smaller images.");
-  }
-}
-
-function inferPartnerUid(conv, convId, myUserId, messages) {
-  if (conv.partner?.uid) return String(conv.partner.uid);
-  const parts = String(convId).split("_");
-  const other = parts.find(p => p && p !== String(myUserId));
-  if (other) return other;
-  const m = (messages || []).find(msg => msg.sender_id !== myUserId) || (messages || [])[0];
-  if (!m) return null;
-  return String(m.sender_id) === String(myUserId) ? String(m.receiver_id) : String(m.sender_id);
-}
-
-/** Merge duplicate threads into one chat per other user. */
-export function consolidateConversations(myUserId) {
-  if (!myUserId) return;
-  const store = loadStore();
-  const byPartner = new Map();
-
-  for (const [convId, conv] of Object.entries(store.conversations)) {
-    const msgs = [...(conv.messages || [])];
-    const partnerUid = inferPartnerUid(conv, convId, myUserId, msgs);
-
-    if (!partnerUid) {
-      if (msgs.length === 0) delete store.conversations[convId];
-      continue;
-    }
-
-    if (!byPartner.has(partnerUid)) {
-      byPartner.set(partnerUid, {
-        partner: {
-          uid: partnerUid,
-          name: conv.partner?.name || "User",
-          role: conv.partner?.role || "user",
-        },
-        messages: [],
-      });
-    }
-
-    const bucket = byPartner.get(partnerUid);
-    if (conv.partner?.name) {
-      bucket.partner.name = conv.partner.name;
-      if (conv.partner.role) bucket.partner.role = conv.partner.role;
-    }
-
-    const canonicalId = getConvId(myUserId, partnerUid);
-    for (const m of msgs) {
-      const copy = { ...m, conversation_id: canonicalId };
-      if (!bucket.messages.some(x => x.id === copy.id)) bucket.messages.push(copy);
-    }
-  }
-
-  const next = {};
-  for (const [partnerUid, { partner, messages }] of byPartner) {
-    messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const canonicalId = getConvId(myUserId, partnerUid);
-    next[canonicalId] = { partner, messages };
-  }
-
-  store.conversations = next;
-  saveStore(store);
 }
 
 export function buildMessage(fields) {
@@ -98,140 +24,6 @@ export function buildMessage(fields) {
   };
 }
 
-export function saveMessage(message, myUserId = null) {
-  const me = String(myUserId || message.receiver_id || message.sender_id);
-  const partnerUid = String(message.sender_id) === me
-    ? String(message.receiver_id)
-    : String(message.sender_id);
-  const canonicalId = getConvId(me, partnerUid);
-
-  message.conversation_id = canonicalId;
-
-  consolidateConversations(me);
-
-  const store = loadStore();
-  if (!store.conversations[canonicalId]) {
-    store.conversations[canonicalId] = { partner: null, messages: [] };
-  }
-  const conv = store.conversations[canonicalId];
-
-  if (!conv.partner) {
-    conv.partner = {
-      uid: partnerUid,
-      name: message.sender_id === me ? message.receiver_name : message.sender_name,
-      role: message.sender_id === me ? (message.receiver_role || "user") : (message.sender_role || "user"),
-    };
-  } else {
-    conv.partner.uid = partnerUid;
-    if (message.receiver_name && conv.partner.uid === message.receiver_id)
-      conv.partner.name = message.receiver_name;
-    if (message.sender_name && conv.partner.uid === message.sender_id)
-      conv.partner.name = message.sender_name;
-    if (message.sender_role && conv.partner.uid === message.sender_id)
-      conv.partner.role = message.sender_role;
-    if (message.receiver_role && conv.partner.uid === message.receiver_id)
-      conv.partner.role = message.receiver_role;
-  }
-
-  if (!conv.partner.name) conv.partner.name = "User";
-
-  const exists = conv.messages.some(m => m.id === message.id);
-  if (!exists) conv.messages.push(message);
-  conv.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  saveStore(store);
-}
-
-export function setConversationPartner(convId, partner, myUserId) {
-  if (!myUserId || !partner?.uid) return;
-  const canonicalId = getConvId(myUserId, partner.uid);
-  consolidateConversations(myUserId);
-
-  const store = loadStore();
-  if (!store.conversations[canonicalId]) {
-    store.conversations[canonicalId] = { partner, messages: [] };
-  } else {
-    store.conversations[canonicalId].partner = { ...store.conversations[canonicalId].partner, ...partner, uid: String(partner.uid) };
-  }
-  saveStore(store);
-}
-
-export function getMessages(convId, myUserId) {
-  if (myUserId) consolidateConversations(myUserId);
-  return loadStore().conversations[convId]?.messages || [];
-}
-
-/** One row per other user (most recent message). */
-export function getConversationSummaries(myUserId) {
-  consolidateConversations(myUserId);
-
-  const store = loadStore();
-  const byPartner = new Map();
-
-  for (const [convId, conv] of Object.entries(store.conversations)) {
-    const msgs = conv.messages || [];
-    if (msgs.length === 0) continue;
-
-    const partnerUid = conv.partner?.uid || inferPartnerUid(conv, convId, myUserId, msgs);
-    if (!partnerUid) continue;
-
-    const last = msgs[msgs.length - 1];
-    const canonicalId = getConvId(myUserId, partnerUid);
-    const row = {
-      ...last,
-      conversation_id: canonicalId,
-      _partner: {
-        uid: partnerUid,
-        name: conv.partner?.name || last.sender_name || last.receiver_name || "User",
-        role: conv.partner?.role || "user",
-      },
-    };
-
-    const prev = byPartner.get(partnerUid);
-    if (!prev || new Date(row.created_at) > new Date(prev.created_at)) {
-      byPartner.set(partnerUid, row);
-    }
-  }
-
-  return [...byPartner.values()].sort(
-    (a, b) => new Date(b.created_at) - new Date(a.created_at)
-  );
-}
-
-export function getUnreadMap(myUserId) {
-  consolidateConversations(myUserId);
-
-  const store = loadStore();
-  const map = {};
-
-  for (const [convId, conv] of Object.entries(store.conversations)) {
-    const partnerUid = conv.partner?.uid || inferPartnerUid(conv, convId, myUserId, conv.messages);
-    const canonicalId = partnerUid ? getConvId(myUserId, partnerUid) : convId;
-    const n = (conv.messages || []).filter(
-      m => String(m.receiver_id) === String(myUserId) && !m.is_read
-    ).length;
-    if (n > 0) map[canonicalId] = (map[canonicalId] || 0) + n;
-  }
-
-  return map;
-}
-
-export function markConversationRead(convId, myUserId) {
-  consolidateConversations(myUserId);
-
-  const store = loadStore();
-  const conv = store.conversations[convId];
-  if (!conv) return;
-
-  let changed = false;
-  for (const m of conv.messages) {
-    if (String(m.receiver_id) === String(myUserId) && !m.is_read) {
-      m.is_read = true;
-      changed = true;
-    }
-  }
-  if (changed) saveStore(store);
-}
-
 export function getPreviewText(content) {
   if (!content) return "";
   if (content.startsWith("[img]"))       return "📷 Photo";
@@ -239,6 +31,267 @@ export function getPreviewText(content) {
   if (content.startsWith("[videocall]")) return "📹 Video call";
   if (content.startsWith("[voicecall]")) return "📞 Voice call";
   return content.length > 36 ? content.substring(0, 36) + "..." : content;
+}
+
+function partnerFromRow(m, myUserId) {
+  const me = String(myUserId);
+  const isMine = String(m.sender_id) === me;
+  return {
+    uid: isMine ? String(m.receiver_id) : String(m.sender_id),
+    name: isMine ? (m.receiver_name || "User") : (m.sender_name || "User"),
+    role: isMine ? "user" : (m.sender_role || "user"),
+  };
+}
+
+export function setConversationPartner(convId, partner, myUserId) {
+  if (!partner?.uid) return;
+  const canonicalId = getConvId(myUserId, partner.uid);
+  partnerCache[canonicalId] = {
+    uid: String(partner.uid),
+    name: partner.name || "User",
+    role: partner.role || "user",
+  };
+}
+
+export async function getMessages(convId) {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", convId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("getMessages:", error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function getConversationSummaries(myUserId) {
+  const me = String(myUserId);
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
+    .order("created_at", { ascending: false })
+    .limit(400);
+
+  if (error) {
+    console.error("getConversationSummaries:", error);
+    return [];
+  }
+
+  const byPartner = new Map();
+  for (const m of data || []) {
+    const partner = partnerFromRow(m, me);
+    const canonicalId = getConvId(me, partner.uid);
+    const cached = partnerCache[canonicalId];
+    const row = {
+      ...m,
+      conversation_id: canonicalId,
+      _partner: cached || partner,
+    };
+    if (!byPartner.has(partner.uid)) byPartner.set(partner.uid, row);
+  }
+
+  return [...byPartner.values()].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  );
+}
+
+export async function getUnreadMap(myUserId) {
+  const me = String(myUserId);
+  const { data, error } = await supabase
+    .from("messages")
+    .select("conversation_id, receiver_id, is_read")
+    .eq("receiver_id", me)
+    .eq("is_read", false);
+
+  if (error) return {};
+
+  const map = {};
+  for (const m of data || []) {
+    map[m.conversation_id] = (map[m.conversation_id] || 0) + 1;
+  }
+  return map;
+}
+
+export async function markConversationRead(convId, myUserId) {
+  const me = String(myUserId);
+  const { error } = await supabase
+    .from("messages")
+    .update({ is_read: true })
+    .eq("conversation_id", convId)
+    .eq("receiver_id", me)
+    .eq("is_read", false);
+
+  if (error) console.error("markConversationRead:", error);
+}
+
+export async function uploadChatBlob(blob, { userId, convId, ext }) {
+  const safeExt = (ext || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "bin";
+  const path = `${convId}/${userId}_${Date.now()}.${safeExt}`;
+  const { error } = await supabase.storage
+    .from("chat-media")
+    .upload(path, blob, { contentType: blob.type || "application/octet-stream", upsert: false });
+
+  if (error) throw new Error(error.message || "Upload failed — run supabase-chat-media.sql in Supabase.");
+
+  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function prepareMessageContent(message) {
+  const content = message.content || "";
+  if (content.startsWith("[img]") && content.length > 500 && content[5] !== "h") {
+    const dataUrl = content.slice(5);
+    const blob = await dataUrlToBlob(dataUrl);
+    const url = await uploadChatBlob(blob, {
+      userId: message.sender_id,
+      convId: message.conversation_id,
+      ext: "jpg",
+    });
+    return "[img]" + url;
+  }
+  if (content.startsWith("[audio]") && content.length > 500 && content[7] !== "h") {
+    const dataUrl = content.slice(7);
+    const blob = await dataUrlToBlob(dataUrl);
+    const url = await uploadChatBlob(blob, {
+      userId: message.sender_id,
+      convId: message.conversation_id,
+      ext: "webm",
+    });
+    return "[audio]" + url;
+  }
+  return content;
+}
+
+async function dataUrlToBlob(dataUrl) {
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+export async function insertMessage(message) {
+  const row = {
+    id: message.id,
+    conversation_id: message.conversation_id,
+    sender_id: message.sender_id,
+    sender_name: message.sender_name,
+    sender_role: message.sender_role,
+    receiver_id: message.receiver_id,
+    receiver_name: message.receiver_name,
+    content: message.content,
+    is_read: !!message.is_read,
+    created_at: message.created_at,
+  };
+
+  const { error } = await supabase.from("messages").insert(row);
+  if (error) throw new Error(error.message || "Could not save message.");
+  return row;
+}
+
+export async function sendChatMessage(_supabaseClient, message) {
+  const senderId = String(message.sender_id);
+  const receiverId = String(message.receiver_id);
+  message.conversation_id = getConvId(senderId, receiverId);
+
+  message.content = await prepareMessageContent(message);
+  await insertMessage(message);
+}
+
+let inboxChannelRef = null;
+
+export function subscribeInbox(supabaseClient, userId, { onMessage, onCallInvite }) {
+  unsubscribeInbox(supabaseClient);
+  const me = String(userId);
+
+  messagesChannelRef = supabaseClient
+    .channel(`chat_db_${me}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${me}` },
+      ({ new: row }) => {
+        if (!row || String(row.sender_id) === me) return;
+        onMessage?.(row);
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages", filter: `sender_id=eq.${me}` },
+      ({ new: row }) => {
+        if (!row) return;
+        onMessage?.(row);
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "messages", filter: `sender_id=eq.${me}` },
+      ({ new: row }) => {
+        if (row) onMessage?.(row);
+      }
+    )
+    .subscribe();
+
+  inboxChannelRef = supabaseClient
+    .channel(`chat_inbox_${me}`)
+    .on("broadcast", { event: INBOX_EVENT_CALL }, ({ payload }) => {
+      if (!payload || String(payload.sender_id) === me) return;
+      onCallInvite?.(payload);
+    })
+    .subscribe();
+
+  return { messages: messagesChannelRef, inbox: inboxChannelRef };
+}
+
+export function unsubscribeInbox(supabaseClient) {
+  if (messagesChannelRef) {
+    supabaseClient.removeChannel(messagesChannelRef);
+    messagesChannelRef = null;
+  }
+  if (inboxChannelRef) {
+    supabaseClient.removeChannel(inboxChannelRef);
+    inboxChannelRef = null;
+  }
+}
+
+export async function broadcastToUser(supabaseClient, receiverId, event, payload) {
+  const ch = supabaseClient.channel(`chat_inbox_${receiverId}_tx_${Date.now()}`);
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      supabaseClient.removeChannel(ch);
+      reject(new Error("Could not reach the other user right now."));
+    }, 8000);
+
+    ch.subscribe(status => {
+      if (status === "SUBSCRIBED") {
+        ch.send({ type: "broadcast", event, payload })
+          .then(() => {
+            clearTimeout(timeout);
+            setTimeout(() => {
+              supabaseClient.removeChannel(ch);
+              resolve();
+            }, 80);
+          })
+          .catch(err => {
+            clearTimeout(timeout);
+            supabaseClient.removeChannel(ch);
+            reject(err);
+          });
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        clearTimeout(timeout);
+        supabaseClient.removeChannel(ch);
+        reject(new Error("Could not reach the other user right now."));
+      }
+    });
+  });
+}
+
+export async function sendCallInvite(supabaseClient, payload) {
+  try {
+    await broadcastToUser(supabaseClient, payload.receiver_id, INBOX_EVENT_CALL, payload);
+  } catch (e) {
+    console.warn("Call invite delivery:", e.message);
+  }
 }
 
 export function readFileAsDataUrl(file) {
@@ -269,6 +322,11 @@ export async function compressImageFile(file, maxDim = 1200, quality = 0.82) {
   return readFileAsDataUrl(blob);
 }
 
+export async function compressImageToBlob(file, maxDim = 1200, quality = 0.82) {
+  const dataUrl = await compressImageFile(file, maxDim, quality);
+  return dataUrlToBlob(dataUrl);
+}
+
 export function readBlobAsDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -278,80 +336,5 @@ export function readBlobAsDataUrl(blob) {
   });
 }
 
-/* ── Realtime inbox (ephemeral delivery, not stored on server) ── */
-let inboxChannelRef = null;
-
-export function subscribeInbox(supabase, userId, { onMessage, onCallInvite }) {
-  if (inboxChannelRef) supabase.removeChannel(inboxChannelRef);
-
-  inboxChannelRef = supabase
-    .channel(`chat_inbox_${userId}`)
-    .on("broadcast", { event: INBOX_EVENT_MSG }, ({ payload }) => {
-      if (!payload || String(payload.sender_id) === String(userId)) return;
-      saveMessage(payload, userId);
-      onMessage?.(payload);
-    })
-    .on("broadcast", { event: INBOX_EVENT_CALL }, ({ payload }) => {
-      if (!payload || String(payload.sender_id) === String(userId)) return;
-      onCallInvite?.(payload);
-    })
-    .subscribe();
-
-  return inboxChannelRef;
-}
-
-export function unsubscribeInbox(supabase) {
-  if (inboxChannelRef) {
-    supabase.removeChannel(inboxChannelRef);
-    inboxChannelRef = null;
-  }
-}
-
-export async function broadcastToUser(supabase, receiverId, event, payload) {
-  const ch = supabase.channel(`chat_inbox_${receiverId}_tx_${Date.now()}`);
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      supabase.removeChannel(ch);
-      reject(new Error("Message delivery timed out — is the other person online?"));
-    }, 8000);
-
-    ch.subscribe(status => {
-      if (status === "SUBSCRIBED") {
-        ch.send({ type: "broadcast", event, payload })
-          .then(() => {
-            clearTimeout(timeout);
-            setTimeout(() => {
-              supabase.removeChannel(ch);
-              resolve();
-            }, 80);
-          })
-          .catch(err => {
-            clearTimeout(timeout);
-            supabase.removeChannel(ch);
-            reject(err);
-          });
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        clearTimeout(timeout);
-        supabase.removeChannel(ch);
-        reject(new Error("Could not reach the other user right now."));
-      }
-    });
-  });
-}
-
-export async function sendChatMessage(supabase, message) {
-  const senderId = String(message.sender_id);
-  const receiverId = String(message.receiver_id);
-  message.conversation_id = getConvId(senderId, receiverId);
-  saveMessage(message, senderId);
-  try {
-    const outbound = { ...message, conversation_id: getConvId(senderId, receiverId) };
-    await broadcastToUser(supabase, receiverId, INBOX_EVENT_MSG, outbound);
-  } catch (e) {
-    console.warn("Live delivery failed (saved locally):", e.message);
-  }
-}
-
-export async function sendCallInvite(supabase, payload) {
-  await broadcastToUser(supabase, payload.receiver_id, INBOX_EVENT_CALL, payload);
-}
+/** @deprecated local-only helper — no-op for DB chat */
+export function consolidateConversations() {}

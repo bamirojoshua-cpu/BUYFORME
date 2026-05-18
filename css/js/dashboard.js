@@ -20,10 +20,16 @@ import {
   sendCallInvite,
   markConversationRead,
   setConversationPartner,
-  compressImageFile,
-  readBlobAsDataUrl,
+  compressImageToBlob,
+  uploadChatBlob,
   subscribeInbox,
 } from "./chat-local.js";
+import {
+  startOutgoingCall,
+  acceptIncomingCall,
+  prepareIncomingCallSignaling,
+  clearIncomingCallPrep,
+} from "./call-webrtc.js";
 
 /* ─── STATE ─── */
 let currentUser    = null;
@@ -41,13 +47,7 @@ let shopperMediaRecorder = null;
 let shopperAudioChunks   = [];
 let shopperIsRecording   = false;
 
-/* WebRTC state */
-let shopperPeerConn    = null;
-let shopperLocalStream = null;
-let shopperSigChannel  = null;
-let shopperCallType    = null;
-
-const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+let shopperActiveCall = null;
 
 function getShopperChatUserId() {
   return String(currentProfile?.uid || currentUser?.id || "");
@@ -701,35 +701,35 @@ function initAvatarUpload() {
   });
 }
 
-function handleShopperInboxMessage(msg) {
+async function handleShopperInboxMessage(msg) {
   if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
   const myId = getShopperChatUserId();
-  const partnerUid = String(msg.sender_id);
+  const partnerUid = String(msg.sender_id) === myId ? String(msg.receiver_id) : String(msg.sender_id);
   const canonicalId = getConvId(myId, partnerUid);
   showToast(`💬 New message from ${msg.sender_name}`);
   addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
   if (activeChatPartner?.uid === partnerUid || activeChatConvId === canonicalId) {
     activeChatConvId = canonicalId;
-    loadShopperMessages();
-    markShopperRead();
+    await loadShopperMessages();
+    await markShopperRead();
   }
-  renderShopperChatList();
+  await renderShopperChatList();
 }
 
-/* ─── CHAT (stored locally on this device) ─── */
+/* ─── CHAT (Supabase) ─── */
 async function renderShopperChatList() {
   const list = document.getElementById("msgConvList");
   if (!list) return;
 
-  allShopperConvs = getConversationSummaries(getShopperChatUserId());
+  allShopperConvs = await getConversationSummaries(getShopperChatUserId());
 
   if (allShopperConvs.length === 0) {
-    list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.<br><small style="opacity:0.8">Chats are saved on this device only.</small></div>`;
+    list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.</div>`;
     updateMsgBadge(0);
     return;
   }
 
-  const unreadMap = getUnreadMap(getShopperChatUserId());
+  const unreadMap = await getUnreadMap(getShopperChatUserId());
   const total = Object.values(unreadMap).reduce((a, b) => a + b, 0);
   updateMsgBadge(total);
   renderShopperConvItems(allShopperConvs, unreadMap);
@@ -786,13 +786,13 @@ window.openShopperChat = async function (otherUid, otherName) {
   document.getElementById("msgThreadInput").style.display    = "flex";
   document.getElementById("msgThreadHav").textContent   = (otherName||"?")[0].toUpperCase();
   document.getElementById("msgThreadHname").textContent = otherName;
-  loadShopperMessages();
-  markShopperRead();
+  await loadShopperMessages();
+  await markShopperRead();
   await renderShopperChatList();
 };
 
-function loadShopperMessages() {
-  const msgs = getMessages(activeChatConvId, getShopperChatUserId());
+async function loadShopperMessages() {
+  const msgs = await getMessages(activeChatConvId);
   const container = document.getElementById("msgThreadMessages");
   if (!container) return;
   if (msgs.length === 0) {
@@ -860,6 +860,7 @@ window.sendShopperMessage = async function () {
   });
   try {
     await sendChatMessage(supabase, msg);
+    await loadShopperMessages();
     await renderShopperChatList();
   } catch (e) {
     console.error("Send error:", e);
@@ -873,29 +874,28 @@ window.handleShopperImageUpload = async function (e) {
   const file = e.target.files?.[0];
   if (!file || !activeChatConvId || !activeChatPartner) return;
   e.target.value = "";
-  let dataUrl;
   try {
-    dataUrl = await compressImageFile(file);
-  } catch (e) {
-    showToast(e.message || "Could not process image.", "error");
-    return;
-  }
-  const content = "[img]" + dataUrl;
-  appendShopperOptimistic(content);
-  const msg = buildMessage({
-    conversation_id: activeChatConvId,
-    sender_id: getShopperChatUserId(),
-    sender_name: currentProfile.name,
-    sender_role: "shopper",
-    receiver_id: activeChatPartner.uid,
-    receiver_name: activeChatPartner.name,
-    content,
-  });
-  try {
+    const blob = await compressImageToBlob(file);
+    appendShopperOptimistic("[img]" + URL.createObjectURL(blob));
+    const url = await uploadChatBlob(blob, {
+      userId: getShopperChatUserId(),
+      convId: activeChatConvId,
+      ext: "jpg",
+    });
+    const msg = buildMessage({
+      conversation_id: activeChatConvId,
+      sender_id: getShopperChatUserId(),
+      sender_name: currentProfile.name,
+      sender_role: "shopper",
+      receiver_id: activeChatPartner.uid,
+      receiver_name: activeChatPartner.name,
+      content: "[img]" + url,
+    });
     await sendChatMessage(supabase, msg);
+    await loadShopperMessages();
     await renderShopperChatList();
-  } catch (e) {
-    showToast(e.message || "Failed to send image.", "error");
+  } catch (err) {
+    showToast(err.message || "Failed to send image.", "error");
   }
 };
 
@@ -926,26 +926,24 @@ window.toggleShopperVoice = async function () {
 
 async function uploadShopperAudio(blob) {
   if (!activeChatConvId || !activeChatPartner) return;
-  let dataUrl;
+  appendShopperOptimistic("[audio]…");
   try {
-    dataUrl = await readBlobAsDataUrl(blob);
-  } catch {
-    showToast("Could not save voice note.", "error");
-    return;
-  }
-  const content = "[audio]" + dataUrl;
-  appendShopperOptimistic(content);
-  const msg = buildMessage({
-    conversation_id: activeChatConvId,
-    sender_id: getShopperChatUserId(),
-    sender_name: currentProfile.name,
-    sender_role: "shopper",
-    receiver_id: activeChatPartner.uid,
-    receiver_name: activeChatPartner.name,
-    content,
-  });
-  try {
+    const url = await uploadChatBlob(blob, {
+      userId: getShopperChatUserId(),
+      convId: activeChatConvId,
+      ext: "webm",
+    });
+    const msg = buildMessage({
+      conversation_id: activeChatConvId,
+      sender_id: getShopperChatUserId(),
+      sender_name: currentProfile.name,
+      sender_role: "shopper",
+      receiver_id: activeChatPartner.uid,
+      receiver_name: activeChatPartner.name,
+      content: "[audio]" + url,
+    });
     await sendChatMessage(supabase, msg);
+    await loadShopperMessages();
     await renderShopperChatList();
   } catch (e) {
     showToast(e.message || "Failed to send voice note.", "error");
@@ -953,88 +951,90 @@ async function uploadShopperAudio(blob) {
 }
 
 /* ─── CALLS ─── */
-window.startShopperVideoCall = async function () { if (!activeChatPartner) return; await openShopperCallUI("video", true); };
-window.startShopperVoiceCall = async function () { if (!activeChatPartner) return; await openShopperCallUI("voice", true); };
-window.acceptShopperVideoCall = async function () { document.getElementById("shopperIncomingBanner")?.remove(); await openShopperCallUI("video", false); };
-window.acceptShopperVoiceCall = async function () { document.getElementById("shopperIncomingBanner")?.remove(); await openShopperCallUI("voice", false); };
-window.rejectShopperCall = function () { sendShopperSignal({ type: "reject" }); document.getElementById("shopperIncomingBanner")?.remove(); };
+window.startShopperVideoCall = async function () {
+  if (!activeChatPartner) return;
+  await startShopperCall("video");
+};
+window.startShopperVoiceCall = async function () {
+  if (!activeChatPartner) return;
+  await startShopperCall("voice");
+};
+window.acceptShopperVideoCall = async function () {
+  document.getElementById("shopperIncomingBanner")?.remove();
+  await acceptShopperCall("video");
+};
+window.acceptShopperVoiceCall = async function () {
+  document.getElementById("shopperIncomingBanner")?.remove();
+  await acceptShopperCall("voice");
+};
+window.rejectShopperCall = async function () {
+  if (shopperActiveCall) await shopperActiveCall.rejectRemote?.();
+  clearIncomingCallPrep();
+  document.getElementById("shopperIncomingBanner")?.remove();
+};
 window.endShopperCall = function () {
-  shopperPeerConn?.close(); shopperPeerConn = null;
-  shopperLocalStream?.getTracks().forEach(t => t.stop()); shopperLocalStream = null;
-  if (shopperSigChannel) { supabase.removeChannel(shopperSigChannel); shopperSigChannel = null; }
-  document.getElementById("shopperCallOverlay")?.remove();
-  shopperCallType = null;
+  shopperActiveCall?.end();
+  shopperActiveCall = null;
+  clearIncomingCallPrep();
+  document.getElementById("shopperIncomingBanner")?.remove();
 };
 
-async function openShopperCallUI(type, isCaller) {
-  shopperCallType = type;
-  const isVideo   = type === "video";
-  const overlay   = document.createElement("div");
-  overlay.id = "shopperCallOverlay";
-  overlay.innerHTML = `
-    <div style="position:fixed;inset:0;background:#111;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
-      <p style="color:#fff;font-family:'Sora',sans-serif;font-size:1.1rem">${isVideo?"📹":"📞"} ${isVideo?"Video":"Voice"} Call — ${activeChatPartner.name}</p>
-      ${isVideo?`<div style="display:flex;gap:16px">
-        <video id="shopperLocalVid" autoplay muted playsinline style="width:200px;border-radius:12px;background:#222"></video>
-        <video id="shopperRemoteVid" autoplay playsinline style="width:320px;border-radius:12px;background:#222"></video>
-      </div>`:`
-      <div style="width:100px;height:100px;border-radius:50%;background:#1a9e6e;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#fff;font-family:'Sora',sans-serif;font-weight:700">
-        ${(activeChatPartner.name||"?")[0].toUpperCase()}</div>
-      <p style="color:#aaa;font-size:0.9rem" id="shopperCallStatus">${isCaller?"Calling…":"Connected"}</p>
-      <audio id="shopperRemoteAudio" autoplay></audio>`}
-      <button onclick="endShopperCall()" style="padding:12px 32px;background:#e74c3c;color:#fff;border:none;border-radius:24px;font-size:0.95rem;cursor:pointer;margin-top:8px">🔴 End Call</button>
-    </div>`;
-  document.body.appendChild(overlay);
+async function startShopperCall(callType) {
+  window.endShopperCall();
   try {
-    shopperLocalStream = await navigator.mediaDevices.getUserMedia(isVideo?{video:true,audio:true}:{audio:true});
-    if (isVideo) document.getElementById("shopperLocalVid").srcObject = shopperLocalStream;
-  } catch { alert(`${isVideo?"Camera/":""}Microphone access denied.`); window.endShopperCall(); return; }
-  shopperPeerConn = new RTCPeerConnection(ICE_SERVERS);
-  shopperLocalStream.getTracks().forEach(t => shopperPeerConn.addTrack(t, shopperLocalStream));
-  shopperPeerConn.ontrack = e => {
-    if (isVideo) { const v = document.getElementById("shopperRemoteVid"); if (v) v.srcObject = e.streams[0]; }
-    else { const a = document.getElementById("shopperRemoteAudio"); if (a) a.srcObject = e.streams[0]; const s = document.getElementById("shopperCallStatus"); if (s) s.textContent = "Connected"; }
-  };
-  const sigKey = `vc_${activeChatConvId}_${type}`;
-  if (shopperSigChannel) supabase.removeChannel(shopperSigChannel);
-  shopperSigChannel = supabase.channel(sigKey)
-    .on("broadcast",{event:"signal"},async({payload})=>{
-      if (payload.from===currentUser.id) return;
-      if (payload.type==="offer"&&!isCaller) { await shopperPeerConn.setRemoteDescription(new RTCSessionDescription(payload.sdp)); const answer=await shopperPeerConn.createAnswer(); await shopperPeerConn.setLocalDescription(answer); sendShopperSignal({type:"answer",sdp:answer}); }
-      else if (payload.type==="answer"&&isCaller) { await shopperPeerConn.setRemoteDescription(new RTCSessionDescription(payload.sdp)); }
-      else if (payload.type==="ice") { try{await shopperPeerConn.addIceCandidate(new RTCIceCandidate(payload.candidate));}catch{} }
-      else if (payload.type==="reject") { alert(`${activeChatPartner.name} rejected the call.`); window.endShopperCall(); }
-    })
-    .subscribe(async(status)=>{
-      if (status==="SUBSCRIBED"&&isCaller) {
-        shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});};
-        const offer=await shopperPeerConn.createOffer(); await shopperPeerConn.setLocalDescription(offer); sendShopperSignal({type:"offer",sdp:offer});
-        await sendCallInvite(supabase, {
-          sender_id: getShopperChatUserId(),
-          sender_name: currentProfile.name,
-          receiver_id: activeChatPartner.uid,
-          callType: type,
-          conversation_id: activeChatConvId,
-        });
-      }
+    await sendCallInvite(supabase, {
+      sender_id: getShopperChatUserId(),
+      sender_name: currentProfile.name,
+      receiver_id: activeChatPartner.uid,
+      callType,
+      conversation_id: activeChatConvId,
     });
-  if (!isCaller) { shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});}; }
+    shopperActiveCall = await startOutgoingCall({
+      supabase,
+      myUserId: getShopperChatUserId(),
+      partnerUserId: activeChatPartner.uid,
+      partnerName: activeChatPartner.name,
+      callType,
+    });
+  } catch (e) {
+    showToast(e.message || "Could not start call.", "error");
+    window.endShopperCall();
+  }
 }
 
-function sendShopperSignal(payload) { shopperSigChannel?.send({type:"broadcast",event:"signal",payload:{...payload,from:currentUser.id}}); }
+async function acceptShopperCall(callType) {
+  window.endShopperCall();
+  try {
+    shopperActiveCall = await acceptIncomingCall({
+      supabase,
+      myUserId: getShopperChatUserId(),
+      partnerUserId: activeChatPartner.uid,
+      partnerName: activeChatPartner.name,
+      callType,
+    });
+  } catch (e) {
+    showToast(e.message || "Could not connect call.", "error");
+    window.endShopperCall();
+  }
+}
 
-function handleShopperIncomingCall(msg) {
+
+async function handleShopperIncomingCall(msg) {
   const isVideo = msg.content==="[videocall]incoming";
   const isVoice = msg.content==="[voicecall]incoming";
   if (!isVideo&&!isVoice) return;
   const myId = getShopperChatUserId();
   if (String(msg.receiver_id) !== myId) return;
 
+  const callType = isVideo ? "video" : "voice";
+
   if (!activeChatPartner || activeChatPartner.uid !== msg.sender_id) {
     activeChatPartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "buyer" };
     activeChatConvId = getConvId(myId, msg.sender_id);
     setConversationPartner(activeChatConvId, activeChatPartner, myId);
   }
+
+  await prepareIncomingCallSignaling(supabase, myId, msg.sender_id, callType);
 
   document.getElementById("shopperIncomingBanner")?.remove();
   const banner = document.createElement("div");
@@ -1048,10 +1048,10 @@ function handleShopperIncomingCall(msg) {
   document.body.appendChild(banner);
 }
 
-function markShopperRead() {
+async function markShopperRead() {
   if (!activeChatConvId) return;
-  markConversationRead(activeChatConvId, getShopperChatUserId());
-  loadShopperMessages();
+  await markConversationRead(activeChatConvId, getShopperChatUserId());
+  await loadShopperMessages();
 }
 
 window.filterShopperConversations = function (query) {
