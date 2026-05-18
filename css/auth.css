@@ -1,0 +1,133 @@
+/* 1. The Background / Wrapper */
+.auth-page {
+    display: flex;
+    justify-content: center;
+    /* Centers horizontally */
+    align-items: center;
+    /* Centers vertically */
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1f4d3c, #0f2c22);
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* Prevents weird side-scrolling */
+}
+/* 3. Ensure the container is the only 'flex child' being centered */
+.auth-container {
+    background: #fff;
+    width: 100%;
+    max-width: 400px;
+    /* Limits the width so it doesn't become 'big and wide' */
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    z-index: 5;
+    position: relative;
+}
+.tab-group {
+    display: flex;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #eee;
+}
+
+.tab {
+    flex: 1;
+    padding: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #888;
+    transition: 0.3s;
+}
+
+.tab.active {
+    color: #1f4d3c;
+    border-bottom: 3px solid #667eea;
+}
+
+.role-selector {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.role-option {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.3s;
+}
+
+.role-option.selected {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+.btn-auth {
+    width: 100%;
+    padding: 14px;
+    background: #1f4d3c;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-top: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-auth:hover {
+    background: #2a6b53;
+    transform: translateY(-2px);
+}
+
+body {
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+body.loaded {
+    opacity: 1;
+}
+
+/* Force the Navbar to the top */
+.navbar {
+    position: absolute;
+    /* Or 'fixed' if you want it to stay while scrolling */
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    /* Aligns content to the left */
+    padding: 25px 50px;
+    background: transparent;
+    /* Makes it blend with the green background */
+    z-index: 10;
+}
+
+.logo-link {
+    text-decoration: none;
+    color: #ffffff;
+    /* White looks better on the green background */
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+/* Ensure the container doesn't overlap the navbar */
+.auth-page {
+    padding-top: 80px;
+}

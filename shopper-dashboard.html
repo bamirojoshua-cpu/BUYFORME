@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BuyForMe | Shopper Dashboard</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --green: #1a9e6e;
+            --green-dark: #127a54;
+            --green-light: #e6f7f1;
+            --amber: #f59e0b;
+            --amber-light: #fef3c7;
+            --red: #ef4444;
+            --red-light: #fee2e2;
+            --text: #0f1c18;
+            --text-muted: #5a7268;
+            --border: #dde8e4;
+            --bg: #f4f8f6;
+            --white: #ffffff;
+            --sidebar-w: 240px;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: var(--sidebar-w) 1fr;
+            min-height: 100vh
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            background: var(--white);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 28px 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto
+        }
+
+        .sidebar-profile {
+            text-align: center;
+            padding: 0 20px 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 16px
+        }
+
+        .avatar-large {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--green);
+            color: white;
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            overflow: hidden
+        }
+
+        .avatar-large img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover
+        }
+
+        .sidebar-profile h3 {
+            font-family: 'Sora', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 4px
+        }
+
+        .verified-tag {
+            font-size: 0.72rem;
+            background: var(--green-light);
+            color: var(--green-dark);
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-weight: 600
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0 12px;
+            flex: 1
+        }
+
+        .sidebar-menu li {
+            margin-bottom: 2px
+        }
+
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: background 0.15s, color 0.15s;
+            position: relative
+        }
+
+        .sidebar-menu a:hover {
+            background: var(--bg);
+            color: var(--text)
+        }
+
+        .sidebar-menu a.active {
+            background: var(--green-light);
+            color: var(--green-dark)
+        }
+
+        .sidebar-menu a i {
+            width: 16px;
+            text-align: center;
+            font-size: 0.85rem
+        }
+
+        .badge {
+            margin-left: auto;
+            background: var(--red);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center
+        }
+
+        .sidebar-logout {
+            padding: 0 12px;
+            margin-top: auto
+        }
+
+        .btn-logout {
+            width: 100%;
+            padding: 10px;
+            border: 1.5px solid var(--border);
+            background: none;
+            border-radius: 8px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s
+        }
+
+        .btn-logout:hover {
+            border-color: var(--red);
+            color: var(--red)
+        }
+
+        /* MAIN */
+        .dashboard-main {
+            padding: 28px 32px;
+            overflow-y: auto
+        }
+
+        .dash-section {
+            display: none
+        }
+
+        .dash-section.active {
+            display: block
+        }
+
+        /* WELCOME */
+        .welcome-card {
+            background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+            border-radius: var(--radius);
+            padding: 24px 28px;
+            color: white;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .welcome-card h2 {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 4px
+        }
+
+        .welcome-card p {
+            opacity: 0.85;
+            font-size: 0.9rem
+        }
+
+        .notif-bell {
+            position: relative;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            color: white;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: background 0.15s
+        }
+
+        .notif-bell:hover {
+            background: rgba(255, 255, 255, 0.25)
+        }
+
+        .notif-dot {
+            position: absolute;
+            top: 6px;
+            right: 7px;
+            width: 8px;
+            height: 8px;
+            background: var(--amber);
+            border-radius: 50%;
+            border: 2px solid var(--green);
+            display: none
+        }
+
+        .notif-dot.show {
+            display: block
+        }
+
+        /* STATS */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 28px
+        }
+
+        .stat-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            transition: box-shadow 0.15s
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07)
+        }
+
+        .stat-card .stat-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--green);
+            margin-bottom: 4px
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.82rem;
+            color: var(--text-muted)
+        }
+
+        /* SECTION TITLE */
+        .section-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .count-pill {
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 2px 10px;
+            border-radius: 20px
+        }
+
+        /* REQUEST / ORDER ITEMS */
+        .request-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .request-item {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            transition: box-shadow 0.15s
+        }
+
+        .request-item:hover {
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07)
+        }
+
+        .request-item h4 {
+            font-family: 'Sora', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 6px
+        }
+
+        .request-meta {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap
+        }
+
+        .request-meta span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .request-action {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            min-width: 120px
+        }
+
+        .service-fee {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--green)
+        }
+
+        .fee-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: -6px
+        }
+
+        /* BUTTONS */
+        .btn {
+            border: none;
+            border-radius: 7px;
+            padding: 8px 18px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Inter', sans-serif
+        }
+
+        .btn-primary {
+            background: var(--green);
+            color: white
+        }
+
+        .btn-primary:hover {
+            background: var(--green-dark)
+        }
+
+        .btn-danger {
+            background: var(--red-light);
+            color: var(--red)
+        }
+
+        .btn-danger:hover {
+            background: var(--red);
+            color: white
+        }
+
+        .btn-ghost {
+            background: var(--bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border)
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--green);
+            color: var(--green)
+        }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border)
+        }
+
+        /* STATUS BADGES */
+        .status-badge {
+            display: inline-block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: capitalize
+        }
+
+        .status-accepted {
+            background: var(--amber-light);
+            color: #92400e
+        }
+
+        .status-paid {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe
+        }
+
+        .status-funded {
+            background: #ede9fe;
+            color: #5b21b6;
+            border: 1px solid #ddd6fe
+        }
+
+        .status-purchased {
+            background: var(--green-light);
+            color: var(--green-dark)
+        }
+
+        .status-delivering {
+            background: #ede9fe;
+            color: #5b21b6
+        }
+
+        .status-delivered {
+            background: #f3f4f6;
+            color: #374151
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-muted)
+        }
+
+        .empty-state .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px
+        }
+
+        .empty-state p {
+            font-size: 0.9rem
+        }
+
+        /* MESSAGES */
+        .messages-section-inner {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            height: 580px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden
+        }
+
+        .msg-conv-panel {
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden
+        }
+
+        .msg-conv-header {
+            padding: 14px 16px;
+            font-family: 'Sora', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0
+        }
+
+        .msg-conv-search {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0
+        }
+
+        .msg-conv-search input {
+            width: 100%;
+            padding: 7px 12px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            font-size: 0.8rem;
+            outline: none;
+            background: var(--bg);
+            font-family: 'Inter', sans-serif
+        }
+
+        .msg-conv-search input:focus {
+            border-color: var(--green)
+        }
+
+        .msg-conv-list {
+            flex: 1;
+            overflow-y: auto
+        }
+
+        .msg-conv-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s
+        }
+
+        .msg-conv-item:hover {
+            background: var(--bg)
+        }
+
+        .msg-conv-item.active {
+            background: var(--green-light)
+        }
+
+        .msg-conv-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--green);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            flex-shrink: 0
+        }
+
+        .msg-conv-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .msg-conv-name-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2px
+        }
+
+        .msg-conv-name {
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: var(--text)
+        }
+
+        .msg-conv-time {
+            font-size: 0.68rem;
+            color: var(--text-muted)
+        }
+
+        .msg-conv-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .msg-conv-preview {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 160px
+        }
+
+        .msg-unread-badge {
+            background: var(--green);
+            color: white;
+            font-size: 0.62rem;
+            font-weight: 700;
+            min-width: 17px;
+            height: 17px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px
+        }
+
+        .msg-conv-empty {
+            padding: 30px 14px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            line-height: 1.6
+        }
+
+        .msg-thread-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden
+        }
+
+        .msg-thread-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            gap: 10px;
+            font-size: 0.85rem
+        }
+
+        .msg-thread-empty .ei {
+            font-size: 2.5rem
+        }
+
+        .msg-thread-header {
+            padding: 12px 16px;
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0
+        }
+
+        .msg-thread-hav {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--green);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.82rem;
+            flex-shrink: 0
+        }
+
+        .msg-thread-hname {
+            font-weight: 600;
+            font-size: 0.88rem
+        }
+
+        .msg-thread-hrole {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: capitalize
+        }
+
+        .msg-thread-vcall {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--green-light);
+            color: var(--green);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            transition: all 0.15s
+        }
+
+        .msg-thread-vcall:hover {
+            background: var(--green);
+            color: white
+        }
+
+        .msg-thread-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .message {
+            max-width: 66%;
+            padding: 9px 13px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            word-break: break-word
+        }
+
+        .shopper-message {
+            background: var(--green);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px
+        }
+
+        .buyer-message {
+            background: var(--bg);
+            color: var(--text);
+            align-self: flex-start;
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px
+        }
+
+        .msg-time {
+            font-size: 0.62rem;
+            opacity: 0.65;
+            margin-top: 3px;
+            text-align: right
+        }
+
+        .msg-date-divider {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin: 4px 0
+        }
+
+        .msg-thread-input {
+            border-top: 1px solid var(--border);
+            padding: 10px 14px;
+            display: flex;
+            gap: 7px;
+            align-items: center;
+            background: var(--white);
+            flex-shrink: 0
+        }
+
+        .msg-thread-input input[type="text"] {
+            flex: 1;
+            padding: 9px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            outline: none;
+            background: var(--bg);
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.15s
+        }
+
+        .msg-thread-input input[type="text"]:focus {
+            border-color: var(--green)
+        }
+
+        .msg-icon-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.82rem;
+            transition: all 0.15s
+        }
+
+        .msg-icon-btn:hover {
+            border-color: var(--green);
+            color: var(--green);
+            background: var(--green-light)
+        }
+
+        .msg-thread-send {
+            padding: 9px 16px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-family: 'Inter', sans-serif;
+            flex-shrink: 0
+        }
+
+        .msg-thread-send:hover {
+            background: var(--green-dark)
+        }
+
+        /* EARNINGS */
+        .earnings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px
+        }
+
+        .earnings-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px
+        }
+
+        .earnings-card .e-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--green);
+            margin-bottom: 4px
+        }
+
+        .earnings-card .e-label {
+            font-size: 0.8rem;
+            color: var(--text-muted)
+        }
+
+        /* SETTINGS */
+        .settings-grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px
+        }
+
+        .settings-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px
+        }
+
+        .settings-card label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px
+        }
+
+        .settings-card input[type="text"],
+        .settings-card input[type="email"],
+        .settings-card input[type="tel"],
+        .settings-card input[type="number"],
+        .settings-card select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--text);
+            background: var(--bg);
+            outline: none;
+            transition: border-color 0.15s;
+            font-family: 'Inter', sans-serif
+        }
+
+        .settings-card input:focus,
+        .settings-card select:focus {
+            border-color: var(--green)
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .toggle-track {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            background: var(--border);
+            border-radius: 11px;
+            cursor: pointer;
+            transition: background 0.2s
+        }
+
+        .toggle-track.on {
+            background: var(--green)
+        }
+
+        .toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s
+        }
+
+        .toggle-track.on .toggle-thumb {
+            transform: translateX(18px)
+        }
+
+        /* PAYOUT SECTION */
+        .payout-section-divider {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border)
+        }
+
+        .payout-section-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .payout-section-title span {
+            font-size: 0.72rem;
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: 0;
+            color: var(--text-muted)
+        }
+
+        .payout-method-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--text);
+            background: var(--bg);
+            outline: none;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: border-color 0.15s
+        }
+
+        .payout-method-select:focus {
+            border-color: var(--green)
+        }
+
+        .payout-fields {
+            display: none
+        }
+
+        .payout-note {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-top: 8px;
+            padding: 10px 14px;
+            background: var(--amber-light);
+            border-radius: 8px;
+            border-left: 3px solid var(--amber)
+        }
+
+        .btn-save-settings {
+            margin-top: 20px;
+            padding: 11px 32px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s
+        }
+
+        .btn-save-settings:hover {
+            background: var(--green-dark)
+        }
+
+        .btn-save-payout {
+            margin-top: 16px;
+            padding: 11px 32px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .btn-save-payout:hover {
+            background: var(--green-dark)
+        }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--text);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all 0.25s;
+            pointer-events: none
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0)
+        }
+
+        .toast.success {
+            background: var(--green)
+        }
+
+        .toast.error {
+            background: var(--red)
+        }
+
+        @media(max-width:768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr
+            }
+
+            .sidebar {
+                display: none
+            }
+
+            .stats-cards {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .earnings-grid {
+                grid-template-columns: 1fr
+            }
+
+            .settings-grid-layout {
+                grid-template-columns: 1fr
+            }
+
+            .dashboard-main {
+                padding: 20px 16px
+            }
+
+            .messages-section-inner {
+                grid-template-columns: 1fr;
+                height: auto
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-grid">
+
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="sidebar-profile">
+                <div class="avatar-large" id="sidebarAvatar">A</div>
+                <h3 id="sidebarName">Shopper</h3>
+                <span class="verified-tag">✓ Verified Shopper</span>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a class="active" href="#" data-tab="overview-section"><i class="fas fa-home"></i> Dashboard</a>
+                </li>
+                <li><a href="#" data-tab="requests-section"><i class="fas fa-inbox"></i> Requests <span class="badge"
+                            id="reqBadge" style="display:none"></span></a></li>
+                <li><a href="#" data-tab="orders-section"><i class="fas fa-shopping-bag"></i> My Orders</a></li>
+                <li><a href="#" data-tab="messages-section"><i class="fas fa-comment"></i> Messages <span class="badge"
+                            id="msgBadge" style="display:none"></span></a></li>
+                <li><a href="#" data-tab="earnings-section"><i class="fas fa-wallet"></i> Earnings</a></li>
+                <li><a href="#" data-tab="settings-section"><i class="fas fa-cog"></i> Settings</a></li>
+            </ul>
+            <div class="sidebar-logout">
+                <button class="btn-logout" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Log Out</button>
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="dashboard-main">
+
+            <div class="welcome-card">
+                <div>
+                    <h2 id="welcomeMsg">Welcome back!</h2>
+                    <p>Here's your performance overview.</p>
+                </div>
+                <button class="notif-bell" onclick="openNotifications()">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-dot" id="notifDot"></span>
+                </button>
+            </div>
+
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-value" id="statEarnings">$0</div>
+                    <div class="stat-label">Total Paid Out</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statOrders">0</div>
+                    <div class="stat-label">Orders Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statRating">—</div>
+                    <div class="stat-label">Average Rating</div>
+                </div>
+            </div>
+
+            <!-- OVERVIEW -->
+            <div class="dash-section active" id="overview-section">
+                <h2 class="section-title">Recent Requests <span class="count-pill" id="overviewReqCount"></span></h2>
+                <div class="request-list" id="overviewRequestList"></div>
+            </div>
+
+            <!-- REQUESTS -->
+            <div class="dash-section" id="requests-section">
+                <h2 class="section-title">Available Requests <span class="count-pill" id="requestCount"></span></h2>
+                <div class="request-list" id="requestList"></div>
+            </div>
+
+            <!-- ORDERS -->
+            <div class="dash-section" id="orders-section">
+                <h2 class="section-title">My Orders <span class="count-pill" id="orderCount"></span></h2>
+                <div class="request-list" id="orderList"></div>
+            </div>
+
+            <!-- MESSAGES -->
+            <div class="dash-section" id="messages-section">
+                <h2 class="section-title">Messages</h2>
+                <div class="messages-section-inner">
+                    <div class="msg-conv-panel">
+                        <div class="msg-conv-header">💬 Conversations</div>
+                        <div class="msg-conv-search">
+                            <input type="text" id="msgConvSearch" placeholder="Search...">
+                        </div>
+                        <div class="msg-conv-list" id="msgConvList">
+                            <div class="msg-conv-empty">Loading conversations...</div>
+                        </div>
+                    </div>
+                    <div class="msg-thread-panel" id="msgThreadPanel">
+                        <div class="msg-thread-empty" id="msgThreadEmpty">
+                            <div class="ei">💬</div>
+                            <p>Select a conversation to reply</p>
+                        </div>
+                        <div class="msg-thread-header" id="msgThreadHeader" style="display:none">
+                            <div class="msg-thread-hav" id="msgThreadHav">?</div>
+                            <div>
+                                <div class="msg-thread-hname" id="msgThreadHname">—</div>
+                                <div class="msg-thread-hrole">buyer</div>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-left:auto">
+                                <button class="msg-thread-vcall" onclick="startShopperVoiceCall()" title="Voice call"><i
+                                        class="fas fa-phone"></i></button>
+                                <button class="msg-thread-vcall" onclick="startShopperVideoCall()" title="Video call"><i
+                                        class="fas fa-video"></i></button>
+                            </div>
+                        </div>
+                        <div class="msg-thread-messages" id="msgThreadMessages" style="display:none"></div>
+                        <div class="msg-thread-input" id="msgThreadInput" style="display:none">
+                            <input type="file" id="shopperImageInput" accept="image/*" style="display:none"
+                                onchange="handleShopperImageUpload(event)">
+                            <button class="msg-icon-btn" onclick="triggerShopperImageUpload()" title="Send image"><i
+                                    class="fas fa-image"></i></button>
+                            <button class="msg-icon-btn" id="shopperVoiceBtn" onclick="toggleShopperVoice()"
+                                title="Record voice note"><i class="fas fa-microphone"></i></button>
+                            <input type="text" id="shopperChatInput" placeholder="Type a reply...">
+                            <button class="msg-thread-send" onclick="sendShopperMessage()">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EARNINGS -->
+            <div class="dash-section" id="earnings-section">
+                <h2 class="section-title">Earnings Overview</h2>
+                <div class="earnings-grid">
+                    <div class="earnings-card">
+                        <div class="e-value" id="earnTotal">$0</div>
+                        <div class="e-label">Total Paid Out to You</div>
+                    </div>
+                    <div class="earnings-card">
+                        <div class="e-value" id="earnMonth">$0</div>
+                        <div class="e-label">This Month</div>
+                    </div>
+                    <div class="earnings-card">
+                        <div class="e-value" id="earnPending">$0</div>
+                        <div class="e-label">Pending (Active Orders)</div>
+                    </div>
+                    <div class="earnings-card">
+                        <div class="e-value" id="earnCompleted">0</div>
+                        <div class="e-label">Completed Orders</div>
+                    </div>
+                </div>
+                <div id="earningsList"></div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div class="dash-section" id="settings-section">
+                <h2 class="section-title">Account Settings</h2>
+
+                <!-- BASIC INFO -->
+                <h3
+                    style="font-family:'Sora',sans-serif;font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">
+                    Basic Info</h3>
+                <div class="settings-grid-layout" style="margin-bottom:16px">
+                    <div class="settings-card"><label>Full Name</label><input type="text" id="settingName"
+                            placeholder="Your name"></div>
+                    <div class="settings-card"><label>Email Address</label><input type="email" id="settingEmail"
+                            placeholder="your@email.com"></div>
+                    <div class="settings-card"><label>Phone Number</label><input type="tel" id="settingPhone"
+                            placeholder="+90 555 000 0000"></div>
+                    <div class="settings-card"><label>Location (City, Country)</label><input type="text"
+                            id="settingLocation" placeholder="e.g. Istanbul, Turkey"></div>
+                    <div class="settings-card">
+                        <label>Profile Photo</label>
+                        <input type="file" id="settingAvatar" accept="image/*">
+                        <div id="avatarPreview" style="margin-top:10px"></div>
+                    </div>
+                    <div class="settings-card">
+                        <label>Notifications</label>
+                        <div class="toggle-row">
+                            <span style="font-size:0.88rem;color:var(--text-muted)">Enable push notifications</span>
+                            <div class="toggle-track on" id="notifToggle" onclick="toggleNotif()">
+                                <div class="toggle-thumb"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PUBLIC PROFILE -->
+                <h3
+                    style="font-family:'Sora',sans-serif;font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;margin-top:8px">
+                    Public Profile (visible to buyers)</h3>
+                <div class="settings-grid-layout" style="margin-bottom:16px">
+                    <div class="settings-card" style="grid-column:span 2">
+                        <label>About / Bio</label>
+                        <textarea id="settingAbout" rows="4" placeholder="Tell buyers about yourself..."
+                            style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;color:var(--text);background:var(--bg);outline:none;resize:vertical;font-family:'Inter',sans-serif;transition:border-color 0.15s"></textarea>
+                    </div>
+                    <div class="settings-card"><label>Service Fee</label><input type="text" id="settingFee"
+                            placeholder="e.g. 10-12%"></div>
+                    <div class="settings-card"><label>Years Active</label><input type="number" id="settingYearsActive"
+                            placeholder="e.g. 3" min="0"></div>
+                    <div class="settings-card"><label>Response Time</label><input type="text" id="settingResponseTime"
+                            placeholder="e.g. Under 1 hour"></div>
+                    <div class="settings-card"><label>Completion Rate</label><input type="text"
+                            id="settingCompletionRate" placeholder="e.g. 98%"></div>
+                    <div class="settings-card" style="grid-column:span 2">
+                        <label>Services / Tags <span
+                                style="font-weight:400;text-transform:none;font-size:0.75rem">(comma
+                                separated)</span></label>
+                        <input type="text" id="settingTags" placeholder="e.g. Fashion, Shoes, Electronics, Bags">
+                    </div>
+                </div>
+                <button class="btn-save-settings" onclick="saveSettings()">Save Profile</button>
+
+                <!-- ══════════════════════════════════════
+                 PAYOUT INFORMATION SECTION
+            ══════════════════════════════════════ -->
+                <div class="payout-section-divider">
+                    <div class="payout-section-title">
+                        💳 Payout Information
+                        <span>— How you want to receive your money from BuyForMe</span>
+                    </div>
+
+                    <div class="settings-grid-layout" style="margin-bottom:16px">
+                        <div class="settings-card" style="grid-column:span 2">
+                            <label>Payout Method</label>
+                            <select id="payoutMethod" class="payout-method-select"
+                                onchange="togglePayoutFields(this.value)">
+                                <option value="">— Select how you want to be paid —</option>
+                                <option value="Bank Transfer">🏦 Bank Transfer</option>
+                                <option value="Mobile Money">📱 Mobile Money (MoMo)</option>
+                                <option value="PayPal">🅿️ PayPal</option>
+                                <option value="Wise / Revolut">🌍 Wise / Revolut</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- BANK TRANSFER FIELDS -->
+                    <div id="bankFields" class="payout-fields">
+                        <div class="settings-grid-layout" style="margin-bottom:16px">
+                            <div class="settings-card">
+                                <label>Account Name</label>
+                                <input type="text" id="payoutAccountName" placeholder="Full name on bank account">
+                            </div>
+                            <div class="settings-card">
+                                <label>Account Number / IBAN</label>
+                                <input type="text" id="payoutAccountNumber"
+                                    placeholder="e.g. 0123456789 or GB29NWBK...">
+                            </div>
+                            <div class="settings-card">
+                                <label>Bank Name</label>
+                                <input type="text" id="payoutBankName" placeholder="e.g. GTBank, Barclays, Ziraat">
+                            </div>
+                            <div class="settings-card">
+                                <label>Country</label>
+                                <input type="text" id="payoutCountry" placeholder="e.g. Nigeria, UK, Turkey">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MOBILE MONEY FIELDS -->
+                    <div id="momoFields" class="payout-fields">
+                        <div class="settings-grid-layout" style="margin-bottom:16px">
+                            <div class="settings-card">
+                                <label>Full Name on Account</label>
+                                <input type="text" id="payoutAccountName" placeholder="Name registered on MoMo">
+                            </div>
+                            <div class="settings-card">
+                                <label>Phone Number</label>
+                                <input type="text" id="payoutAccountNumber" placeholder="e.g. +233 24 000 0000">
+                            </div>
+                            <div class="settings-card">
+                                <label>Network / Provider</label>
+                                <input type="text" id="payoutBankName" placeholder="e.g. MTN, Airtel, Opay, Palmpay">
+                            </div>
+                            <div class="settings-card">
+                                <label>Country</label>
+                                <input type="text" id="payoutCountry" placeholder="e.g. Ghana, Nigeria, Kenya">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PAYPAL FIELDS -->
+                    <div id="paypalFields" class="payout-fields">
+                        <div class="settings-grid-layout" style="margin-bottom:16px">
+                            <div class="settings-card">
+                                <label>PayPal Email Address</label>
+                                <input type="email" id="payoutEmail" placeholder="your@paypal.com">
+                            </div>
+                            <div class="settings-card">
+                                <label>Full Name on PayPal Account</label>
+                                <input type="text" id="payoutAccountName" placeholder="Your PayPal display name">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WISE / REVOLUT FIELDS -->
+                    <div id="wiseFields" class="payout-fields">
+                        <div class="settings-grid-layout" style="margin-bottom:16px">
+                            <div class="settings-card">
+                                <label>Wise / Revolut Email</label>
+                                <input type="email" id="payoutEmail" placeholder="your@wise.com or revolut email">
+                            </div>
+                            <div class="settings-card">
+                                <label>Full Name on Account</label>
+                                <input type="text" id="payoutAccountName" placeholder="Your full name">
+                            </div>
+                            <div class="settings-card">
+                                <label>Account Number / @Tag</label>
+                                <input type="text" id="payoutAccountNumber" placeholder="IBAN or @revoluttag">
+                            </div>
+                            <div class="settings-card">
+                                <label>Country</label>
+                                <input type="text" id="payoutCountry" placeholder="e.g. UK, Turkey, Germany">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn-save-payout" onclick="savePayoutDetails()">
+                        <i class="fas fa-save"></i> Save Payout Details
+                    </button>
+                    <p class="payout-note" style="margin-top:12px">
+                        ⚠️ Make sure these details are correct. BuyForMe will use them to send your earnings after each
+                        completed order. Double-check your account number and method before saving.
+                    </p>
+                </div>
+
+            </div><!-- end settings-section -->
+
+        </div><!-- end dashboard-main -->
+    </div><!-- end dashboard-grid -->
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module" src="css/js/dashboard.js"></script>
+</body>
+
+</html>

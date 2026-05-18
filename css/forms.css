@@ -1,0 +1,150 @@
+/* =========================
+   REQUEST FORM PAGE
+========================= */
+
+.request-container {
+    display: flex;
+    justify-content: center;
+    padding: 80px 20px;
+}
+
+.request-card {
+    background: #fff;
+    padding: 50px;
+    border-radius: 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+    max-width: 600px;
+    width: 100%;
+}
+
+.request-card h2 {
+    margin-bottom: 10px;
+}
+
+.request-card p {
+    margin-bottom: 30px;
+    color: #666;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.form-group input,
+.form-group textarea {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border: 1px solid #000;
+}
+
+.btn-large {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+
+    .request-card {
+        padding: 30px;
+    }
+
+}
+
+
+
+/* =========================
+   TRACKING PAGE
+========================= */
+
+.tracking-container {
+    display: flex;
+    justify-content: center;
+    padding: 80px 20px;
+}
+
+.tracking-card {
+    background: #fff;
+    padding: 50px;
+    border-radius: 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+    max-width: 800px;
+    width: 100%;
+}
+
+.order-info {
+    margin: 20px 0 40px 0;
+}
+
+.order-info p {
+    margin-bottom: 8px;
+}
+
+/* Progress Bar */
+
+.progress-wrapper {
+    position: relative;
+}
+
+.progress-line {
+    height: 6px;
+    background: #eee;
+    border-radius: 10px;
+    position: relative;
+    margin-bottom: 40px;
+}
+
+.progress-fill {
+    height: 6px;
+    background: #000;
+    width: 0%;
+    border-radius: 10px;
+    transition: width 0.6s ease;
+}
+
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+}
+
+.step {
+    text-align: center;
+    flex: 1;
+    font-size: 13px;
+    color: #aaa;
+}
+
+.step i {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 18px;
+}
+
+.step.active {
+    color: #000;
+}
+
+@media (max-width: 768px) {
+    .progress-steps {
+        flex-direction: column;
+        gap: 20px;
+    }
+}

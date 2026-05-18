@@ -1,0 +1,505 @@
+/* =============================================================
+   BuyForMe — Shopper Profile CSS
+   ============================================================= */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --green: #1a9e6e;
+    --green-dark: #127a54;
+    --green-light: #e6f7f1;
+    --amber: #f59e0b;
+    --amber-light: #fef3c7;
+    --red: #ef4444;
+    --red-light: #fee2e2;
+    --text: #0f1c18;
+    --text-muted: #5a7268;
+    --border: #dde8e4;
+    --bg: #f4f8f6;
+    --white: #ffffff;
+    --radius: 14px;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* ── NAVBAR ── */
+.navbar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--green);
+    letter-spacing: -0.5px;
+    text-decoration: none;
+}
+
+.back-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--white);
+    transition: all 0.15s;
+    font-weight: 500;
+}
+
+.back-link:hover {
+    border-color: var(--green);
+    color: var(--green);
+}
+
+/* ── BANNER — completely hidden ── */
+.profile-banner {
+    display: none;
+}
+
+/* ── PAGE CONTAINER ── */
+.page-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+}
+
+/* ── PROFILE INTRO ── */
+.profile-intro {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+
+.profile-avatar {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 3px solid var(--green-light);
+    background: var(--green);
+    color: white;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-intro-text {
+    flex: 1;
+    min-width: 200px;
+}
+
+.profile-intro-text h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.verified-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: var(--green-light);
+    color: var(--green-dark);
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.profile-location {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── MAIN LAYOUT ── */
+.profile-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 24px;
+    align-items: start;
+}
+
+/* ── STATS ROW ── */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.stat-box {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    text-align: center;
+}
+
+.stat-box .val {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--green);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.stat-box .lbl {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* ── CARDS ── */
+.card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.card h3 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.card p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+}
+
+/* ── TAGS ── */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag {
+    font-size: 0.8rem;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: var(--green-light);
+    color: var(--green-dark);
+    font-weight: 500;
+    border: 1px solid #b6e5d4;
+}
+
+/* ── REVIEWS ── */
+.review-card {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.review-card:first-child {
+    padding-top: 0;
+}
+
+.review-card:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.review-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+}
+
+.review-stars {
+    color: var(--amber);
+    font-size: 0.85rem;
+}
+
+.review-text {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.review-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    opacity: 0.7;
+}
+
+/* ── SHOPPING TRIPS ── */
+.trip-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.trip-item:last-child {
+    border-bottom: none;
+}
+
+.trip-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--green-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: var(--green);
+    flex-shrink: 0;
+}
+
+.trip-name {
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.trip-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* ── SIDEBAR ACTION CARD ── */
+.action-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    position: sticky;
+    top: 80px;
+}
+
+.fee-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.fee-amount {
+    font-family: 'Sora', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--green);
+    margin-bottom: 2px;
+}
+
+.fee-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.btn-request {
+    width: 100%;
+    padding: 13px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Sora', sans-serif;
+    transition: background 0.15s;
+    margin-bottom: 10px;
+}
+
+.btn-request:hover {
+    background: var(--green-dark);
+}
+
+.btn-message {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+}
+
+.btn-message:hover {
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+}
+
+.sidebar-stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    padding: 6px 0;
+}
+
+.sidebar-stat-row span:first-child {
+    color: var(--text-muted);
+}
+
+.sidebar-stat-row span:last-child {
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* ── TRUST BADGES ── */
+.trust-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.trust-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.trust-item i {
+    color: var(--green);
+    width: 16px;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+/* ── NOT FOUND ── */
+.not-found {
+    text-align: center;
+    padding: 80px 20px;
+}
+
+.not-found h2 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.4rem;
+    margin-bottom: 10px;
+}
+
+.not-found p {
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.not-found a {
+    display: inline-block;
+    padding: 10px 24px;
+    background: var(--green);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0 16px;
+    }
+
+    .page-container {
+        padding: 20px 16px 40px;
+    }
+
+    .profile-intro {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .profile-avatar {
+        width: 72px;
+        height: 72px;
+        font-size: 1.6rem;
+    }
+
+    .profile-intro-text h1 {
+        font-size: 1.2rem;
+    }
+
+    .profile-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .action-card {
+        position: static;
+    }
+}

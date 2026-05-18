@@ -1,0 +1,326 @@
+/* =========================
+   1. RESET & BASE
+========================= */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f7f7f7;
+    color: #333;
+    line-height: 1.6;
+    opacity: 0;
+    /* Starts hidden for the JS fade-in */
+    transition: opacity 0.8s ease;
+}
+
+body.loaded {
+    opacity: 1;
+}
+
+/* Common Container for Spacing */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* =========================
+   2. NAVBAR (Glassmorphism)
+========================= */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 5%;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(15px);
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    animation: dropDown 0.8s ease forwards;
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: 800;
+    color: #111;
+}
+
+.navbar nav a {
+    text-decoration: none;
+    color: #111;
+    margin-left: 15px;
+    font-weight: 500;
+}
+
+.nav-btn {
+    background: #000;
+    color: #fff !important;
+    padding: 8px 20px;
+    border-radius: 8px;
+}
+
+.nav-btn-outline {
+    border: 2px solid #000;
+    padding: 8px 20px;
+    border-radius: 8px;
+}
+
+/* =========================
+   3. HERO SECTION
+========================= */
+.hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 120px 10% 60px;
+    background: linear-gradient(135deg, #1f4d3c, #0f2c22);
+    background-size: 200% 200%;
+    animation: gradientMove 10s ease infinite;
+    color: #fff;
+    min-height: 90vh;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-content {
+    flex: 1;
+    max-width: 550px;
+    z-index: 2;
+    animation: slideinleft 1.2s ease forwards;
+}
+
+.hero-content h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    /* Responsive font size */
+    margin-bottom: 20px;
+    line-height: 1.1;
+    background: linear-gradient(90deg, #ffffff, #a5b4fc, #ffffff);
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: shimmerText 5s linear infinite;
+}
+
+.hero-phone {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    z-index: 2;
+}
+
+.hero-phone img {
+    width: 100%;
+    max-width: 400px;
+    animation: slideinright 1.4s ease forwards, float 4s ease-in-out infinite;
+    transform-style: preserve-3d;
+    transition: transform 0.4s ease;
+}
+
+.hero-phone img:hover {
+    transform: rotateY(12deg) rotateX(6deg) scale(1.05);
+}
+
+/* =========================
+   4. BUTTONS & UTILITIES
+========================= */
+.btn {
+    padding: 14px 28px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: #fff;
+}
+
+.btn-secondary {
+    background: #fff;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
+}
+
+/* =========================
+   5. DYNAMIC SECTIONS (Grid/Flex)
+========================= */
+.landing-stats,
+.how-it-works,
+.features-locations {
+    padding: 80px 0;
+    text-align: center;
+}
+
+.stats-cards,
+.steps,
+.features,
+.locations {
+    display: flex;
+    flex-wrap: wrap;
+    /* Allows items to wrap on mobile */
+    justify-content: center;
+    gap: 30px;
+    margin-top: 40px;
+}
+
+/* Shared Card Style */
+.stat-card,
+.step,
+.feature-item {
+    background: #fff;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    flex: 1 1 280px;
+    /* Responsive: grow/shrink, base 280px */
+    max-width: 350px;
+    transition: all 0.35s ease;
+}
+
+.stat-card:hover,
+.step:hover,
+.feature-item:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+}
+
+/* =========================
+   6. RESPONSIVE QUERIES
+========================= */
+@media (max-width: 992px) {
+    .hero {
+        flex-direction: column;
+        text-align: center;
+        padding-top: 150px;
+    }
+
+    .hero-content {
+        margin-bottom: 50px;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .navbar nav {
+        display: flex;
+        gap: 10px;
+        font-size: 14px;
+    }
+
+    .hero-content h1 {
+        font-size: 2.2rem;
+    }
+}
+
+/* =========================
+   7. KEYFRAMES
+========================= */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-15px);
+    }
+}
+
+@keyframes dropDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideinleft {
+    from {
+        transform: translateX(-100px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideinright {
+    from {
+        transform: translateX(100px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes shimmerText {
+    to {
+        background-position: 200% center;
+    }
+}
+
+@keyframes gradientMove {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+.step,
+.stat-card,
+.feature-item,
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.6s ease-out;
+}
+
+.step.active,
+.stat-card.active,
+.feature-item.active,
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+}

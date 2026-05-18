@@ -1,0 +1,846 @@
+/* =============================================================
+   BuyForMe — Shopper Dashboard JS
+   ✅ Image sharing
+   ✅ Voice notes
+   ✅ Video calling (WebRTC)
+   ✅ Voice calling (WebRTC, audio only)
+   ✅ Payout details in settings
+   ✅ Real payout history in earnings
+   ============================================================= */
+
+import { supabase } from "./supabase.js";
+
+/* ─── STATE ─── */
+let currentUser    = null;
+let currentProfile = null;
+let allPayouts     = [];
+const SHOPPER_STATUSES = ["paid", "purchased", "delivering", "delivered"];
+
+/* Chat state */
+let activeChatConvId  = null;
+let activeChatPartner = null;
+let chatChannel       = null;
+let allShopperConvs   = [];
+
+/* Voice note state */
+let shopperMediaRecorder = null;
+let shopperAudioChunks   = [];
+let shopperIsRecording   = false;
+
+/* WebRTC state */
+let shopperPeerConn    = null;
+let shopperLocalStream = null;
+let shopperSigChannel  = null;
+let shopperCallType    = null;
+
+const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+/* ─── INIT ─── */
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { window.location.href = "auth.html"; return; }
+  currentUser = session.user;
+
+  const { data: profile } = await supabase
+    .from("users").select("*").eq("uid", currentUser.id).maybeSingle();
+
+  if (!profile || profile.role !== "shopper") { window.location.href = "auth.html"; return; }
+  if (profile.verification_status?.toLowerCase() !== "approved") { window.location.href = "verify.html"; return; }
+
+  currentProfile = profile;
+
+  renderSidebarProfile();
+  await renderRequests();
+  await renderOrders();
+  await renderStats();
+  await renderEarnings();
+  loadSettingsIntoForm();
+  initTabs();
+  initAvatarUpload();
+  updateNotifDot();
+  initRealtimeOrders();
+  initRealtimeChatNotif();
+  await renderShopperChatList();
+
+  document.getElementById("shopperChatInput")?.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendShopperMessage(); }
+  });
+
+  document.getElementById("msgConvSearch")?.addEventListener("input", function (e) {
+    filterShopperConversations(e.target.value.trim());
+  });
+});
+
+/* ─── HELPERS ─── */
+function showToast(msg, type = "success") {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.className   = `toast ${type} show`;
+  setTimeout(() => { t.className = "toast"; }, 2800);
+}
+
+function formatTime(ts) {
+  const d = new Date(ts), now = new Date();
+  return d.toDateString() === now.toDateString()
+    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function statusClass(s) { return "status-" + s.toLowerCase().replace(" ", "-"); }
+function getStatusBadge(s) { return `<span class="status-badge ${statusClass(s)}">${s}</span>`; }
+
+function escapeHtml(t) {
+  return (t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function getConvId(a, b) { return [a, b].sort().join("_"); }
+
+function renderSidebarProfile() {
+  const name = currentProfile.name || "Shopper";
+  document.getElementById("sidebarName").textContent = name;
+  document.getElementById("welcomeMsg").textContent  = `Welcome back, ${name.split(" ")[0]}!`;
+  const el = document.getElementById("sidebarAvatar");
+  if (currentProfile.avatar_url) {
+    el.innerHTML = `<img src="${currentProfile.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else { el.textContent = name[0].toUpperCase(); }
+}
+
+async function renderStats() {
+  const orders    = await getOrders();
+  const completed = orders.filter(o => o.status === "delivered").length;
+  const earned    = orders.filter(o => o.status === "delivered").reduce((s,o) => s + (parseFloat(o.budget)||0)*0.85, 0);
+  document.getElementById("statEarnings").textContent = `$${earned.toFixed(0)}`;
+  document.getElementById("statOrders").textContent   = completed;
+  document.getElementById("statRating").textContent   = currentProfile.rating || "—";
+}
+
+/* ─── TABS ─── */
+function initTabs() {
+  const tabs = document.querySelectorAll(".sidebar-menu a[data-tab]");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", function (e) {
+      e.preventDefault();
+      tabs.forEach(t => t.classList.remove("active"));
+      this.classList.add("active");
+      document.querySelectorAll(".dash-section").forEach(s => s.classList.remove("active"));
+      const target = document.getElementById(this.dataset.tab);
+      if (target) target.classList.add("active");
+      if (this.dataset.tab === "messages-section") {
+        const b = document.getElementById("msgBadge");
+        if (b) b.style.display = "none";
+        renderShopperChatList();
+      }
+      if (this.dataset.tab === "requests-section") renderRequests();
+      if (this.dataset.tab === "orders-section")   renderOrders();
+      if (this.dataset.tab === "earnings-section") renderEarnings();
+    });
+  });
+}
+
+/* ─── REQUESTS ─── */
+async function renderRequests() {
+  const list = document.getElementById("requestList");
+  const ov   = document.getElementById("overviewRequestList");
+  list.innerHTML = ov.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>`;
+
+  const { data: reqs, error } = await supabase
+    .from("requests").select("*").eq("shopper_id", currentUser.id).eq("status","pending")
+    .order("created_at",{ascending:false});
+
+  if (error) { list.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><p>Failed to load.</p></div>`; return; }
+
+  document.getElementById("requestCount").textContent     = `${reqs.length} new`;
+  document.getElementById("overviewReqCount").textContent = `${reqs.length} new`;
+
+  const badge = document.getElementById("reqBadge");
+  if (reqs.length > 0) { badge.textContent = reqs.length; badge.style.display = "inline-block"; }
+  else badge.style.display = "none";
+
+  if (reqs.length === 0) {
+    const e = `<div class="empty-state"><div class="empty-icon">📭</div><p>No new requests right now.</p></div>`;
+    list.innerHTML = ov.innerHTML = e; return;
+  }
+  list.innerHTML = reqs.map(buildRequestCard).join("");
+  ov.innerHTML   = reqs.slice(0,3).map(buildRequestCard).join("");
+}
+
+function buildRequestCard(r) {
+  return `
+    <div class="request-item">
+      <div>
+        <h4>${r.product_name}</h4>
+        <div class="request-meta">
+          <span><i class="fas fa-user"></i> ${r.buyer_name}</span>
+          <span><i class="fas fa-tag"></i> ${r.category||"—"}</span>
+          <span><i class="fas fa-clock"></i> ${new Date(r.created_at).toLocaleDateString()}</span>
+        </div>
+        ${r.notes ? `<p style="font-size:0.8rem;color:var(--text-muted);margin-top:6px;line-height:1.5">${r.notes}</p>` : ""}
+      </div>
+      <div class="request-action">
+        <div class="service-fee">${r.currency||"$"}${r.budget}</div>
+        <div class="fee-label">Budget</div>
+        <button class="btn btn-primary" onclick="acceptRequest('${r.id}','${r.product_name}')">Accept</button>
+        <button class="btn btn-danger"  onclick="declineRequest('${r.id}','${r.product_name}')">Decline</button>
+      </div>
+    </div>`;
+}
+
+window.acceptRequest = async function (id, name) {
+  const { error } = await supabase.from("requests").update({status:"accepted"}).eq("id",id);
+  if (error) { showToast("Failed to accept.", "error"); return; }
+  addNotification(`New order accepted: ${name}`);
+  showToast(`✅ Request accepted: ${name}`);
+  await renderRequests(); await renderOrders(); await renderStats();
+};
+
+window.declineRequest = async function (id, name) {
+  if (!confirm(`Decline request for "${name}"?`)) return;
+  const { error } = await supabase.from("requests").update({status:"cancelled"}).eq("id",id);
+  if (error) { showToast("Failed to decline.", "error"); return; }
+  showToast(`Request declined: ${name}`, "error");
+  await renderRequests();
+};
+
+/* ─── ORDERS ─── */
+async function getOrders() {
+  const { data, error } = await supabase.from("requests").select("*")
+    .eq("shopper_id", currentUser.id).neq("status","pending").neq("status","cancelled")
+    .order("created_at",{ascending:false});
+  if (error) return [];
+  return data || [];
+}
+
+async function renderOrders() {
+  const orders = await getOrders();
+  const list   = document.getElementById("orderList");
+  document.getElementById("orderCount").textContent = `${orders.length} order${orders.length!==1?"s":""}`;
+
+  if (orders.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🛍️</div><p>No orders yet.</p></div>`; return;
+  }
+
+  list.innerHTML = orders.map(o => {
+    const isLocked    = o.status==="accepted" || o.status==="payment";
+    const isCompleted = o.status==="delivered";
+    let action = "";
+    if (isCompleted)    action = `<button class="btn btn-ghost" disabled>Completed ✅</button>`;
+    else if (isLocked)  action = `<button class="btn btn-secondary" disabled><i class="fas fa-lock" style="margin-right:6px"></i>Waiting for Payment</button>`;
+    else                action = `<button class="btn btn-primary" onclick="cycleOrderStatus('${o.id}','${o.status}')">Update Status</button>`;
+
+    return `
+      <div class="request-item">
+        <div>
+          <h4>${o.product_name}</h4>
+          <div class="request-meta">
+            <span><i class="fas fa-user"></i> ${o.buyer_name}</span>
+            <span><i class="fas fa-map-marker-alt"></i> ${o.address||"—"}</span>
+            <span><i class="fas fa-dollar-sign"></i> ${o.currency||"$"}${o.budget} budget</span>
+          </div>
+          <div style="margin-top:8px">${getStatusBadge(o.status)}</div>
+        </div>
+        <div class="request-action">${action}</div>
+      </div>`;
+  }).join("");
+}
+
+window.cycleOrderStatus = async function (id, current) {
+  const idx = SHOPPER_STATUSES.indexOf(current);
+  if (idx === -1) { showToast("Cannot update this order.", "error"); return; }
+  if (idx === SHOPPER_STATUSES.length-1) { showToast("Already completed.", "error"); return; }
+  const next = SHOPPER_STATUSES[idx+1];
+  const { error } = await supabase.from("requests").update({status:next}).eq("id",id);
+  if (error) { showToast("Failed to update.", "error"); return; }
+  showToast(`✅ Updated to: ${next}`);
+  await renderOrders(); await renderStats(); await renderEarnings();
+};
+
+/* ─── REALTIME ORDERS ─── */
+function initRealtimeOrders() {
+  supabase.channel("shopper-orders-"+currentUser.id)
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"requests",filter:`shopper_id=eq.${currentUser.id}`},
+      async (payload) => {
+        const u = payload.new;
+        if (u.status==="paid") {
+          showToast(`💳 ${u.buyer_name} paid for "${u.product_name}"!`);
+          addNotification(`Payment received from ${u.buyer_name} for "${u.product_name}"`);
+        }
+        if (u.status==="funded") {
+          showToast(`🏦 Funds released for "${u.product_name}"! Check your payout details.`);
+          addNotification(`Funds released for "${u.product_name}" — go purchase the item`);
+        }
+        await renderOrders(); await renderStats(); await renderEarnings();
+      }).subscribe();
+}
+
+/* ══════════════════════════════════════════════
+   EARNINGS — real payout history from payouts table
+══════════════════════════════════════════════ */
+async function renderEarnings() {
+  const orders    = await getOrders();
+  const delivered = orders.filter(o => o.status === "delivered");
+  const active    = orders.filter(o => !["delivered","cancelled"].includes(o.status));
+
+  // Fetch real payouts from DB
+  const { data: payouts } = await supabase
+    .from("payouts")
+    .select("*")
+    .eq("shopper_id", currentUser.id)
+    .order("paid_at", { ascending: false });
+
+  allPayouts = payouts || [];
+
+  const totalPaidOut  = allPayouts.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+  const totalEarned   = delivered.reduce((s,o) => s + (parseFloat(o.budget)||0) * 0.85, 0);
+  const pendingEarned = active.reduce((s,o) => s + (parseFloat(o.budget)||0) * 0.85, 0);
+
+  // This month
+  const now = new Date();
+  const thisMonthPayouts = allPayouts.filter(p => {
+    const d = new Date(p.paid_at);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const thisMonth = thisMonthPayouts.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+
+  document.getElementById("earnTotal").textContent     = `$${totalPaidOut.toFixed(2)}`;
+  document.getElementById("earnMonth").textContent     = `$${thisMonth.toFixed(2)}`;
+  document.getElementById("earnPending").textContent   = `$${pendingEarned.toFixed(2)}`;
+  document.getElementById("earnCompleted").textContent = delivered.length;
+
+  const list = document.getElementById("earningsList");
+
+  // Payout history table
+  if (allPayouts.length === 0) {
+    list.innerHTML = `
+      <h2 class="section-title" style="margin-bottom:12px">Payout History</h2>
+      <div class="empty-state">
+        <div class="empty-icon">💳</div>
+        <p>No payouts received yet.<br>Complete orders to start earning.</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = `
+    <h2 class="section-title" style="margin-bottom:16px">Payout History</h2>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg)">
+            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Product</th>
+            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Amount</th>
+            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Method</th>
+            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Reference</th>
+            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Date</th>
+            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allPayouts.map(p => `
+            <tr style="border-top:1px solid var(--border)">
+              <td style="padding:12px 16px;font-size:0.85rem;font-weight:500">${p.product_name || "—"}</td>
+              <td style="padding:12px 16px;font-size:0.88rem;font-weight:700;color:var(--green)">$${parseFloat(p.amount||0).toFixed(2)}</td>
+              <td style="padding:12px 16px;font-size:0.8rem;color:var(--text-muted)">${methodIcon(p.method)} ${p.method || "—"}</td>
+              <td style="padding:12px 16px;font-size:0.75rem;color:var(--text-muted);font-family:monospace">${p.reference || "—"}</td>
+              <td style="padding:12px 16px;font-size:0.78rem;color:var(--text-muted)">${p.paid_at ? new Date(p.paid_at).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "—"}</td>
+              <td style="padding:12px 16px">
+                <span style="background:#d1fae5;color:#065f46;font-size:0.68rem;font-weight:600;padding:3px 8px;border-radius:6px">Received ✓</span>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    ${allPayouts.length > 0 ? `
+    <div style="margin-top:14px;padding:14px 18px;background:var(--green-light);border-radius:var(--radius);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:0.85rem;color:var(--green-dark);font-weight:600">💰 Total Received</span>
+      <span style="font-size:1.1rem;font-weight:700;color:var(--green)">$${totalPaidOut.toFixed(2)}</span>
+    </div>` : ""}`;
+}
+
+function methodIcon(method) {
+  if (!method) return "";
+  const m = method.toLowerCase();
+  if (m.includes("paypal"))  return "🅿️";
+  if (m.includes("momo") || m.includes("mobile")) return "📱";
+  if (m.includes("wise") || m.includes("revolut")) return "🌍";
+  if (m.includes("bank"))    return "🏦";
+  return "💳";
+}
+
+/* ─── SETTINGS ─── */
+function loadSettingsIntoForm() {
+  document.getElementById("settingName").value           = currentProfile.name            || "";
+  document.getElementById("settingEmail").value          = currentProfile.email           || "";
+  document.getElementById("settingPhone").value          = currentProfile.phone           || "";
+  document.getElementById("settingLocation").value       = currentProfile.location        || "";
+  document.getElementById("settingAbout").value          = currentProfile.about           || "";
+  document.getElementById("settingFee").value            = currentProfile.fee             || "";
+  document.getElementById("settingYearsActive").value    = parseInt(currentProfile.years_active)||"";
+  document.getElementById("settingResponseTime").value   = currentProfile.response_time   || "";
+  document.getElementById("settingCompletionRate").value = currentProfile.completion_rate || "";
+  document.getElementById("settingTags").value           = currentProfile.tags            || "";
+
+  // Payout fields
+  const methodEl = document.getElementById("payoutMethod");
+  if (methodEl && currentProfile.payout_method) {
+    methodEl.value = currentProfile.payout_method;
+    togglePayoutFields(currentProfile.payout_method);
+  }
+  if (document.getElementById("payoutAccountName"))   document.getElementById("payoutAccountName").value   = currentProfile.payout_account_name   || "";
+  if (document.getElementById("payoutAccountNumber")) document.getElementById("payoutAccountNumber").value = currentProfile.payout_account_number || "";
+  if (document.getElementById("payoutBankName"))      document.getElementById("payoutBankName").value      = currentProfile.payout_bank_name      || "";
+  if (document.getElementById("payoutCountry"))       document.getElementById("payoutCountry").value       = currentProfile.payout_country        || "";
+  if (document.getElementById("payoutEmail"))         document.getElementById("payoutEmail").value         = currentProfile.payout_email          || "";
+
+  const toggle = document.getElementById("notifToggle");
+  if (toggle) toggle.className = `toggle-track ${currentProfile.notifications?"on":""}`;
+  if (currentProfile.avatar_url)
+    document.getElementById("avatarPreview").innerHTML =
+      `<img src="${currentProfile.avatar_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover">`;
+}
+
+/* Toggle which payout fields show based on method */
+window.togglePayoutFields = function(method) {
+  const bankFields   = document.getElementById("bankFields");
+  const momoFields   = document.getElementById("momoFields");
+  const paypalFields = document.getElementById("paypalFields");
+  const wiseFields   = document.getElementById("wiseFields");
+
+  [bankFields, momoFields, paypalFields, wiseFields].forEach(el => {
+    if (el) el.style.display = "none";
+  });
+
+  if (method === "Bank Transfer"  && bankFields)   bankFields.style.display   = "block";
+  if (method === "Mobile Money"   && momoFields)   momoFields.style.display   = "block";
+  if (method === "PayPal"         && paypalFields) paypalFields.style.display = "block";
+  if (method === "Wise / Revolut" && wiseFields)   wiseFields.style.display   = "block";
+};
+
+window.toggleNotif = function () {
+  document.getElementById("notifToggle")?.classList.toggle("on");
+};
+
+window.saveSettings = async function () {
+  const fields = {
+    name:"settingName", email:"settingEmail", phone:"settingPhone",
+    location:"settingLocation", about:"settingAbout", fee:"settingFee",
+    response_time:"settingResponseTime", completion_rate:"settingCompletionRate", tags:"settingTags"
+  };
+  const update = {};
+  for (const [key, id] of Object.entries(fields)) update[key] = document.getElementById(id)?.value.trim() || "";
+  update.years_active  = parseInt(document.getElementById("settingYearsActive")?.value)||0;
+  update.notifications = document.getElementById("notifToggle")?.classList.contains("on") || false;
+
+  const { error } = await supabase.from("users").update(update).eq("uid", currentUser.id);
+  if (error) { showToast("Failed to save.", "error"); return; }
+  Object.assign(currentProfile, update);
+  renderSidebarProfile();
+  showToast("Profile saved! ✅");
+};
+
+window.savePayoutDetails = async function () {
+  const method = document.getElementById("payoutMethod")?.value || "";
+  if (!method) { showToast("Please select a payout method.", "error"); return; }
+
+  const update = {
+    payout_method:         method,
+    payout_account_name:   document.getElementById("payoutAccountName")?.value.trim()   || "",
+    payout_account_number: document.getElementById("payoutAccountNumber")?.value.trim() || "",
+    payout_bank_name:      document.getElementById("payoutBankName")?.value.trim()      || "",
+    payout_country:        document.getElementById("payoutCountry")?.value.trim()       || "",
+    payout_email:          document.getElementById("payoutEmail")?.value.trim()         || "",
+  };
+
+  const { error } = await supabase.from("users").update(update).eq("uid", currentUser.id);
+  if (error) { showToast("Failed to save payout details.", "error"); return; }
+
+  Object.assign(currentProfile, update);
+  showToast("💳 Payout details saved! Admin will use these to send your money.", "success");
+};
+
+function initAvatarUpload() {
+  document.getElementById("settingAvatar")?.addEventListener("change", async function () {
+    const file = this.files[0]; if (!file) return;
+    const path = `${currentUser.id}/avatar.${file.name.split(".").pop()}`;
+    const { error } = await supabase.storage.from("avatars").upload(path, file, {upsert:true});
+    if (error) { showToast(`Upload failed: ${error.message}`, "error"); return; }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    await supabase.from("users").update({avatar_url:data.publicUrl}).eq("uid",currentUser.id);
+    currentProfile.avatar_url = data.publicUrl;
+    document.getElementById("avatarPreview").innerHTML =
+      `<img src="${data.publicUrl}" style="width:64px;height:64px;border-radius:50%;object-fit:cover">`;
+    renderSidebarProfile();
+    showToast("Avatar updated!");
+  });
+}
+
+/* ─── CHAT ─── */
+async function renderShopperChatList() {
+  const list = document.getElementById("msgConvList");
+  if (!list) return;
+
+  const { data: msgs } = await supabase.from("messages").select("*")
+    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+    .order("created_at",{ascending:false});
+
+  if (!msgs || msgs.length === 0) {
+    list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.</div>`;
+    allShopperConvs = [];
+    updateMsgBadge(0);
+    return;
+  }
+
+  const seen = {};
+  msgs.forEach(m => { if (!seen[m.conversation_id]) seen[m.conversation_id] = m; });
+  allShopperConvs = Object.values(seen);
+
+  const unreadMap = {};
+  msgs.forEach(m => {
+    if (m.receiver_id === currentUser.id && !m.is_read)
+      unreadMap[m.conversation_id] = (unreadMap[m.conversation_id]||0) + 1;
+  });
+
+  const total = Object.values(unreadMap).reduce((a,b) => a+b, 0);
+  updateMsgBadge(total);
+  renderShopperConvItems(allShopperConvs, unreadMap);
+}
+
+function renderShopperConvItems(convs, unreadMap = {}) {
+  const list = document.getElementById("msgConvList");
+  if (!list) return;
+  if (convs.length === 0) {
+    list.innerHTML = `<div class="msg-conv-empty">No conversations found.</div>`; return;
+  }
+  list.innerHTML = convs.map(m => {
+    const isMine    = m.sender_id === currentUser.id;
+    const otherName = isMine ? m.receiver_name : m.sender_name;
+    const otherId   = isMine ? m.receiver_id   : m.sender_id;
+    const preview   = getShopperPreview(m.content || "");
+    const time      = formatTime(m.created_at);
+    const unread    = unreadMap[m.conversation_id] || 0;
+    const isActive  = activeChatConvId === m.conversation_id;
+    return `
+      <div class="msg-conv-item ${isActive?"active":""}" onclick="openShopperChat('${otherId}','${escapeHtml(otherName)}')">
+        <div class="msg-conv-avatar">${(otherName||"?")[0].toUpperCase()}</div>
+        <div class="msg-conv-info">
+          <div class="msg-conv-name-row">
+            <span class="msg-conv-name">${otherName}</span>
+            <span class="msg-conv-time">${time}</span>
+          </div>
+          <div class="msg-conv-bottom">
+            <span class="msg-conv-preview">${isMine?"You: ":""}${escapeHtml(preview)}</span>
+            ${unread > 0 ? `<span class="msg-unread-badge">${unread}</span>` : ""}
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function getShopperPreview(content) {
+  if (content.startsWith("[img]"))        return "📷 Photo";
+  if (content.startsWith("[audio]"))      return "🎤 Voice note";
+  if (content.startsWith("[videocall]"))  return "📹 Video call";
+  if (content.startsWith("[voicecall]"))  return "📞 Voice call";
+  return content.length > 30 ? content.substring(0,30)+"..." : content;
+}
+
+function updateMsgBadge(count) {
+  const b = document.getElementById("msgBadge");
+  if (!b) return;
+  b.textContent   = count;
+  b.style.display = count > 0 ? "inline-block" : "none";
+}
+
+window.openShopperChat = async function (otherUid, otherName) {
+  activeChatConvId  = getConvId(currentUser.id, otherUid);
+  activeChatPartner = { uid: otherUid, name: otherName };
+  document.getElementById("msgThreadEmpty").style.display    = "none";
+  document.getElementById("msgThreadHeader").style.display   = "flex";
+  document.getElementById("msgThreadMessages").style.display = "flex";
+  document.getElementById("msgThreadInput").style.display    = "flex";
+  document.getElementById("msgThreadHav").textContent   = (otherName||"?")[0].toUpperCase();
+  document.getElementById("msgThreadHname").textContent = otherName;
+  await loadShopperMessages();
+  await markShopperRead();
+  subscribeShopperThread();
+  await renderShopperChatList();
+};
+
+async function loadShopperMessages() {
+  const { data: msgs } = await supabase.from("messages").select("*")
+    .eq("conversation_id", activeChatConvId).order("created_at",{ascending:true});
+  const container = document.getElementById("msgThreadMessages");
+  if (!container) return;
+  if (!msgs || msgs.length === 0) {
+    container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin:auto;padding:30px">No messages yet</div>`;
+    return;
+  }
+  let lastDate = null;
+  container.innerHTML = msgs.map(m => {
+    if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return "";
+    const isMine  = m.sender_id === currentUser.id;
+    const time    = new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+    const read    = isMine ? (m.is_read?" ✓✓":" ✓") : "";
+    const msgDate = new Date(m.created_at).toLocaleDateString();
+    let divider   = "";
+    if (msgDate !== lastDate) { lastDate = msgDate; divider = `<div class="msg-date-divider">${msgDate}</div>`; }
+    return `${divider}
+      <div class="message ${isMine?"shopper-message":"buyer-message"}">
+        <div>${renderShopperMsgContent(m.content)}</div>
+        <div class="msg-time">${time}${read}</div>
+      </div>`;
+  }).join("");
+  container.scrollTop = container.scrollHeight;
+}
+
+function renderShopperMsgContent(content) {
+  if (!content) return "";
+  if (content.startsWith("[img]")) {
+    const url = content.slice(5);
+    return `<img src="${url}" style="max-width:200px;max-height:200px;border-radius:10px;cursor:pointer;display:block" onclick="window.open('${url}','_blank')" loading="lazy">`;
+  }
+  if (content.startsWith("[audio]")) {
+    const url = content.slice(7);
+    return `<audio controls style="max-width:190px;height:36px"><source src="${url}"></audio>`;
+  }
+  return escapeHtml(content);
+}
+
+function appendShopperOptimistic(content) {
+  const container = document.getElementById("msgThreadMessages");
+  if (!container) return;
+  const empty = container.querySelector("div[style*='padding:30px']");
+  if (empty) empty.remove();
+  const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const el   = document.createElement("div");
+  el.className = "message shopper-message";
+  el.innerHTML = `<div>${renderShopperMsgContent(content)}</div><div class="msg-time">${time} ✓</div>`;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+window.sendShopperMessage = async function () {
+  const input   = document.getElementById("shopperChatInput");
+  const content = input?.value.trim();
+  if (!content || !activeChatConvId || !activeChatPartner) return;
+  input.value = "";
+  appendShopperOptimistic(content);
+  const { error } = await supabase.from("messages").insert({
+    conversation_id: activeChatConvId,
+    sender_id:       currentUser.id,
+    sender_name:     currentProfile.name,
+    sender_role:     "shopper",
+    receiver_id:     activeChatPartner.uid,
+    receiver_name:   activeChatPartner.name,
+    content,
+    is_read: false
+  });
+  if (error) { console.error("Send error:", error); showToast("Failed to send.", "error"); }
+};
+
+window.triggerShopperImageUpload = function () { document.getElementById("shopperImageInput")?.click(); };
+
+window.handleShopperImageUpload = async function (e) {
+  const file = e.target.files?.[0];
+  if (!file || !activeChatConvId || !activeChatPartner) return;
+  e.target.value = "";
+  const ext  = file.name.split(".").pop();
+  const path = `chat/${activeChatConvId}/${Date.now()}.${ext}`;
+  const { error: upErr } = await supabase.storage.from("chat-media").upload(path, file, { upsert: false });
+  if (upErr) { showToast("Image upload failed: " + upErr.message, "error"); return; }
+  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
+  appendShopperOptimistic("[img]" + data.publicUrl);
+  await supabase.from("messages").insert({
+    conversation_id: activeChatConvId, sender_id: currentUser.id,
+    sender_name: currentProfile.name, sender_role: "shopper",
+    receiver_id: activeChatPartner.uid, receiver_name: activeChatPartner.name,
+    content: "[img]" + data.publicUrl, is_read: false
+  });
+};
+
+window.toggleShopperVoice = async function () {
+  if (shopperIsRecording) {
+    shopperMediaRecorder?.stop();
+    shopperIsRecording = false;
+    const btn = document.getElementById("shopperVoiceBtn");
+    if (btn) { btn.style.background = ""; btn.style.color = ""; btn.title = "Record voice note"; }
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      shopperAudioChunks   = [];
+      shopperMediaRecorder = new MediaRecorder(stream);
+      shopperMediaRecorder.ondataavailable = e => shopperAudioChunks.push(e.data);
+      shopperMediaRecorder.onstop = async () => {
+        const blob = new Blob(shopperAudioChunks, { type: "audio/webm" });
+        stream.getTracks().forEach(t => t.stop());
+        await uploadShopperAudio(blob);
+      };
+      shopperMediaRecorder.start();
+      shopperIsRecording = true;
+      const btn = document.getElementById("shopperVoiceBtn");
+      if (btn) { btn.style.background = "#e74c3c"; btn.style.color = "#fff"; btn.title = "Click to stop recording"; }
+    } catch { alert("Microphone access denied."); }
+  }
+};
+
+async function uploadShopperAudio(blob) {
+  if (!activeChatConvId || !activeChatPartner) return;
+  const path = `chat/${activeChatConvId}/audio_${Date.now()}.webm`;
+  const { error } = await supabase.storage.from("chat-media").upload(path, blob, { contentType: "audio/webm" });
+  if (error) { showToast("Audio upload failed: " + error.message, "error"); return; }
+  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
+  appendShopperOptimistic("[audio]" + data.publicUrl);
+  await supabase.from("messages").insert({
+    conversation_id: activeChatConvId, sender_id: currentUser.id,
+    sender_name: currentProfile.name, sender_role: "shopper",
+    receiver_id: activeChatPartner.uid, receiver_name: activeChatPartner.name,
+    content: "[audio]" + data.publicUrl, is_read: false
+  });
+}
+
+/* ─── CALLS ─── */
+window.startShopperVideoCall = async function () { if (!activeChatPartner) return; await openShopperCallUI("video", true); };
+window.startShopperVoiceCall = async function () { if (!activeChatPartner) return; await openShopperCallUI("voice", true); };
+window.acceptShopperVideoCall = async function () { document.getElementById("shopperIncomingBanner")?.remove(); await openShopperCallUI("video", false); };
+window.acceptShopperVoiceCall = async function () { document.getElementById("shopperIncomingBanner")?.remove(); await openShopperCallUI("voice", false); };
+window.rejectShopperCall = function () { sendShopperSignal({ type: "reject" }); document.getElementById("shopperIncomingBanner")?.remove(); };
+window.endShopperCall = function () {
+  shopperPeerConn?.close(); shopperPeerConn = null;
+  shopperLocalStream?.getTracks().forEach(t => t.stop()); shopperLocalStream = null;
+  if (shopperSigChannel) { supabase.removeChannel(shopperSigChannel); shopperSigChannel = null; }
+  document.getElementById("shopperCallOverlay")?.remove();
+  shopperCallType = null;
+};
+
+async function openShopperCallUI(type, isCaller) {
+  shopperCallType = type;
+  const isVideo   = type === "video";
+  const overlay   = document.createElement("div");
+  overlay.id = "shopperCallOverlay";
+  overlay.innerHTML = `
+    <div style="position:fixed;inset:0;background:#111;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
+      <p style="color:#fff;font-family:'Sora',sans-serif;font-size:1.1rem">${isVideo?"📹":"📞"} ${isVideo?"Video":"Voice"} Call — ${activeChatPartner.name}</p>
+      ${isVideo?`<div style="display:flex;gap:16px">
+        <video id="shopperLocalVid" autoplay muted playsinline style="width:200px;border-radius:12px;background:#222"></video>
+        <video id="shopperRemoteVid" autoplay playsinline style="width:320px;border-radius:12px;background:#222"></video>
+      </div>`:`
+      <div style="width:100px;height:100px;border-radius:50%;background:#1a9e6e;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#fff;font-family:'Sora',sans-serif;font-weight:700">
+        ${(activeChatPartner.name||"?")[0].toUpperCase()}</div>
+      <p style="color:#aaa;font-size:0.9rem" id="shopperCallStatus">${isCaller?"Calling…":"Connected"}</p>
+      <audio id="shopperRemoteAudio" autoplay></audio>`}
+      <button onclick="endShopperCall()" style="padding:12px 32px;background:#e74c3c;color:#fff;border:none;border-radius:24px;font-size:0.95rem;cursor:pointer;margin-top:8px">🔴 End Call</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  try {
+    shopperLocalStream = await navigator.mediaDevices.getUserMedia(isVideo?{video:true,audio:true}:{audio:true});
+    if (isVideo) document.getElementById("shopperLocalVid").srcObject = shopperLocalStream;
+  } catch { alert(`${isVideo?"Camera/":""}Microphone access denied.`); window.endShopperCall(); return; }
+  shopperPeerConn = new RTCPeerConnection(ICE_SERVERS);
+  shopperLocalStream.getTracks().forEach(t => shopperPeerConn.addTrack(t, shopperLocalStream));
+  shopperPeerConn.ontrack = e => {
+    if (isVideo) { const v = document.getElementById("shopperRemoteVid"); if (v) v.srcObject = e.streams[0]; }
+    else { const a = document.getElementById("shopperRemoteAudio"); if (a) a.srcObject = e.streams[0]; const s = document.getElementById("shopperCallStatus"); if (s) s.textContent = "Connected"; }
+  };
+  const sigKey = `vc_${activeChatConvId}_${type}`;
+  if (shopperSigChannel) supabase.removeChannel(shopperSigChannel);
+  shopperSigChannel = supabase.channel(sigKey)
+    .on("broadcast",{event:"signal"},async({payload})=>{
+      if (payload.from===currentUser.id) return;
+      if (payload.type==="offer"&&!isCaller) { await shopperPeerConn.setRemoteDescription(new RTCSessionDescription(payload.sdp)); const answer=await shopperPeerConn.createAnswer(); await shopperPeerConn.setLocalDescription(answer); sendShopperSignal({type:"answer",sdp:answer}); }
+      else if (payload.type==="answer"&&isCaller) { await shopperPeerConn.setRemoteDescription(new RTCSessionDescription(payload.sdp)); }
+      else if (payload.type==="ice") { try{await shopperPeerConn.addIceCandidate(new RTCIceCandidate(payload.candidate));}catch{} }
+      else if (payload.type==="reject") { alert(`${activeChatPartner.name} rejected the call.`); window.endShopperCall(); }
+    })
+    .subscribe(async(status)=>{
+      if (status==="SUBSCRIBED"&&isCaller) {
+        shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});};
+        const offer=await shopperPeerConn.createOffer(); await shopperPeerConn.setLocalDescription(offer); sendShopperSignal({type:"offer",sdp:offer});
+        await supabase.from("messages").insert({conversation_id:activeChatConvId,sender_id:currentUser.id,sender_name:currentProfile.name,sender_role:"shopper",receiver_id:activeChatPartner.uid,receiver_name:activeChatPartner.name,content:`[${type}call]incoming`,is_read:false});
+      }
+    });
+  if (!isCaller) { shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});}; }
+}
+
+function sendShopperSignal(payload) { shopperSigChannel?.send({type:"broadcast",event:"signal",payload:{...payload,from:currentUser.id}}); }
+
+function handleShopperIncomingCall(msg) {
+  const isVideo = msg.content==="[videocall]incoming";
+  const isVoice = msg.content==="[voicecall]incoming";
+  if (!isVideo&&!isVoice) return;
+  if (msg.receiver_id!==currentUser.id) return;
+  document.getElementById("shopperIncomingBanner")?.remove();
+  const banner = document.createElement("div");
+  banner.id = "shopperIncomingBanner";
+  banner.innerHTML = `
+    <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a9e6e;color:#fff;padding:16px 24px;border-radius:16px;z-index:9998;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,0.2)">
+      <span>${isVideo?"📹":"📞"} Incoming ${isVideo?"video":"voice"} call from <strong>${msg.sender_name}</strong></span>
+      <button onclick="${isVideo?"acceptShopperVideoCall":"acceptShopperVoiceCall"}()" style="background:#fff;color:#1a9e6e;border:none;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer">Accept</button>
+      <button onclick="rejectShopperCall()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer">Decline</button>
+    </div>`;
+  document.body.appendChild(banner);
+}
+
+function subscribeShopperThread() {
+  if (chatChannel) supabase.removeChannel(chatChannel);
+  chatChannel = supabase.channel("shopper-thread-"+activeChatConvId)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${activeChatConvId}`},
+      async(payload)=>{
+        const msg=payload.new;
+        if (msg.content==="[videocall]incoming"||msg.content==="[voicecall]incoming"){handleShopperIncomingCall(msg);return;}
+        if (msg.sender_id!==currentUser.id){await loadShopperMessages();await markShopperRead();}
+      }).subscribe();
+}
+
+function initRealtimeChatNotif() {
+  supabase.channel("shopper-chat-notif-"+currentUser.id)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`receiver_id=eq.${currentUser.id}`},
+      async(payload)=>{
+        const msg=payload.new;
+        if (msg.content==="[videocall]incoming"||msg.content==="[voicecall]incoming"){handleShopperIncomingCall(msg);return;}
+        showToast(`💬 New message from ${msg.sender_name}`);
+        addNotification(`Message from ${msg.sender_name}: "${(msg.content||"").substring(0,40)}"`);
+        await renderShopperChatList();
+        if (activeChatConvId===msg.conversation_id){await loadShopperMessages();await markShopperRead();}
+      }).subscribe();
+}
+
+async function markShopperRead() {
+  if (!activeChatConvId) return;
+  await supabase.from("messages").update({is_read:true}).eq("conversation_id",activeChatConvId).eq("receiver_id",currentUser.id).eq("is_read",false);
+}
+
+window.filterShopperConversations = function (query) {
+  if (!query) { renderShopperConvItems(allShopperConvs); return; }
+  const q = query.toLowerCase();
+  const filtered = allShopperConvs.filter(m => {
+    const isMine = m.sender_id===currentUser.id;
+    const otherName = isMine?m.receiver_name:m.sender_name;
+    return (otherName||"").toLowerCase().includes(q)||(m.content||"").toLowerCase().includes(q);
+  });
+  renderShopperConvItems(filtered);
+};
+
+/* ─── NOTIFICATIONS ─── */
+function getNotifications() { return JSON.parse(localStorage.getItem("bfm_notifications")) || []; }
+function addNotification(msg) {
+  const n = getNotifications();
+  n.unshift({message:msg, time:Date.now()});
+  localStorage.setItem("bfm_notifications", JSON.stringify(n));
+  updateNotifDot();
+}
+function updateNotifDot() {
+  const dot = document.getElementById("notifDot");
+  if (dot) dot.className = getNotifications().length > 0 ? "notif-dot show" : "notif-dot";
+}
+window.openNotifications = function () {
+  const n = getNotifications();
+  if (n.length === 0) { showToast("No new notifications."); return; }
+  alert("Notifications:\n\n" + n.map(x => `• ${x.message}`).join("\n"));
+  localStorage.removeItem("bfm_notifications");
+  updateNotifDot();
+};
+
+/* ─── LOGOUT ─── */
+window.handleLogout = async function () {
+  await supabase.auth.signOut();
+  window.location.href = "auth.html";
+};

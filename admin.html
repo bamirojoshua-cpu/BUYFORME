@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BuyForMe Admin</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #0b0f0e;
+            --surface: #111715;
+            --surface2: #181e1c;
+            --border: #1f2a27;
+            --green: #1a9e6e;
+            --green-dim: #0f5c3f;
+            --green-glow: rgba(26, 158, 110, 0.15);
+            --amber: #f59e0b;
+            --amber-dim: #92400e;
+            --red: #ef4444;
+            --red-dim: #7f1d1d;
+            --blue: #3b82f6;
+            --purple: #8b5cf6;
+            --text: #e8f0ed;
+            --muted: #5a7268;
+            --muted2: #3d524b;
+            --radius: 12px;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Sora', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 240px;
+            min-height: 100vh;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 200;
+        }
+
+        .sidebar-logo {
+            padding: 24px 20px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-logo .brand {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--green);
+            letter-spacing: -0.5px;
+        }
+
+        .sidebar-logo .tag {
+            font-size: 0.65rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 0;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            padding: 0 12px;
+            margin-bottom: 4px;
+        }
+
+        .nav-section-label {
+            font-size: 0.6rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            padding: 8px 8px 6px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: all 0.15s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            position: relative;
+        }
+
+        .nav-item i {
+            width: 16px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            background: var(--green-glow);
+            color: var(--green);
+            border: 1px solid var(--green-dim);
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--red);
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 20px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .sidebar-footer {
+            padding: 16px 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .admin-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 8px;
+            background: var(--surface2);
+        }
+
+        .admin-av {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--green-dim);
+            color: var(--green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .admin-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .admin-role {
+            font-size: 0.62rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .logout-btn {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: color 0.15s;
+        }
+
+        .logout-btn:hover {
+            color: var(--red);
+        }
+
+        /* ── MAIN ── */
+        .main {
+            margin-left: 240px;
+            flex: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .topbar {
+            height: 58px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .topbar-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .topbar-logout {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 600;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .topbar-logout:hover {
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+        }
+
+        .topbar-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
+        .status-dot-live {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.4
+            }
+        }
+
+        .content {
+            flex: 1;
+            padding: 28px;
+            overflow-y: auto;
+        }
+
+        /* ── SECTIONS ── */
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section-header {
+            margin-bottom: 24px;
+        }
+
+        .section-header h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: -0.3px;
+        }
+
+        .section-header p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* ── STAT CARDS ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+        }
+
+        .stat-card.green::before {
+            background: var(--green);
+        }
+
+        .stat-card.amber::before {
+            background: var(--amber);
+        }
+
+        .stat-card.blue::before {
+            background: var(--blue);
+        }
+
+        .stat-card.purple::before {
+            background: var(--purple);
+        }
+
+        .stat-card.red::before {
+            background: var(--red);
+        }
+
+        .stat-label {
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: -0.5px;
+            line-height: 1;
+        }
+
+        .stat-sub {
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-top: 6px;
+        }
+
+        .stat-icon {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 1.2rem;
+            opacity: 0.15;
+        }
+
+        /* ── TABLES ── */
+        .table-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .table-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .table-header h3 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 12px;
+            color: var(--text);
+            font-size: 0.78rem;
+            font-family: 'Sora', sans-serif;
+            outline: none;
+            width: 200px;
+            transition: border-color 0.15s;
+        }
+
+        .search-input::placeholder {
+            color: var(--muted);
+        }
+
+        .search-input:focus {
+            border-color: var(--green);
+        }
+
+        .filter-select {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 10px;
+            color: var(--text);
+            font-size: 0.78rem;
+            font-family: 'Sora', sans-serif;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .filter-select option {
+            background: var(--surface2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            padding: 10px 16px;
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface2);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+
+        tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: var(--surface2);
+        }
+
+        tbody td {
+            padding: 12px 16px;
+            font-size: 0.8rem;
+            color: var(--text);
+            vertical-align: middle;
+        }
+
+        .td-muted {
+            color: var(--muted);
+            font-size: 0.75rem;
+        }
+
+        .td-mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+        }
+
+        /* ── BADGES ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge-green {
+            background: rgba(26, 158, 110, 0.15);
+            color: #4ade80;
+        }
+
+        .badge-amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+
+        .badge-red {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+        }
+
+        .badge-blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .badge-purple {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+        }
+
+        .badge-gray {
+            background: rgba(107, 114, 128, 0.15);
+            color: #9ca3af;
+        }
+
+        /* ── BUTTONS ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'Sora', sans-serif;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .btn-green:hover {
+            background: #15856e;
+        }
+
+        .btn-amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-amber:hover {
+            background: rgba(245, 158, 11, 0.25);
+        }
+
+        .btn-red {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-red:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        .btn-ghost {
+            background: var(--surface2);
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            color: var(--text);
+            border-color: var(--muted2);
+        }
+
+        .btn-blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--blue);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-blue:hover {
+            background: rgba(59, 130, 246, 0.25);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ── ACTIVITY FEED ── */
+        .activity-feed {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            align-items: flex-start;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+
+        .activity-text {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .activity-time {
+            font-size: 0.68rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+
+        /* ── TWO COL ── */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .three-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* ── SETTINGS FORM ── */
+        .settings-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .settings-card h3 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.72rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 12px;
+            color: var(--text);
+            font-size: 0.82rem;
+            font-family: 'Sora', sans-serif;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .form-input:focus {
+            border-color: var(--green);
+        }
+
+        .form-input::placeholder {
+            color: var(--muted);
+        }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toggle-row:last-child {
+            border-bottom: none;
+        }
+
+        .toggle-info p {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .toggle-info span {
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
+        .toggle {
+            width: 40px;
+            height: 22px;
+            border-radius: 20px;
+            background: var(--muted2);
+            border: none;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            transition: transform 0.2s;
+        }
+
+        .toggle.on {
+            background: var(--green);
+        }
+
+        .toggle.on::after {
+            transform: translateX(18px);
+        }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 520px;
+            width: 90%;
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: var(--text);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+
+        .modal-close:hover {
+            color: var(--red);
+        }
+
+        .modal-detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.82rem;
+        }
+
+        .modal-detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .modal-detail-row .label {
+            color: var(--muted);
+            font-size: 0.75rem;
+        }
+
+        .modal-detail-row .value {
+            color: var(--text);
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* ── TOAST ── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text);
+            z-index: 9999;
+            transform: translateY(80px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            max-width: 320px;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-color: var(--green);
+        }
+
+        .toast.error {
+            border-color: var(--red);
+        }
+
+        .toast.success i {
+            color: var(--green);
+        }
+
+        .toast.error i {
+            color: var(--red);
+        }
+
+        /* ── EMPTY ── */
+        .empty-row td {
+            text-align: center;
+            padding: 40px !important;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        /* ── LOADING ── */
+        .loading-row td {
+            text-align: center;
+            padding: 30px !important;
+        }
+
+        .mini-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── DISPUTE CARD ── */
+        .dispute-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 12px;
+        }
+
+        .dispute-card.flagged {
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .dispute-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+
+        .dispute-meta span {
+            font-size: 0.75rem;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dispute-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        /* ── BROADCAST ── */
+        .broadcast-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 14px;
+        }
+
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                width: 56px;
+            }
+
+            .sidebar-logo .brand,
+            .sidebar-logo .tag,
+            .nav-item span,
+            .nav-badge,
+            .admin-name,
+            .admin-role {
+                display: none;
+            }
+
+            .main {
+                margin-left: 56px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .two-col,
+            .three-col {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="brand">🛍️ BuyForMe</div>
+            <div class="tag">Admin Console</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-label">Main</div>
+                <button class="nav-item active" onclick="showSection('overview', this)">
+                    <i class="fas fa-chart-line"></i><span>Overview</span>
+                </button>
+                <button class="nav-item" onclick="showSection('orders', this)">
+                    <i class="fas fa-box"></i><span>Orders</span>
+                    <span class="nav-badge" id="pendingPaymentBadge" style="display:none">0</span>
+                </button>
+                <button class="nav-item" onclick="showSection('payments', this)">
+                    <i class="fas fa-wallet"></i><span>Payments</span>
+                </button>
+                <button class="nav-item" onclick="showSection('disputes', this)">
+                    <i class="fas fa-flag"></i><span>Disputes</span>
+                    <span class="nav-badge" id="disputeBadge" style="display:none">0</span>
+                </button>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-label">Users</div>
+                <button class="nav-item" onclick="showSection('shoppers', this)">
+                    <i class="fas fa-store"></i><span>Shoppers</span>
+                    <span class="nav-badge" id="pendingShopperBadge" style="display:none">0</span>
+                </button>
+                <button class="nav-item" onclick="showSection('buyers', this)">
+                    <i class="fas fa-users"></i><span>Buyers</span>
+                </button>
+                <button class="nav-item" onclick="showSection('reviews', this)">
+                    <i class="fas fa-star"></i><span>Reviews</span>
+                </button>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-label">Platform</div>
+                <button class="nav-item" onclick="showSection('broadcast', this)">
+                    <i class="fas fa-bullhorn"></i><span>Broadcast</span>
+                </button>
+                <button class="nav-item" onclick="showSection('settings', this)">
+                    <i class="fas fa-cog"></i><span>Settings</span>
+                </button>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="admin-info">
+                <div class="admin-av" id="sidebarAv">A</div>
+                <div>
+                    <div class="admin-name" id="sidebarName">Admin</div>
+                    <div class="admin-role">buyforme.admin</div>
+                </div>
+                <button class="logout-btn" onclick="handleLogout()" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-title" id="topbarTitle">Overview</div>
+            <div class="topbar-right">
+                <div class="status-dot-live"></div>
+                <div class="topbar-time" id="topbarTime">—</div>
+                <button class="topbar-logout" onclick="handleLogout()" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="content">
+
+            <!-- ══════════════════════════════════════
+           1. OVERVIEW
+      ══════════════════════════════════════ -->
+            <div class="section active" id="section-overview">
+                <div class="section-header">
+                    <h2>Platform Overview</h2>
+                    <p>Real-time snapshot of BuyForMe activity</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="stat-label">Total Revenue</div>
+                        <div class="stat-value" id="statRevenue">—</div>
+                        <div class="stat-sub">All payments received</div>
+                        <i class="fas fa-money-bill-wave stat-icon"></i>
+                    </div>
+                    <div class="stat-card amber">
+                        <div class="stat-label">Pending Release</div>
+                        <div class="stat-value" id="statPending">—</div>
+                        <div class="stat-sub">Paid, not yet funded</div>
+                        <i class="fas fa-clock stat-icon"></i>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="stat-label">Platform Fees</div>
+                        <div class="stat-value" id="statFees">—</div>
+                        <div class="stat-sub">15% of completed orders</div>
+                        <i class="fas fa-percentage stat-icon"></i>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="stat-label">Total Orders</div>
+                        <div class="stat-value" id="statOrders">—</div>
+                        <div class="stat-sub">All time</div>
+                        <i class="fas fa-box stat-icon"></i>
+                    </div>
+                </div>
+
+                <div class="three-col">
+                    <div class="stat-card green">
+                        <div class="stat-label">Active Shoppers</div>
+                        <div class="stat-value" id="statShoppers">—</div>
+                        <div class="stat-sub">Approved & active</div>
+                        <i class="fas fa-store stat-icon"></i>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="stat-label">Total Buyers</div>
+                        <div class="stat-value" id="statBuyers">—</div>
+                        <div class="stat-sub">Registered accounts</div>
+                        <i class="fas fa-users stat-icon"></i>
+                    </div>
+                    <div class="stat-card amber">
+                        <div class="stat-label">Pending Approval</div>
+                        <div class="stat-value" id="statPendingShoppers">—</div>
+                        <div class="stat-sub">Shoppers awaiting review</div>
+                        <i class="fas fa-user-clock stat-icon"></i>
+                    </div>
+                </div>
+
+                <div class="two-col">
+                    <div>
+                        <div class="table-card">
+                            <div class="table-header">
+                                <h3>Recent Orders</h3>
+                                <button class="btn btn-ghost"
+                                    onclick="showSection('orders', document.querySelector('[onclick*=orders]'))">View
+                                    All</button>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Buyer</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentOrdersBody">
+                                    <tr class="loading-row">
+                                        <td colspan="4">
+                                            <div class="mini-spinner"></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="table-header" style="padding:0;margin-bottom:12px">
+                            <h3 style="color:var(--text);font-size:0.88rem;font-weight:700">Activity Feed</h3>
+                        </div>
+                        <div class="activity-feed" id="activityFeed">
+                            <div class="activity-item">
+                                <div class="activity-dot" style="background:var(--muted)"></div>
+                                <div>
+                                    <div class="activity-text">Loading activity...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           2. ORDERS
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-orders">
+                <div class="section-header">
+                    <h2>Orders Management</h2>
+                    <p>View, fund, and manage all platform orders</p>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>All Orders</h3>
+                        <div class="table-actions">
+                            <input class="search-input" placeholder="Search product, buyer..." id="orderSearch"
+                                oninput="filterOrdersTable()">
+                            <select class="filter-select" id="orderStatusFilter" onchange="filterOrdersTable()">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="accepted">Accepted</option>
+                                <option value="paid">Paid</option>
+                                <option value="funded">Funded</option>
+                                <option value="purchased">Purchased</option>
+                                <option value="delivering">Delivering</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="disputed">Disputed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Buyer</th>
+                                <th>Shopper</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersBody">
+                            <tr class="loading-row">
+                                <td colspan="7">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           3. PAYMENTS & FINANCE
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-payments">
+                <div class="section-header">
+                    <h2>Payments & Finance</h2>
+                    <p>Track every naira in and out of BuyForMe</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="stat-label">Total Collected</div>
+                        <div class="stat-value" id="finRevenue">—</div>
+                        <div class="stat-sub">Via Paystack</div>
+                        <i class="fas fa-arrow-down stat-icon"></i>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-label">Released to Shoppers</div>
+                        <div class="stat-value" id="finReleased">—</div>
+                        <div class="stat-sub">Funded orders</div>
+                        <i class="fas fa-arrow-up stat-icon"></i>
+                    </div>
+                    <div class="stat-card amber">
+                        <div class="stat-label">Holding (Escrow)</div>
+                        <div class="stat-value" id="finEscrow">—</div>
+                        <div class="stat-sub">Paid, not funded yet</div>
+                        <i class="fas fa-vault stat-icon"></i>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="stat-label">Net Platform Fees</div>
+                        <div class="stat-value" id="finFees">—</div>
+                        <div class="stat-sub">From delivered orders</div>
+                        <i class="fas fa-coins stat-icon"></i>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>Awaiting Fund Release</h3>
+                        <span style="font-size:0.75rem;color:var(--amber)">These orders are paid — release funds to
+                            shoppers so they can purchase</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Buyer</th>
+                                <th>Shopper</th>
+                                <th>Amount</th>
+                                <th>Paid At</th>
+                                <th>Paystack Ref</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="awaitingFundBody">
+                            <tr class="loading-row">
+                                <td colspan="7">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>Payment History</h3>
+                        <input class="search-input" placeholder="Search ref or buyer..." id="paymentSearch"
+                            oninput="filterPaymentsTable()">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Buyer</th>
+                                <th>Shopper</th>
+                                <th>Amount</th>
+                                <th>Ref</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentHistoryBody">
+                            <tr class="loading-row">
+                                <td colspan="7">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           4. DISPUTES
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-disputes">
+                <div class="section-header">
+                    <h2>Disputes</h2>
+                    <p>Investigate and resolve buyer-shopper conflicts</p>
+                </div>
+                <div id="disputesList">
+                    <div style="text-align:center;padding:40px;color:var(--muted)">Loading disputes...</div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           5. SHOPPERS
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-shoppers">
+                <div class="section-header">
+                    <h2>Shoppers Management</h2>
+                    <p>Approve, suspend, and monitor all shoppers</p>
+                </div>
+
+                <div class="table-card" style="margin-bottom:20px">
+                    <div class="table-header">
+                        <h3>⏳ Pending Verification</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Location</th>
+                                <th>Applied</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingShoppersBody">
+                            <tr class="loading-row">
+                                <td colspan="5">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>All Shoppers</h3>
+                        <input class="search-input" placeholder="Search name or location..." id="shopperSearch"
+                            oninput="filterShoppersTable()">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Location</th>
+                                <th>Rating</th>
+                                <th>Orders</th>
+                                <th>Earnings</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allShoppersBody">
+                            <tr class="loading-row">
+                                <td colspan="7">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           6. BUYERS
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-buyers">
+                <div class="section-header">
+                    <h2>Buyers Management</h2>
+                    <p>View and manage all registered buyers</p>
+                </div>
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>All Buyers</h3>
+                        <input class="search-input" placeholder="Search name or email..." id="buyerSearch"
+                            oninput="filterBuyersTable()">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Country</th>
+                                <th>Orders</th>
+                                <th>Total Spent</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allBuyersBody">
+                            <tr class="loading-row">
+                                <td colspan="7">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           7. REVIEWS
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-reviews">
+                <div class="section-header">
+                    <h2>Reviews Moderation</h2>
+                    <p>Monitor and manage shopper reviews</p>
+                </div>
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>All Reviews</h3>
+                        <select class="filter-select" id="reviewStarFilter" onchange="filterReviewsTable()">
+                            <option value="">All Stars</option>
+                            <option value="5">⭐⭐⭐⭐⭐ 5 Stars</option>
+                            <option value="4">⭐⭐⭐⭐ 4 Stars</option>
+                            <option value="3">⭐⭐⭐ 3 Stars</option>
+                            <option value="2">⭐⭐ 2 Stars</option>
+                            <option value="1">⭐ 1 Star</option>
+                        </select>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Buyer</th>
+                                <th>Shopper</th>
+                                <th>Stars</th>
+                                <th>Review</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reviewsBody">
+                            <tr class="loading-row">
+                                <td colspan="6">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           8. BROADCAST
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-broadcast">
+                <div class="section-header">
+                    <h2>Broadcast Message</h2>
+                    <p>Send announcements to buyers or shoppers</p>
+                </div>
+
+                <div class="broadcast-card">
+                    <h3 style="font-size:0.9rem;font-weight:700;color:var(--text);margin-bottom:16px">
+                        <i class="fas fa-bullhorn" style="color:var(--green);margin-right:8px"></i>New Broadcast
+                    </h3>
+                    <div class="form-group">
+                        <label>Send To</label>
+                        <select class="form-input" id="broadcastTarget">
+                            <option value="all">Everyone (Buyers + Shoppers)</option>
+                            <option value="buyers">Buyers Only</option>
+                            <option value="shoppers">Shoppers Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Message Title</label>
+                        <input type="text" class="form-input" id="broadcastTitle"
+                            placeholder="e.g. Platform Maintenance Notice">
+                    </div>
+                    <div class="form-group">
+                        <label>Message Body</label>
+                        <textarea class="form-input" id="broadcastBody" placeholder="Write your announcement here..."
+                            rows="4"></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:4px">
+                        <button class="btn btn-green" onclick="sendBroadcast()">
+                            <i class="fas fa-paper-plane"></i> Send Broadcast
+                        </button>
+                        <button class="btn btn-ghost" onclick="clearBroadcast()">Clear</button>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>Broadcast History</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Target</th>
+                                <th>Message</th>
+                                <th>Sent At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="broadcastHistory">
+                            <tr class="loading-row">
+                                <td colspan="4">
+                                    <div class="mini-spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+           9. SETTINGS
+      ══════════════════════════════════════ -->
+            <div class="section" id="section-settings">
+                <div class="section-header">
+                    <h2>Platform Settings</h2>
+                    <p>Configure BuyForMe platform behaviour</p>
+                </div>
+
+                <div class="settings-card">
+                    <h3><i class="fas fa-sliders-h" style="color:var(--green);margin-right:8px"></i>Platform
+                        Configuration</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Platform Name</label>
+                            <input type="text" class="form-input" id="setPlatformName" value="BuyForMe">
+                        </div>
+                        <div class="form-group">
+                            <label>Support Email</label>
+                            <input type="email" class="form-input" id="setSupportEmail"
+                                placeholder="support@buyforme.com">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Service Fee (%)</label>
+                            <input type="number" class="form-input" id="setServiceFee" value="15" min="0" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Default Currency</label>
+                            <select class="form-input" id="setDefaultCurrency">
+                                <option value="NGN">NGN (₦)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="GHS">GHS (₵)</option>
+                                <option value="KES">KES (KSh)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-green" onclick="savePlatformSettings()">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+
+                <div class="settings-card">
+                    <h3><i class="fas fa-toggle-on" style="color:var(--green);margin-right:8px"></i>Platform Controls
+                    </h3>
+                    <div class="toggle-row">
+                        <div class="toggle-info">
+                            <p>Maintenance Mode</p>
+                            <span>Shows a maintenance page to all users</span>
+                        </div>
+                        <button class="toggle" id="toggleMaintenance"
+                            onclick="toggleSetting('toggleMaintenance')"></button>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-info">
+                            <p>New Shopper Registrations</p>
+                            <span>Allow new shoppers to apply</span>
+                        </div>
+                        <button class="toggle on" id="toggleShopperReg"
+                            onclick="toggleSetting('toggleShopperReg')"></button>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-info">
+                            <p>New Buyer Registrations</p>
+                            <span>Allow new buyers to sign up</span>
+                        </div>
+                        <button class="toggle on" id="toggleBuyerReg"
+                            onclick="toggleSetting('toggleBuyerReg')"></button>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-info">
+                            <p>Payment Processing</p>
+                            <span>Allow Paystack payments to go through</span>
+                        </div>
+                        <button class="toggle on" id="togglePayments"
+                            onclick="toggleSetting('togglePayments')"></button>
+                    </div>
+                    <div style="margin-top:16px">
+                        <button class="btn btn-green" onclick="savePlatformSettings()">
+                            <i class="fas fa-save"></i> Save Controls
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3><i class="fas fa-user-shield" style="color:var(--green);margin-right:8px"></i>Admin Account</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Display Name</label>
+                            <input type="text" class="form-input" id="setAdminName" placeholder="Your name">
+                        </div>
+                        <div class="form-group">
+                            <label>Admin Email</label>
+                            <input type="email" class="form-input" id="setAdminEmail" placeholder="admin@buyforme.com"
+                                disabled>
+                        </div>
+                    </div>
+                    <button class="btn btn-green" onclick="saveAdminProfile()">
+                        <i class="fas fa-save"></i> Update Profile
+                    </button>
+                </div>
+            </div>
+
+        </div><!-- /content -->
+    </div><!-- /main -->
+
+    <!-- ORDER DETAIL MODAL -->
+    <div class="modal-overlay" id="orderModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('orderModal')"><i class="fas fa-times"></i></button>
+            <h3 id="orderModalTitle">Order Details</h3>
+            <div id="orderModalBody"></div>
+            <div class="modal-actions" id="orderModalActions"></div>
+        </div>
+    </div>
+
+    <!-- SHOPPER DETAIL MODAL -->
+    <div class="modal-overlay" id="shopperModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('shopperModal')"><i class="fas fa-times"></i></button>
+            <h3 id="shopperModalTitle">Shopper Details</h3>
+            <div id="shopperModalBody"></div>
+            <div class="modal-actions" id="shopperModalActions"></div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle" id="toastIcon"></i>
+        <span id="toastMsg">Done</span>
+    </div>
+
+    <script type="module" src="css/js/admin.js"></script>
+</body>
+
+</html>

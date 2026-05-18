@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Request | BuyForMe</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Paystack -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --green: #1a9e6e;
+            --green-dark: #127a54;
+            --green-light: #e6f7f1;
+            --amber: #f59e0b;
+            --amber-light: #fef3c7;
+            --red: #ef4444;
+            --red-light: #fee2e2;
+            --text: #0f1c18;
+            --text-muted: #5a7268;
+            --border: #dde8e4;
+            --bg: #f4f8f6;
+            --white: #ffffff;
+            --radius: 14px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            height: 62px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--green);
+            text-decoration: none;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 7px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .back-link:hover {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .page {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 48px 24px 60px;
+        }
+
+        .shopper-preview {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .shopper-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            color: white;
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .shopper-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .shopper-info {
+            flex: 1;
+        }
+
+        .shopper-info h4 {
+            font-family: 'Sora', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .shopper-info p {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .verified-badge {
+            font-size: 0.68rem;
+            font-weight: 600;
+            background: var(--green-light);
+            color: var(--green-dark);
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        .page-header {
+            margin-bottom: 28px;
+        }
+
+        .page-header h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+        }
+
+        .page-header p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .form-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin-bottom: 16px;
+        }
+
+        .form-card h3 {
+            font-family: 'Sora', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-card h3 i {
+            color: var(--green);
+            font-size: 0.85rem;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 7px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            font-size: 0.92rem;
+            color: var(--text);
+            background: var(--bg);
+            outline: none;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.15s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: var(--green);
+            background: var(--white);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 110px;
+            line-height: 1.6;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .field-hint {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        .budget-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .budget-display input {
+            flex: 1;
+        }
+
+        .currency-select {
+            width: 90px;
+            flex-shrink: 0;
+        }
+
+        /* Price breakdown */
+        .price-breakdown {
+            background: var(--green-light);
+            border: 1px solid #b6e5d4;
+            border-radius: 10px;
+            padding: 16px 18px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .price-row:last-child {
+            margin-bottom: 0;
+            padding-top: 10px;
+            border-top: 1px solid #b6e5d4;
+        }
+
+        .price-row.total {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--green-dark);
+            font-family: 'Sora', sans-serif;
+        }
+
+        .price-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .price-label .buyforme-badge {
+            font-size: 0.65rem;
+            background: var(--green);
+            color: white;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .error-msg {
+            font-size: 0.82rem;
+            color: var(--red);
+            background: var(--red-light);
+            border: 1px solid #fca5a5;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .error-msg.show {
+            display: block;
+        }
+
+        .notice-box {
+            background: var(--amber-light);
+            border: 1px solid #fcd34d;
+            border-radius: 10px;
+            padding: 14px 18px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            font-size: 0.82rem;
+            color: #92400e;
+            line-height: 1.6;
+        }
+
+        .notice-box i {
+            margin-top: 2px;
+            flex-shrink: 0;
+            color: var(--amber);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-submit:hover {
+            background: var(--green-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(26, 158, 110, 0.25);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .success-state {
+            display: none;
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .success-state.show {
+            display: block;
+        }
+
+        .success-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--green-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: var(--green);
+            margin: 0 auto 20px;
+        }
+
+        .success-state h2 {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .success-state p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.7;
+            max-width: 400px;
+            margin: 0 auto 28px;
+        }
+
+        .success-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-orders {
+            padding: 12px 24px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 9px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            font-family: 'Inter', sans-serif;
+            transition: background 0.15s;
+        }
+
+        .btn-orders:hover {
+            background: var(--green-dark);
+        }
+
+        .btn-back {
+            padding: 12px 24px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.15s;
+        }
+
+        .btn-back:hover {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            color: white;
+            background: var(--green);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all 0.25s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 600px) {
+            .navbar {
+                padding: 0 16px;
+            }
+
+            .page {
+                padding: 28px 16px 40px;
+            }
+
+            .form-card {
+                padding: 20px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">🛍️ BUYFORME</a>
+        <a href="javascript:history.back()" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </nav>
+
+    <div class="page">
+
+        <div class="shopper-preview" id="shopperPreview">
+            <div class="shopper-avatar" id="previewAvatar">A</div>
+            <div class="shopper-info">
+                <h4 id="previewName">Loading shopper...</h4>
+                <p>
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="previewLocation">—</span>
+                    &nbsp;·&nbsp;
+                    <span class="verified-badge">✓ Verified</span>
+                </p>
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-muted);text-align:right">
+                <div style="font-family:'Sora',serif;font-weight:700;font-size:1rem;color:var(--green)" id="previewFee">
+                    —</div>
+                <div>service fee</div>
+            </div>
+        </div>
+
+        <div class="page-header">
+            <h1>Send Purchase Request</h1>
+            <p>Describe exactly what you need. Your shopper will confirm before purchasing anything.</p>
+        </div>
+
+        <div class="notice-box">
+            <i class="fas fa-info-circle"></i>
+            <span>Your shopper will <strong>send you photos and videos</strong> from the store before making any
+                purchase. You stay in full control at every step.</span>
+        </div>
+
+        <div class="error-msg" id="errorMsg"></div>
+
+        <div id="formState">
+            <div class="form-card">
+                <h3><i class="fas fa-box"></i> Product Details</h3>
+                <div class="form-group">
+                    <label>Product Name <span style="color:var(--red)">*</span></label>
+                    <input type="text" id="productName" placeholder="e.g. iPhone 15 Pro Max, Zara puffer jacket">
+                </div>
+                <div class="form-group">
+                    <label>Store or Website</label>
+                    <input type="text" id="storeName" placeholder="e.g. Zara Istanbul, Apple Store, Amazon">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Quantity <span style="color:var(--red)">*</span></label>
+                        <input type="number" id="quantity" value="1" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="category">
+                            <option value="">Select category</option>
+                            <option>Fashion & Clothing</option>
+                            <option>Electronics</option>
+                            <option>Shoes & Bags</option>
+                            <option>Jewellery & Accessories</option>
+                            <option>Home & Decor</option>
+                            <option>Beauty & Cosmetics</option>
+                            <option>Wholesale / Bulk</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Additional Notes</label>
+                    <textarea id="notes" placeholder="Colour, size, specific model, brand preferences..."></textarea>
+                    <div class="field-hint">The more detail you give, the easier it is for your shopper to get it
+                        exactly right.</div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <h3><i class="fas fa-wallet"></i> Budget & Payment</h3>
+                <div class="form-group">
+                    <label>Estimated Product Budget <span style="color:var(--red)">*</span></label>
+                    <div class="budget-display">
+                        <select class="currency-select" id="currency">
+                            <option value="USD">$ USD</option>
+                            <option value="GBP">£ GBP</option>
+                            <option value="EUR">€ EUR</option>
+                            <option value="NGN">₦ NGN</option>
+                            <option value="GHS">₵ GHS</option>
+                            <option value="KES">KES</option>
+                        </select>
+                        <input type="number" id="budget" placeholder="0.00" min="1" oninput="updateFeeEstimate()">
+                    </div>
+                    <div class="field-hint">Enter the estimated cost of the product only.</div>
+                </div>
+
+                <!-- PRICE BREAKDOWN -->
+                <div class="price-breakdown" id="priceBreakdown">
+                    <div class="price-row">
+                        <span class="price-label">Product Budget</span>
+                        <span id="breakdownBudget">—</span>
+                    </div>
+                    <div class="price-row">
+                        <span class="price-label">Shopper Service Fee <span id="breakdownFeePercent"></span></span>
+                        <span id="breakdownShopperFee">—</span>
+                    </div>
+                    <div class="price-row">
+                        <span class="price-label">
+                            BuyForMe Platform Fee
+                            <span class="buyforme-badge">5%</span>
+                        </span>
+                        <span id="breakdownPlatformFee">—</span>
+                    </div>
+                    <div class="price-row total">
+                        <span>Total to Pay</span>
+                        <span id="breakdownTotal">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card" style="margin-bottom:24px">
+                <h3><i class="fas fa-map-marker-alt"></i> Delivery Details</h3>
+                <div class="form-group">
+                    <label>Full Delivery Address <span style="color:var(--red)">*</span></label>
+                    <input type="text" id="address" placeholder="Street address, city, country">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Country</label>
+                        <input type="text" id="country" placeholder="e.g. Nigeria, Ghana, Kenya">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" id="phone" placeholder="+234 800 000 0000">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Preferred Delivery Timeline</label>
+                    <select id="timeline">
+                        <option value="">No preference</option>
+                        <option>As soon as possible</option>
+                        <option>Within 1 week</option>
+                        <option>Within 2 weeks</option>
+                        <option>Within 1 month</option>
+                        <option>Flexible</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">
+                <i class="fas fa-paper-plane"></i> Send Request to Shopper
+            </button>
+        </div>
+
+        <div class="success-state" id="successState">
+            <div class="success-icon"><i class="fas fa-check"></i></div>
+            <h2>Request Sent!</h2>
+            <p>Your request has been sent to <strong id="successShopperName">your shopper</strong>. They'll review it
+                and get back to you. Once accepted, you'll be prompted to make payment.</p>
+            <div class="success-actions">
+                <a href="my-orders.html" class="btn-orders">
+                    <i class="fas fa-shopping-bag"></i> View My Orders
+                </a>
+                <a href="buyers.html" class="btn-back">Browse More Shoppers</a>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+        import { supabase } from "./css/js/supabase.js";
+        import { PAYSTACK_PUBLIC_KEY } from "./css/js/config.js";
+
+        const PLATFORM_FEE_PERCENT = 5;
+
+        /* ─── STATE ─── */
+        let currentUser = null;
+        let currentShopper = null;
+        let shopperFeePercent = 10; // default, overridden by shopper's actual fee
+
+        /* ─── INIT ─── */
+        async function init() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) { window.location.href = "auth.html"; return; }
+
+            const { data: profile } = await supabase
+                .from("users")
+                .select("*")
+                .eq("uid", session.user.id)
+                .maybeSingle();
+
+            if (!profile) { window.location.href = "auth.html"; return; }
+            currentUser = profile;
+
+            const uid = new URLSearchParams(window.location.search).get("id");
+            if (!uid) { window.location.href = "buyers.html"; return; }
+
+            const { data: shopper } = await supabase
+                .from("public_shoppers")
+                .select("*")
+                .eq("uid", uid)
+                .maybeSingle();
+
+            if (!shopper) { window.location.href = "buyers.html"; return; }
+            currentShopper = shopper;
+
+            // Parse shopper fee percentage (e.g. "10-12%" → use lower bound)
+            if (shopper.fee) {
+                const match = shopper.fee.match(/\d+/);
+                if (match) shopperFeePercent = parseInt(match[0]);
+            }
+
+            // Fill shopper preview
+            const avatarEl = document.getElementById("previewAvatar");
+            if (shopper.avatar_url) {
+                avatarEl.innerHTML = `<img src="${shopper.avatar_url}" alt="avatar">`;
+            } else {
+                avatarEl.textContent = (shopper.name || "S")[0].toUpperCase();
+            }
+            document.getElementById("previewName").textContent = shopper.name;
+            document.getElementById("previewLocation").textContent = shopper.location || "—";
+            document.getElementById("previewFee").textContent = shopper.fee || "—";
+            document.getElementById("successShopperName").textContent = shopper.name;
+        }
+
+        /* ─── PRICE BREAKDOWN ─── */
+        window.updateFeeEstimate = function () {
+            const budget = parseFloat(document.getElementById("budget").value);
+            const currency = document.getElementById("currency").value;
+            const box = document.getElementById("priceBreakdown");
+
+            if (!budget || budget <= 0) { box.style.display = "none"; return; }
+
+            const shopperFee = budget * (shopperFeePercent / 100);
+            const platformFee = budget * (PLATFORM_FEE_PERCENT / 100);
+            const total = budget + shopperFee + platformFee;
+
+            document.getElementById("breakdownBudget").textContent = `${currency} ${budget.toFixed(2)}`;
+            document.getElementById("breakdownFeePercent").textContent = `(${shopperFeePercent}%)`;
+            document.getElementById("breakdownShopperFee").textContent = `${currency} ${shopperFee.toFixed(2)}`;
+            document.getElementById("breakdownPlatformFee").textContent = `${currency} ${platformFee.toFixed(2)}`;
+            document.getElementById("breakdownTotal").textContent = `${currency} ${total.toFixed(2)}`;
+
+            box.style.display = "block";
+        };
+
+        /* ─── VALIDATION ─── */
+        function validate() {
+            const product = document.getElementById("productName").value.trim();
+            const quantity = document.getElementById("quantity").value;
+            const budget = document.getElementById("budget").value;
+            const address = document.getElementById("address").value.trim();
+
+            if (!product) { showError("Please enter the product name."); return false; }
+            if (!quantity || quantity < 1) { showError("Please enter a valid quantity."); return false; }
+            if (!budget || budget <= 0) { showError("Please enter your budget."); return false; }
+            if (!address) { showError("Please enter your delivery address."); return false; }
+            return true;
+        }
+
+        /* ─── SUBMIT ─── */
+        window.handleSubmit = async function () {
+            hideError();
+            if (!validate()) return;
+
+            const btn = document.getElementById("submitBtn");
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending...`;
+
+            const budget = parseFloat(document.getElementById("budget").value);
+            const shopperFee = budget * (shopperFeePercent / 100);
+            const platformFee = budget * (PLATFORM_FEE_PERCENT / 100);
+            const totalAmount = budget + shopperFee + platformFee;
+
+            const { error } = await supabase
+                .from("requests")
+                .insert({
+                    buyer_id: currentUser.uid,
+                    buyer_name: currentUser.name,
+                    shopper_id: currentShopper.uid,
+                    shopper_name: currentShopper.name,
+                    shopper_location: currentShopper.location || "",
+                    product_name: document.getElementById("productName").value.trim(),
+                    store_name: document.getElementById("storeName").value.trim(),
+                    quantity: parseInt(document.getElementById("quantity").value),
+                    category: document.getElementById("category").value,
+                    notes: document.getElementById("notes").value.trim(),
+                    budget: budget,
+                    shopper_fee: shopperFee,
+                    platform_fee: platformFee,
+                    total_amount: totalAmount,
+                    currency: document.getElementById("currency").value,
+                    address: document.getElementById("address").value.trim(),
+                    country: document.getElementById("country").value.trim(),
+                    phone: document.getElementById("phone").value.trim(),
+                    timeline: document.getElementById("timeline").value,
+                    status: "pending"
+                });
+
+            if (error) {
+                console.error("Request error:", JSON.stringify(error));
+                showError("Failed to send request. Please try again.");
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-paper-plane"></i> Send Request to Shopper`;
+                return;
+            }
+
+            document.getElementById("formState").style.display = "none";
+            document.getElementById("successState").classList.add("show");
+        };
+
+        /* ─── HELPERS ─── */
+        function showError(msg) {
+            const el = document.getElementById("errorMsg");
+            el.textContent = msg;
+            el.classList.add("show");
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function hideError() {
+            document.getElementById("errorMsg").classList.remove("show");
+        }
+
+        document.addEventListener("DOMContentLoaded", init);
+    </script>
+
+</body>
+
+</html>

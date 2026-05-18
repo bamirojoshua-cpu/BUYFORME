@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopper Profile — BuyForMe</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="css/shoppers-profile.css">
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <a href="buyers.html" class="logo">🛍️ BUYFORME</a>
+        <a href="buyers.html" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back to Shoppers
+        </a>
+    </nav>
+
+    <!-- BANNER -->
+    <div class="profile-banner" id="profileBanner"></div>
+
+    <div class="page-container">
+
+        <!-- PROFILE INTRO -->
+        <div class="profile-intro">
+            <div class="profile-avatar" id="profileAvatar">—</div>
+            <div class="profile-intro-text">
+                <h1 id="profileName">Loading...</h1>
+                <p class="profile-location" id="profileLocation"></p>
+            </div>
+        </div>
+
+        <!-- STATS ROW -->
+        <div class="stats-row">
+            <div class="stat-box"><span class="val" id="statRating">—</span><span class="lbl">Rating</span></div>
+            <div class="stat-box"><span class="val" id="statReviews">—</span><span class="lbl">Reviews</span></div>
+            <div class="stat-box"><span class="val" id="statOrders">—</span><span class="lbl">Orders Done</span></div>
+            <div class="stat-box"><span class="val" id="statYears">—</span><span class="lbl">Years Active</span></div>
+        </div>
+
+        <!-- MAIN LAYOUT -->
+        <div class="profile-layout">
+
+            <!-- LEFT COLUMN -->
+            <div>
+                <div class="card">
+                    <h3><i class="fas fa-user" style="color:var(--green);margin-right:8px"></i>About</h3>
+                    <p id="profileAbout"></p>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-tags" style="color:var(--green);margin-right:8px"></i>Services Offered</h3>
+                    <div class="tags-container" id="profileTags"></div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-map-marker-alt" style="color:var(--green);margin-right:8px"></i>Recent Shopping
+                        Trips</h3>
+                    <div id="profileTrips"></div>
+                </div>
+
+                <div class="card">
+                    <h3>
+                        <i class="fas fa-star" style="color:var(--green);margin-right:8px"></i>Reviews
+                        <span id="reviewCount" style="font-size:0.8rem;font-weight:400;color:var(--text-muted)"></span>
+                    </h3>
+                    <div id="profileReviews"></div>
+                </div>
+            </div>
+
+            <!-- SIDEBAR -->
+            <aside>
+                <div class="action-card">
+                    <p class="fee-label">Service Fee</p>
+                    <div class="fee-amount" id="profileFee">—</div>
+                    <p class="fee-sub">of total item cost</p>
+
+                    <!-- ✅ id added so JS can read shopperId from it -->
+                    <button class="btn-request" id="btnRequest" onclick="handleRequest()">
+                        <i class="fas fa-shopping-bag"></i> Request Purchase
+                    </button>
+
+                    <!-- ✅ id="btnMessage" added — this now opens real chat -->
+                    <button class="btn-message" id="btnMessage" onclick="handleMessage()">
+                        <i class="fas fa-comment"></i> Send Message
+                    </button>
+
+                    <hr class="divider">
+
+                    <div class="sidebar-stat-row"><span>Response time</span><span id="sidebarResponse">—</span></div>
+                    <div class="sidebar-stat-row"><span>Completion rate</span><span id="sidebarCompletion">—</span>
+                    </div>
+                    <div class="sidebar-stat-row"><span>Member since</span><span id="sidebarSince">—</span></div>
+
+                    <div class="trust-badges">
+                        <div class="trust-item"><i class="fas fa-shield-alt"></i> Identity verified</div>
+                        <div class="trust-item"><i class="fas fa-id-card"></i> ID document checked</div>
+                        <div class="trust-item" id="trustPhone"></div>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
+    </div>
+
+    <script type="module" src="css/js/profile.js"></script>
+</body>
+
+</html>

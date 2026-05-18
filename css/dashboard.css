@@ -1,0 +1,273 @@
+/* ==============================
+   SHOPPER DASHBOARD
+============================== */
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    min-height: 100vh;
+    background: #f7f7f7;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Sidebar */
+.sidebar {
+    background: #fff;
+    padding: 2rem 1rem;
+    border-right: 1px solid #eee;
+}
+
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0 auto 1rem;
+}
+
+.sidebar-profile h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+}
+
+.sidebar-profile p {
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.sidebar-menu {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar-menu li {
+    margin-bottom: 1rem;
+}
+
+.sidebar-menu li a {
+    text-decoration: none;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.sidebar-menu li a.active,
+.sidebar-menu li a:hover {
+    background: #667eea;
+    color: #fff;
+}
+
+/* Main Dashboard */
+.dashboard-main {
+    padding: 2rem;
+}
+
+/* Welcome Card */
+.welcome-card {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+}
+
+/* Stats Cards */
+.stats-cards {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: #fff;
+    flex: 1;
+    text-align: center;
+    padding: 1.5rem 0;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+
+.stat-card h3 {
+    font-size: 1.75rem;
+    margin-bottom: 0.25rem;
+    color: #667eea;
+}
+
+.stat-card p {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+/* Requests Section */
+.requests-section h3 {
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+}
+
+.request-item {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.request-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: #888;
+    margin-top: 0.5rem;
+}
+
+.request-action {
+    text-align: right;
+}
+
+.request-action .service-fee {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #667eea;
+}
+
+.request-action p {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-primary:hover {
+    background: #5a6dd8;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-cards {
+        flex-direction: column;
+    }
+}
+
+/* chat */
+.chat-container {
+    width: 100%;
+    max-width: 500px;
+    margin: auto;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+}
+
+.chat-messages {
+    height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.message {
+    padding: 8px 12px;
+    margin: 5px 0;
+    border-radius: 10px;
+    max-width: 70%;
+}
+
+.buyer-message {
+    background: #e6f3ff;
+    align-self: flex-start;
+}
+
+.shopper-message {
+    background: #d1ffd6;
+    margin-left: auto;
+}
+
+.chat-input-area {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.chat-input-area input {
+    flex: 1;
+    padding: 8px;
+}
+.chat-input-area button {
+    padding: 6px 12px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background: #007bff;
+    color: #fff;
+}
+
+.chat-input-area button:hover {
+    background: #0056b3;
+}
+
+.chat-image {
+    max-width: 150px;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+
+.chat-voice {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #eee;
+    border-radius: 5px;
+    margin-top: 5px;
+    font-size: 0.9em;
+}
+/* Progress Bar for Buyers */
+.progress-container {
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    height: 8px;
+    width: 100%;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background-color: #007bff;
+    /* Blue */
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.4s ease;
+}
+
+.status-text {
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 500;
+}
