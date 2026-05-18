@@ -8,11 +8,25 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import {
+  getConvId,
+  getMessages,
+  getConversationSummaries,
+  getUnreadMap,
+  getPreviewText,
+  buildMessage,
+  sendChatMessage,
+  sendCallInvite,
+  markConversationRead,
+  setConversationPartner,
+  compressImageFile,
+  readBlobAsDataUrl,
+  subscribeInbox,
+} from "./chat-local.js";
 
 let currentUser          = null;
 let activeConversationId = null;
 let activePartner        = null;
-let realtimeChannel      = null;
 let allConversations     = [];
 
 /* ── Voice note state ── */
@@ -27,10 +41,6 @@ let signalingChannel = null;
 let activeCallType   = null; // "video" or "voice"
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-
-function getConvId(uid1, uid2) {
-  return [uid1, uid2].sort().join("_");
-}
 
 /* ─────────────────────────────────────────────
    INIT
@@ -47,43 +57,50 @@ async function init() {
   const nav = document.getElementById("navAvatar");
   if (nav) nav.textContent = (currentUser.name || "B")[0].toUpperCase();
 
+  subscribeInbox(supabase, currentUser.uid, {
+    onMessage: handleInboxMessage,
+    onCallInvite: handleInboxCallInvite,
+  });
+
   await loadConversations();
 
   const withUid = new URLSearchParams(window.location.search).get("with");
   if (withUid) await openConversation(withUid);
+}
 
-  initGlobalListener();
+function handleInboxMessage(msg) {
+  if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
+  if (activeConversationId === msg.conversation_id) {
+    renderMessages(getMessages(activeConversationId));
+    markConversationRead(activeConversationId, currentUser.uid);
+  }
+  loadConversations();
+}
+
+function handleInboxCallInvite(payload) {
+  handleIncomingCall({
+    sender_id: payload.sender_id,
+    sender_name: payload.sender_name,
+    receiver_id: currentUser.uid,
+    content: payload.callType === "video" ? "[videocall]incoming" : "[voicecall]incoming",
+  });
 }
 
 /* ─────────────────────────────────────────────
    LOAD CONVERSATIONS
 ───────────────────────────────────────────── */
 async function loadConversations() {
-  const { data: msgs } = await supabase
-    .from("messages").select("*")
-    .or(`sender_id.eq.${currentUser.uid},receiver_id.eq.${currentUser.uid}`)
-    .order("created_at", { ascending: false });
-
   const list = document.getElementById("convList");
   if (!list) return;
 
-  if (!msgs || msgs.length === 0) {
-    list.innerHTML = `<div class="conv-empty">No conversations yet.<br><br>Go to a shopper's profile and click <strong>Send Message</strong> to start chatting.</div>`;
-    allConversations = [];
+  allConversations = getConversationSummaries(currentUser.uid);
+
+  if (allConversations.length === 0) {
+    list.innerHTML = `<div class="conv-empty">No conversations yet.<br><br>Go to a shopper's profile and click <strong>Send Message</strong> to start chatting.<br><small style="opacity:0.8">Chats are saved on this device only.</small></div>`;
     return;
   }
 
-  const seen = {};
-  msgs.forEach(m => { if (!seen[m.conversation_id]) seen[m.conversation_id] = m; });
-  allConversations = Object.values(seen);
-
-  const unreadMap = {};
-  msgs.forEach(m => {
-    if (m.receiver_id === currentUser.uid && !m.is_read)
-      unreadMap[m.conversation_id] = (unreadMap[m.conversation_id] || 0) + 1;
-  });
-
-  renderConvList(allConversations, unreadMap);
+  renderConvList(allConversations, getUnreadMap(currentUser.uid));
 }
 
 function renderConvList(conversations, unreadMap = {}) {
@@ -97,8 +114,9 @@ function renderConvList(conversations, unreadMap = {}) {
 
   list.innerHTML = conversations.map(m => {
     const isMine    = m.sender_id === currentUser.uid;
-    const otherName = isMine ? m.receiver_name : m.sender_name;
-    const otherId   = isMine ? m.receiver_id   : m.sender_id;
+    const partner   = m._partner;
+    const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
+    const otherId   = partner?.uid  || (isMine ? m.receiver_id   : m.sender_id);
     const preview   = getPreviewText(m.content || "");
     const time      = formatTime(m.created_at);
     const unread    = unreadMap[m.conversation_id] || 0;
@@ -121,37 +139,32 @@ function renderConvList(conversations, unreadMap = {}) {
   }).join("");
 }
 
-function getPreviewText(content) {
-  if (content.startsWith("[img]"))        return "📷 Photo";
-  if (content.startsWith("[audio]"))      return "🎤 Voice note";
-  if (content.startsWith("[videocall]"))  return "📹 Video call";
-  if (content.startsWith("[voicecall]"))  return "📞 Voice call";
-  return content.length > 36 ? content.substring(0, 36) + "..." : content;
-}
-
 /* ─────────────────────────────────────────────
    OPEN A CONVERSATION
 ───────────────────────────────────────────── */
-window.openConversation = async function (otherUid) {
-  // With RLS enabled, we cannot fetch arbitrary users here.
-  // Instead, derive partner metadata from existing messages (stored in messages table),
-  // and fall back to placeholders until we load the thread.
+async function resolvePartner(otherUid) {
   const known = allConversations.find(m => {
-    const isMine  = m.sender_id === currentUser.uid;
-    const otherId = isMine ? m.receiver_id : m.sender_id;
-    return otherId === otherUid;
+    const pid = m._partner?.uid || (m.sender_id === currentUser.uid ? m.receiver_id : m.sender_id);
+    return pid === otherUid;
   });
+  if (known?._partner?.name) return known._partner;
 
-  const isMine    = known ? (known.sender_id === currentUser.uid) : false;
-  const otherName = known ? (isMine ? known.receiver_name : known.sender_name) : "User";
-  const otherRole = (() => {
-    // Prefer role from a message that the other user sent
-    const sentByOther = allConversations.find(m => m.sender_id === otherUid);
-    return (sentByOther?.sender_role) || "user";
-  })();
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("with") === otherUid && params.get("name")) {
+    return { uid: otherUid, name: decodeURIComponent(params.get("name")), role: "shopper" };
+  }
 
-  activePartner        = { uid: otherUid, name: otherName || "User", role: otherRole || "user" };
+  const { data } = await supabase
+    .from("public_shoppers").select("uid, name").eq("uid", otherUid).maybeSingle();
+  if (data?.name) return { uid: otherUid, name: data.name, role: "shopper" };
+
+  return { uid: otherUid, name: "User", role: "shopper" };
+}
+
+window.openConversation = async function (otherUid) {
   activeConversationId = getConvId(currentUser.uid, otherUid);
+  activePartner        = await resolvePartner(otherUid);
+  setConversationPartner(activeConversationId, activePartner);
 
   document.getElementById("chatEmptyState").style.display = "none";
   document.getElementById("chatHeader").style.display     = "flex";
@@ -165,37 +178,16 @@ window.openConversation = async function (otherUid) {
   const sidebar = document.getElementById("convSidebar");
   if (window.innerWidth <= 640 && sidebar) sidebar.classList.add("hidden");
 
-  await loadMessages();
-  await markAsRead();
-  subscribeToThread();
+  loadMessages();
+  markAsRead();
   await loadConversations();
 };
 
 /* ─────────────────────────────────────────────
    LOAD & RENDER MESSAGES
 ───────────────────────────────────────────── */
-async function loadMessages() {
-  const { data: msgs } = await supabase
-    .from("messages").select("*")
-    .eq("conversation_id", activeConversationId)
-    .order("created_at", { ascending: true });
-
-  // If we started a conversation from a direct link (?with=),
-  // populate partner name/role from the first message we see.
-  if (msgs && msgs.length > 0 && activePartner) {
-    const first = msgs.find(m => m.sender_id !== currentUser.uid) || msgs[0];
-    if (first) {
-      const inferredName = (first.sender_id === currentUser.uid) ? first.receiver_name : first.sender_name;
-      const inferredRole = first.sender_role;
-      if (inferredName) activePartner.name = inferredName;
-      if (inferredRole) activePartner.role = inferredRole;
-      document.getElementById("chatHeaderAvatar").textContent = (activePartner.name || "?")[0].toUpperCase();
-      document.getElementById("chatHeaderName").textContent   = activePartner.name || "User";
-      document.getElementById("chatHeaderSub").textContent    = activePartner.role || "user";
-    }
-  }
-
-  renderMessages(msgs || []);
+function loadMessages() {
+  renderMessages(getMessages(activeConversationId));
 }
 
 function renderMessages(msgs) {
@@ -278,7 +270,7 @@ window.sendMessage = async function () {
   input.value = "";
   appendOptimisticMessage(content);
 
-  const { error } = await supabase.from("messages").insert({
+  const msg = buildMessage({
     conversation_id: activeConversationId,
     sender_id:       currentUser.uid,
     sender_name:     currentUser.name,
@@ -286,10 +278,14 @@ window.sendMessage = async function () {
     receiver_id:     activePartner.uid,
     receiver_name:   activePartner.name,
     content,
-    is_read: false
   });
 
-  if (error) console.error("Send error:", error);
+  try {
+    await sendChatMessage(supabase, msg);
+    await loadConversations();
+  } catch (e) {
+    console.error("Send error:", e);
+  }
 };
 
 /* ─────────────────────────────────────────────
@@ -304,28 +300,33 @@ window.handleImageUpload = async function (e) {
   if (!file || !activeConversationId || !activePartner) return;
   e.target.value = "";
 
-  const ext  = file.name.split(".").pop();
-  const path = `chat/${activeConversationId}/${Date.now()}.${ext}`;
+  let dataUrl;
+  try {
+    dataUrl = await compressImageFile(file);
+  } catch (e) {
+    alert(e.message || "Could not process image.");
+    return;
+  }
 
-  const { error: upErr } = await supabase.storage
-    .from("chat-media").upload(path, file, { upsert: false });
-  if (upErr) { alert("Image upload failed: " + upErr.message); return; }
+  const content = "[img]" + dataUrl;
+  appendOptimisticMessage(content);
 
-  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
-  const url      = data.publicUrl;
-
-  appendOptimisticMessage("[img]" + url);
-
-  await supabase.from("messages").insert({
+  const msg = buildMessage({
     conversation_id: activeConversationId,
     sender_id:       currentUser.uid,
     sender_name:     currentUser.name,
     sender_role:     currentUser.role,
     receiver_id:     activePartner.uid,
     receiver_name:   activePartner.name,
-    content:         "[img]" + url,
-    is_read:         false
+    content,
   });
+
+  try {
+    await sendChatMessage(supabase, msg);
+    await loadConversations();
+  } catch (e) {
+    alert(e.message || "Failed to send image.");
+  }
 };
 
 /* ─────────────────────────────────────────────
@@ -360,25 +361,34 @@ window.toggleVoiceRecord = async function () {
 
 async function uploadAndSendAudio(blob) {
   if (!activeConversationId || !activePartner) return;
-  const path = `chat/${activeConversationId}/audio_${Date.now()}.webm`;
 
-  const { error: upErr } = await supabase.storage
-    .from("chat-media").upload(path, blob, { contentType: "audio/webm" });
-  if (upErr) { alert("Audio upload failed: " + upErr.message); return; }
+  let dataUrl;
+  try {
+    dataUrl = await readBlobAsDataUrl(blob);
+  } catch {
+    alert("Could not save voice note.");
+    return;
+  }
 
-  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
-  appendOptimisticMessage("[audio]" + data.publicUrl);
+  const content = "[audio]" + dataUrl;
+  appendOptimisticMessage(content);
 
-  await supabase.from("messages").insert({
+  const msg = buildMessage({
     conversation_id: activeConversationId,
     sender_id:       currentUser.uid,
     sender_name:     currentUser.name,
     sender_role:     currentUser.role,
     receiver_id:     activePartner.uid,
     receiver_name:   activePartner.name,
-    content:         "[audio]" + data.publicUrl,
-    is_read:         false
+    content,
   });
+
+  try {
+    await sendChatMessage(supabase, msg);
+    await loadConversations();
+  } catch (e) {
+    alert(e.message || "Failed to send voice note.");
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -497,16 +507,12 @@ async function openCallUI(type, isCaller) {
         await peerConnection.setLocalDescription(offer);
         sendSignal({ type: "offer", sdp: offer });
 
-        // Notify the other person via DB
-        await supabase.from("messages").insert({
+        await sendCallInvite(supabase, {
+          sender_id:   currentUser.uid,
+          sender_name: currentUser.name,
+          receiver_id: activePartner.uid,
+          callType:    type,
           conversation_id: activeConversationId,
-          sender_id:       currentUser.uid,
-          sender_name:     currentUser.name,
-          sender_role:     currentUser.role,
-          receiver_id:     activePartner.uid,
-          receiver_name:   activePartner.name,
-          content:         `[${type}call]incoming`,
-          is_read:         false
         });
       }
     });
@@ -531,6 +537,12 @@ function handleIncomingCall(msg) {
   const isVoice = msg.content === "[voicecall]incoming";
   if (!isVideo && !isVoice) return;
   if (msg.receiver_id !== currentUser.uid) return;
+
+  if (!activePartner || activePartner.uid !== msg.sender_id) {
+    activePartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "user" };
+    activeConversationId = getConvId(currentUser.uid, msg.sender_id);
+    setConversationPartner(activeConversationId, activePartner);
+  }
 
   const type = isVideo ? "video" : "voice";
 
@@ -558,56 +570,12 @@ function handleIncomingCall(msg) {
 }
 
 /* ─────────────────────────────────────────────
-   REALTIME
-───────────────────────────────────────────── */
-function subscribeToThread() {
-  if (realtimeChannel) supabase.removeChannel(realtimeChannel);
-
-  realtimeChannel = supabase
-    .channel("chat-" + activeConversationId)
-    .on("postgres_changes", {
-      event: "INSERT", schema: "public", table: "messages",
-      filter: `conversation_id=eq.${activeConversationId}`
-    }, async (payload) => {
-      const msg = payload.new;
-      if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") {
-        handleIncomingCall(msg); return;
-      }
-      if (msg.sender_id !== currentUser.uid) {
-        await loadMessages();
-        await markAsRead();
-      }
-      await loadConversations();
-    })
-    .subscribe();
-}
-
-function initGlobalListener() {
-  supabase
-    .channel("chat-global-" + currentUser.uid)
-    .on("postgres_changes", {
-      event: "INSERT", schema: "public", table: "messages",
-      filter: `receiver_id=eq.${currentUser.uid}`
-    }, async (payload) => {
-      const msg = payload.new;
-      if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") {
-        handleIncomingCall(msg);
-      }
-      await loadConversations();
-    })
-    .subscribe();
-}
-
-/* ─────────────────────────────────────────────
    MARK AS READ
 ───────────────────────────────────────────── */
-async function markAsRead() {
+function markAsRead() {
   if (!activeConversationId) return;
-  await supabase.from("messages")
-    .update({ is_read: true })
-    .eq("conversation_id", activeConversationId)
-    .eq("receiver_id", currentUser.uid)
-    .eq("is_read", false);
+  markConversationRead(activeConversationId, currentUser.uid);
+  loadMessages();
 }
 
 /* ─────────────────────────────────────────────
@@ -618,7 +586,8 @@ function filterConversations(query) {
   const q = query.toLowerCase();
   const filtered = allConversations.filter(m => {
     const isMine    = m.sender_id === currentUser.uid;
-    const otherName = isMine ? m.receiver_name : m.sender_name;
+    const partner   = m._partner;
+    const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
     return (otherName || "").toLowerCase().includes(q) || (m.content || "").toLowerCase().includes(q);
   });
   renderConvList(filtered);

@@ -9,6 +9,21 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import {
+  getConvId,
+  getMessages,
+  getConversationSummaries,
+  getUnreadMap,
+  getPreviewText,
+  buildMessage,
+  sendChatMessage,
+  sendCallInvite,
+  markConversationRead,
+  setConversationPartner,
+  compressImageFile,
+  readBlobAsDataUrl,
+  subscribeInbox,
+} from "./chat-local.js";
 
 /* ─── STATE ─── */
 let currentUser    = null;
@@ -19,7 +34,6 @@ const SHOPPER_STATUSES = ["paid", "purchased", "delivering", "delivered"];
 /* Chat state */
 let activeChatConvId  = null;
 let activeChatPartner = null;
-let chatChannel       = null;
 let allShopperConvs   = [];
 
 /* Voice note state */
@@ -59,7 +73,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   initAvatarUpload();
   updateNotifDot();
   initRealtimeOrders();
-  initRealtimeChatNotif();
+  subscribeInbox(supabase, currentUser.id, {
+    onMessage: handleShopperInboxMessage,
+    onCallInvite: payload => handleShopperIncomingCall({
+      sender_id: payload.sender_id,
+      sender_name: payload.sender_name,
+      receiver_id: currentUser.id,
+      content: payload.callType === "video" ? "[videocall]incoming" : "[voicecall]incoming",
+    }),
+  });
   await renderShopperChatList();
 
   document.getElementById("shopperChatInput")?.addEventListener("keydown", function (e) {
@@ -94,7 +116,6 @@ function escapeHtml(t) {
   return (t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-function getConvId(a, b) { return [a, b].sort().join("_"); }
 
 function renderSidebarProfile() {
   const name = currentProfile.name || "Shopper";
@@ -473,33 +494,32 @@ function initAvatarUpload() {
   });
 }
 
-/* ─── CHAT ─── */
+function handleShopperInboxMessage(msg) {
+  if (msg.content === "[videocall]incoming" || msg.content === "[voicecall]incoming") return;
+  showToast(`💬 New message from ${msg.sender_name}`);
+  addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
+  if (activeChatConvId === msg.conversation_id) {
+    loadShopperMessages();
+    markShopperRead();
+  }
+  renderShopperChatList();
+}
+
+/* ─── CHAT (stored locally on this device) ─── */
 async function renderShopperChatList() {
   const list = document.getElementById("msgConvList");
   if (!list) return;
 
-  const { data: msgs } = await supabase.from("messages").select("*")
-    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-    .order("created_at",{ascending:false});
+  allShopperConvs = getConversationSummaries(currentUser.id);
 
-  if (!msgs || msgs.length === 0) {
-    list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.</div>`;
-    allShopperConvs = [];
+  if (allShopperConvs.length === 0) {
+    list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.<br><small style="opacity:0.8">Chats are saved on this device only.</small></div>`;
     updateMsgBadge(0);
     return;
   }
 
-  const seen = {};
-  msgs.forEach(m => { if (!seen[m.conversation_id]) seen[m.conversation_id] = m; });
-  allShopperConvs = Object.values(seen);
-
-  const unreadMap = {};
-  msgs.forEach(m => {
-    if (m.receiver_id === currentUser.id && !m.is_read)
-      unreadMap[m.conversation_id] = (unreadMap[m.conversation_id]||0) + 1;
-  });
-
-  const total = Object.values(unreadMap).reduce((a,b) => a+b, 0);
+  const unreadMap = getUnreadMap(currentUser.id);
+  const total = Object.values(unreadMap).reduce((a, b) => a + b, 0);
   updateMsgBadge(total);
   renderShopperConvItems(allShopperConvs, unreadMap);
 }
@@ -512,9 +532,10 @@ function renderShopperConvItems(convs, unreadMap = {}) {
   }
   list.innerHTML = convs.map(m => {
     const isMine    = m.sender_id === currentUser.id;
-    const otherName = isMine ? m.receiver_name : m.sender_name;
-    const otherId   = isMine ? m.receiver_id   : m.sender_id;
-    const preview   = getShopperPreview(m.content || "");
+    const partner   = m._partner;
+    const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
+    const otherId   = partner?.uid  || (isMine ? m.receiver_id   : m.sender_id);
+    const preview   = getPreviewText(m.content || "");
     const time      = formatTime(m.created_at);
     const unread    = unreadMap[m.conversation_id] || 0;
     const isActive  = activeChatConvId === m.conversation_id;
@@ -535,14 +556,6 @@ function renderShopperConvItems(convs, unreadMap = {}) {
   }).join("");
 }
 
-function getShopperPreview(content) {
-  if (content.startsWith("[img]"))        return "📷 Photo";
-  if (content.startsWith("[audio]"))      return "🎤 Voice note";
-  if (content.startsWith("[videocall]"))  return "📹 Video call";
-  if (content.startsWith("[voicecall]"))  return "📞 Voice call";
-  return content.length > 30 ? content.substring(0,30)+"..." : content;
-}
-
 function updateMsgBadge(count) {
   const b = document.getElementById("msgBadge");
   if (!b) return;
@@ -552,25 +565,24 @@ function updateMsgBadge(count) {
 
 window.openShopperChat = async function (otherUid, otherName) {
   activeChatConvId  = getConvId(currentUser.id, otherUid);
-  activeChatPartner = { uid: otherUid, name: otherName };
+  activeChatPartner = { uid: otherUid, name: otherName, role: "buyer" };
+  setConversationPartner(activeChatConvId, activeChatPartner);
   document.getElementById("msgThreadEmpty").style.display    = "none";
   document.getElementById("msgThreadHeader").style.display   = "flex";
   document.getElementById("msgThreadMessages").style.display = "flex";
   document.getElementById("msgThreadInput").style.display    = "flex";
   document.getElementById("msgThreadHav").textContent   = (otherName||"?")[0].toUpperCase();
   document.getElementById("msgThreadHname").textContent = otherName;
-  await loadShopperMessages();
-  await markShopperRead();
-  subscribeShopperThread();
+  loadShopperMessages();
+  markShopperRead();
   await renderShopperChatList();
 };
 
-async function loadShopperMessages() {
-  const { data: msgs } = await supabase.from("messages").select("*")
-    .eq("conversation_id", activeChatConvId).order("created_at",{ascending:true});
+function loadShopperMessages() {
+  const msgs = getMessages(activeChatConvId);
   const container = document.getElementById("msgThreadMessages");
   if (!container) return;
-  if (!msgs || msgs.length === 0) {
+  if (msgs.length === 0) {
     container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin:auto;padding:30px">No messages yet</div>`;
     return;
   }
@@ -624,7 +636,7 @@ window.sendShopperMessage = async function () {
   if (!content || !activeChatConvId || !activeChatPartner) return;
   input.value = "";
   appendShopperOptimistic(content);
-  const { error } = await supabase.from("messages").insert({
+  const msg = buildMessage({
     conversation_id: activeChatConvId,
     sender_id:       currentUser.id,
     sender_name:     currentProfile.name,
@@ -632,9 +644,14 @@ window.sendShopperMessage = async function () {
     receiver_id:     activeChatPartner.uid,
     receiver_name:   activeChatPartner.name,
     content,
-    is_read: false
   });
-  if (error) { console.error("Send error:", error); showToast("Failed to send.", "error"); }
+  try {
+    await sendChatMessage(supabase, msg);
+    await renderShopperChatList();
+  } catch (e) {
+    console.error("Send error:", e);
+    showToast("Failed to send.", "error");
+  }
 };
 
 window.triggerShopperImageUpload = function () { document.getElementById("shopperImageInput")?.click(); };
@@ -643,18 +660,30 @@ window.handleShopperImageUpload = async function (e) {
   const file = e.target.files?.[0];
   if (!file || !activeChatConvId || !activeChatPartner) return;
   e.target.value = "";
-  const ext  = file.name.split(".").pop();
-  const path = `chat/${activeChatConvId}/${Date.now()}.${ext}`;
-  const { error: upErr } = await supabase.storage.from("chat-media").upload(path, file, { upsert: false });
-  if (upErr) { showToast("Image upload failed: " + upErr.message, "error"); return; }
-  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
-  appendShopperOptimistic("[img]" + data.publicUrl);
-  await supabase.from("messages").insert({
-    conversation_id: activeChatConvId, sender_id: currentUser.id,
-    sender_name: currentProfile.name, sender_role: "shopper",
-    receiver_id: activeChatPartner.uid, receiver_name: activeChatPartner.name,
-    content: "[img]" + data.publicUrl, is_read: false
+  let dataUrl;
+  try {
+    dataUrl = await compressImageFile(file);
+  } catch (e) {
+    showToast(e.message || "Could not process image.", "error");
+    return;
+  }
+  const content = "[img]" + dataUrl;
+  appendShopperOptimistic(content);
+  const msg = buildMessage({
+    conversation_id: activeChatConvId,
+    sender_id: currentUser.id,
+    sender_name: currentProfile.name,
+    sender_role: "shopper",
+    receiver_id: activeChatPartner.uid,
+    receiver_name: activeChatPartner.name,
+    content,
   });
+  try {
+    await sendChatMessage(supabase, msg);
+    await renderShopperChatList();
+  } catch (e) {
+    showToast(e.message || "Failed to send image.", "error");
+  }
 };
 
 window.toggleShopperVoice = async function () {
@@ -684,17 +713,30 @@ window.toggleShopperVoice = async function () {
 
 async function uploadShopperAudio(blob) {
   if (!activeChatConvId || !activeChatPartner) return;
-  const path = `chat/${activeChatConvId}/audio_${Date.now()}.webm`;
-  const { error } = await supabase.storage.from("chat-media").upload(path, blob, { contentType: "audio/webm" });
-  if (error) { showToast("Audio upload failed: " + error.message, "error"); return; }
-  const { data } = supabase.storage.from("chat-media").getPublicUrl(path);
-  appendShopperOptimistic("[audio]" + data.publicUrl);
-  await supabase.from("messages").insert({
-    conversation_id: activeChatConvId, sender_id: currentUser.id,
-    sender_name: currentProfile.name, sender_role: "shopper",
-    receiver_id: activeChatPartner.uid, receiver_name: activeChatPartner.name,
-    content: "[audio]" + data.publicUrl, is_read: false
+  let dataUrl;
+  try {
+    dataUrl = await readBlobAsDataUrl(blob);
+  } catch {
+    showToast("Could not save voice note.", "error");
+    return;
+  }
+  const content = "[audio]" + dataUrl;
+  appendShopperOptimistic(content);
+  const msg = buildMessage({
+    conversation_id: activeChatConvId,
+    sender_id: currentUser.id,
+    sender_name: currentProfile.name,
+    sender_role: "shopper",
+    receiver_id: activeChatPartner.uid,
+    receiver_name: activeChatPartner.name,
+    content,
   });
+  try {
+    await sendChatMessage(supabase, msg);
+    await renderShopperChatList();
+  } catch (e) {
+    showToast(e.message || "Failed to send voice note.", "error");
+  }
 }
 
 /* ─── CALLS ─── */
@@ -754,7 +796,13 @@ async function openShopperCallUI(type, isCaller) {
       if (status==="SUBSCRIBED"&&isCaller) {
         shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});};
         const offer=await shopperPeerConn.createOffer(); await shopperPeerConn.setLocalDescription(offer); sendShopperSignal({type:"offer",sdp:offer});
-        await supabase.from("messages").insert({conversation_id:activeChatConvId,sender_id:currentUser.id,sender_name:currentProfile.name,sender_role:"shopper",receiver_id:activeChatPartner.uid,receiver_name:activeChatPartner.name,content:`[${type}call]incoming`,is_read:false});
+        await sendCallInvite(supabase, {
+          sender_id: currentUser.id,
+          sender_name: currentProfile.name,
+          receiver_id: activeChatPartner.uid,
+          callType: type,
+          conversation_id: activeChatConvId,
+        });
       }
     });
   if (!isCaller) { shopperPeerConn.onicecandidate=e=>{if(e.candidate)sendShopperSignal({type:"ice",candidate:e.candidate});}; }
@@ -767,6 +815,13 @@ function handleShopperIncomingCall(msg) {
   const isVoice = msg.content==="[voicecall]incoming";
   if (!isVideo&&!isVoice) return;
   if (msg.receiver_id!==currentUser.id) return;
+
+  if (!activeChatPartner || activeChatPartner.uid !== msg.sender_id) {
+    activeChatPartner = { uid: msg.sender_id, name: msg.sender_name || "User", role: "buyer" };
+    activeChatConvId = getConvId(currentUser.id, msg.sender_id);
+    setConversationPartner(activeChatConvId, activeChatPartner);
+  }
+
   document.getElementById("shopperIncomingBanner")?.remove();
   const banner = document.createElement("div");
   banner.id = "shopperIncomingBanner";
@@ -779,42 +834,20 @@ function handleShopperIncomingCall(msg) {
   document.body.appendChild(banner);
 }
 
-function subscribeShopperThread() {
-  if (chatChannel) supabase.removeChannel(chatChannel);
-  chatChannel = supabase.channel("shopper-thread-"+activeChatConvId)
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${activeChatConvId}`},
-      async(payload)=>{
-        const msg=payload.new;
-        if (msg.content==="[videocall]incoming"||msg.content==="[voicecall]incoming"){handleShopperIncomingCall(msg);return;}
-        if (msg.sender_id!==currentUser.id){await loadShopperMessages();await markShopperRead();}
-      }).subscribe();
-}
-
-function initRealtimeChatNotif() {
-  supabase.channel("shopper-chat-notif-"+currentUser.id)
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`receiver_id=eq.${currentUser.id}`},
-      async(payload)=>{
-        const msg=payload.new;
-        if (msg.content==="[videocall]incoming"||msg.content==="[voicecall]incoming"){handleShopperIncomingCall(msg);return;}
-        showToast(`💬 New message from ${msg.sender_name}`);
-        addNotification(`Message from ${msg.sender_name}: "${(msg.content||"").substring(0,40)}"`);
-        await renderShopperChatList();
-        if (activeChatConvId===msg.conversation_id){await loadShopperMessages();await markShopperRead();}
-      }).subscribe();
-}
-
-async function markShopperRead() {
+function markShopperRead() {
   if (!activeChatConvId) return;
-  await supabase.from("messages").update({is_read:true}).eq("conversation_id",activeChatConvId).eq("receiver_id",currentUser.id).eq("is_read",false);
+  markConversationRead(activeChatConvId, currentUser.id);
+  loadShopperMessages();
 }
 
 window.filterShopperConversations = function (query) {
   if (!query) { renderShopperConvItems(allShopperConvs); return; }
   const q = query.toLowerCase();
   const filtered = allShopperConvs.filter(m => {
-    const isMine = m.sender_id===currentUser.id;
-    const otherName = isMine?m.receiver_name:m.sender_name;
-    return (otherName||"").toLowerCase().includes(q)||(m.content||"").toLowerCase().includes(q);
+    const isMine = m.sender_id === currentUser.id;
+    const partner = m._partner;
+    const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
+    return (otherName || "").toLowerCase().includes(q) || (m.content || "").toLowerCase().includes(q);
   });
   renderShopperConvItems(filtered);
 };

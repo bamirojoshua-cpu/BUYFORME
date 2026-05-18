@@ -111,7 +111,8 @@ window.handleRequest = function () {
 window.handleMessage = function () {
   if (!shopperUid) return;
   // Opens the full-page chat, pre-loading this shopper's conversation
-  window.location.href = `chat.html?with=${shopperUid}`;
+  const name = document.getElementById("profileName")?.textContent?.trim() || "Shopper";
+  window.location.href = `chat.html?with=${shopperUid}&name=${encodeURIComponent(name)}`;
 };
 
 /* ─── HELPERS ─── */
