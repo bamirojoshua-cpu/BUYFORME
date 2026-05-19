@@ -3,6 +3,7 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { getShopperDashboardHref } from "./app-paths.js";
 
 
 /* ─────────────────────────────────────────────
@@ -27,19 +28,31 @@ async function initAuth() {
     return;
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("users")
     .select("*")
     .eq("uid", session.user.id)
     .maybeSingle();
+
+  if (profileError) {
+    console.error("Buyer profile load error:", profileError);
+    await supabase.auth.signOut();
+    window.location.href = "auth.html";
+    return;
+  }
 
   if (!profile) {
     window.location.href = "auth.html";
     return;
   }
 
-  if (profile.role === "shopper") {
-    window.location.href = "verify.html";
+  const role = String(profile.role || "").toLowerCase();
+  if (role === "shopper") {
+    if (profile.verification_status?.toLowerCase() === "approved") {
+      window.location.href = getShopperDashboardHref();
+    } else {
+      window.location.href = "verify.html";
+    }
     return;
   }
 

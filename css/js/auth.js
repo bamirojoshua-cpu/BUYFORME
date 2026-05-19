@@ -26,17 +26,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   await redirectIfAlreadyLoggedIn();
 });
 
+async function fetchUserProfile(uid) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("uid", uid)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Profile fetch error:", error);
+    throw new Error(error.message || "Could not load your account profile.");
+  }
+  return data;
+}
+
 async function redirectIfAlreadyLoggedIn() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("*")
-    .eq("uid", session.user.id)
-    .maybeSingle();
-
-  if (profile) routeUser(profile.role, profile.verification_status);
+  try {
+    const profile = await fetchUserProfile(session.user.id);
+    if (profile) routeUser(profile.role, profile.verification_status);
+  } catch (err) {
+    console.warn("Session exists but profile unavailable:", err);
+  }
 }
 
 
@@ -214,14 +227,7 @@ async function handleAuth() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const user = data.user;
-
-      // Fetch profile from users table
-      const { data: profile } = await supabase
-        .from("users")
-        .select("*")
-        .eq("uid", user.id)
-        .maybeSingle();
+      const profile = await fetchUserProfile(data.user.id);
 
       if (!profile) {
         showError("Account not found. Please sign up first.");
@@ -230,13 +236,15 @@ async function handleAuth() {
         return;
       }
 
-      // Route based on role + verification status
       routeUser(profile.role, profile.verification_status);
     }
 
   } catch (err) {
     console.error("Auth error:", err);
-    const msg = err.message || "Something went wrong. Please try again.";
+    let msg = err.message || "Something went wrong. Please try again.";
+    if (/fetch|network|failed to load/i.test(msg)) {
+      msg = "Network error — check your connection. For local dev, use http://localhost:5173/auth.html (not /BUYFORME/).";
+    }
     showError(msg);
     btn.disabled    = false;
     btn.textContent = mode === "login" ? "Login" : "Create Account";
@@ -248,16 +256,18 @@ async function handleAuth() {
    8. ROUTING — admin goes to admin.html
 ───────────────────────────────────────────── */
 function routeUser(role, verificationStatus) {
-  if (role === "admin") {
-    window.location.href = "admin.html";
-  } else if (role === "shopper") {
+  const r = String(role || "").toLowerCase();
+
+  if (r === "admin") {
+    window.location.assign("admin.html");
+  } else if (r === "shopper") {
     if (verificationStatus?.toLowerCase() === "approved") {
-      window.location.href = getShopperDashboardHref();
+      window.location.assign(getShopperDashboardHref());
     } else {
-      window.location.href = "verify.html";
+      window.location.assign("verify.html");
     }
   } else {
-    window.location.href = "buyers.html";
+    window.location.assign("buyers.html");
   }
 }
 

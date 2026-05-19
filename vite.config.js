@@ -28,7 +28,7 @@ function copyLegacyAssets() {
           cpSync(src, join(out, dir), { recursive: true });
         }
       }
-      for (const file of ["auth.html", "index.html", "verify.html"]) {
+      for (const file of ["auth.html", "index.html", "verify.html", "buyers.html", "chat.html", "admin.html"]) {
         const src = join(__dirname, file);
         if (existsSync(src)) {
           cpSync(src, join(out, file));
@@ -67,7 +67,12 @@ export default defineConfig(({ command }) => {
   return {
     /* Dev: /  |  Build: relative ./assets so login → dashboard works everywhere */
     base: isBuild ? PROD_BASE : "/",
-    plugins: [react(), copyLegacyAssets(), syncGithubPagesRoot()],
+    plugins: [
+      /* Only transform JSX — do not inject React refresh into auth.html / buyers.html */
+      react({ include: /\.(jsx|tsx)$/ }),
+      copyLegacyAssets(),
+      syncGithubPagesRoot(),
+    ],
     root: ".",
     publicDir: false,
     build: {

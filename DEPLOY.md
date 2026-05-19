@@ -28,6 +28,14 @@ After login, shoppers are sent to `shopper-dashboard.dev.html` locally and `shop
 
 Use port **5173** (not plain `localhost` without a port). Stop any old server with `Ctrl+C` and run `npm run dev` again if the page won’t load.
 
+### Login works on live site but not localhost?
+
+In [Supabase Dashboard](https://supabase.com/dashboard) → your project → **Authentication** → **URL configuration**, add:
+
+- **Redirect URLs:** `http://localhost:5173/**` and `http://127.0.0.1:5173/**`
+
+Use **http://localhost:5173/auth.html** (not `/BUYFORME/auth.html`) when testing locally.
+
 ## GitHub Pages setup (recommended)
 
 1. Repo **Settings → Pages**
