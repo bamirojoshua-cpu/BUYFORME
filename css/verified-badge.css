@@ -1,0 +1,43 @@
+/* Verified shopper check — sits beside name like Facebook / Instagram */
+
+.name-with-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+
+.name-with-verified .name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verified-check {
+  flex-shrink: 0;
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+  /* JPEG fallback: blend white away if old asset used */
+  background: transparent;
+}
+
+/* Card / profile title sizing */
+.card-name.name-with-verified .verified-check,
+h1.name-with-verified .verified-check {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+/* Legacy pill badges — hide text-only styles when using image */
+.verified-badge--img-only {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+}

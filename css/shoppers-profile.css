@@ -125,24 +125,23 @@ body {
     min-width: 200px;
 }
 
-.profile-intro-text h1 {
+.profile-intro-text h1,
+.profile-intro-text .name-with-verified-wrap {
     font-family: 'Sora', sans-serif;
     font-size: 1.5rem;
     font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
     margin-bottom: 6px;
 }
 
-.verified-badge {
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: var(--green-light);
-    color: var(--green-dark);
-    padding: 3px 10px;
-    border-radius: 20px;
+.profile-intro-text .name-with-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.profile-intro-text .verified-check {
+    width: 1.35em;
+    height: 1.35em;
 }
 
 .profile-location {

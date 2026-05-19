@@ -9,6 +9,7 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { nameWithVerifiedBadge } from "./verified-badge.js";
 import {
   getConvId,
   getMessagesForPartner,
@@ -349,7 +350,14 @@ window.switchToDashTab = function (sectionId, settingsSubTab) {
 
 function renderSidebarProfile() {
   const name = currentProfile.name || "Shopper";
-  document.getElementById("sidebarName").textContent = name;
+  const sidebarName = document.getElementById("sidebarName");
+  if (sidebarName) {
+    sidebarName.innerHTML = nameWithVerifiedBadge(name, {
+      tag: "span",
+      className: "sidebar-name-verified",
+      size: 18,
+    });
+  }
   document.getElementById("welcomeMsg").textContent  = `Welcome back, ${name.split(" ")[0]}!`;
   const el = document.getElementById("sidebarAvatar");
   if (currentProfile.avatar_url) {

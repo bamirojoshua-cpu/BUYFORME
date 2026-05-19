@@ -4,6 +4,7 @@
 
 import { supabase } from "./supabase.js";
 import { requireBuyerSession, fetchPublicShopper } from "./buyer-session.js";
+import { nameWithVerifiedBadge, plainNameFromElement } from "./verified-badge.js";
 
 let shopperUid = null;
 
@@ -54,8 +55,10 @@ async function renderProfile(shopper) {
     avatarEl.style.background = bannerColor.match(/#[a-f0-9]{6}/gi)?.[1] || "#1a9e6e";
   }
 
-  document.getElementById("profileName").innerHTML =
-    `${escapeHtml(shopper.name)} <span class="verified-badge"><i class="fas fa-circle-check"></i> Verified</span>`;
+  document.getElementById("profileName").innerHTML = nameWithVerifiedBadge(
+    shopper.name || "Shopper",
+    { tag: "span", className: "profile-name-verified", size: 24 }
+  );
   document.getElementById("profileLocation").innerHTML =
     `<i class="fas fa-map-marker-alt"></i> ${escapeHtml(shopper.location || "Location not set")}`;
   document.getElementById("statRating").textContent = shopper.rating ?? "New";
@@ -123,7 +126,7 @@ window.handleRequest = function () {
 window.handleMessage = function () {
   if (!shopperUid) return;
   const nameEl = document.getElementById("profileName");
-  const name = nameEl?.textContent?.replace(/\s*Verified.*/i, "").trim() || "Shopper";
+  const name = plainNameFromElement(nameEl) || "Shopper";
   window.location.assign(
     `chat.html?with=${encodeURIComponent(shopperUid)}&name=${encodeURIComponent(name)}`
   );

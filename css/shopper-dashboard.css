@@ -1,3 +1,5 @@
+@import url("verified-badge.css");
+
 :root {
     --green: #1a9e6e;
     --green-dark: #127a54;
@@ -86,20 +88,23 @@ body {
     object-fit: cover
 }
 
-.sidebar-profile h3 {
+.sidebar-profile h3.sidebar-name-row,
+.sidebar-profile .sidebar-name-verified {
     font-family: 'Sora', sans-serif;
     font-size: 0.95rem;
     font-weight: 600;
-    margin-bottom: 4px
+    margin-bottom: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+    max-width: 100%;
+    text-align: center;
 }
 
-.verified-tag {
-    font-size: 0.72rem;
-    background: var(--green-light);
-    color: var(--green-dark);
-    padding: 2px 9px;
-    border-radius: 20px;
-    font-weight: 600
+.sidebar-profile .verified-check {
+    width: 1.15em;
+    height: 1.15em;
 }
 
 .sidebar-menu {
