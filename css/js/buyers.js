@@ -276,8 +276,9 @@ window.setFilter = function(f) {
   renderShoppers();
 };
 
-window.goToProfile = function(uid) {
-  window.location.href = `shopper-profile.html?id=${uid}`;
+window.goToProfile = function (uid) {
+  if (!uid) return;
+  window.location.assign(`shopper-profile.html?id=${encodeURIComponent(uid)}`);
 };
 
 

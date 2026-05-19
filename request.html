@@ -683,6 +683,7 @@
     <script type="module">
         import { supabase } from "./css/js/supabase.js";
         import { PAYSTACK_PUBLIC_KEY } from "./css/js/config.js";
+        import { requireBuyerSession, fetchPublicShopper } from "./css/js/buyer-session.js";
 
         const PLATFORM_FEE_PERCENT = 5;
 
@@ -693,28 +694,16 @@
 
         /* ─── INIT ─── */
         async function init() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) { window.location.href = "auth.html"; return; }
-
-            const { data: profile } = await supabase
-                .from("users")
-                .select("*")
-                .eq("uid", session.user.id)
-                .maybeSingle();
-
-            if (!profile) { window.location.href = "auth.html"; return; }
-            currentUser = profile;
+            try {
+            const buyer = await requireBuyerSession();
+            if (!buyer) return;
+            currentUser = buyer.profile;
 
             const uid = new URLSearchParams(window.location.search).get("id");
-            if (!uid) { window.location.href = "buyers.html"; return; }
+            if (!uid) { window.location.assign("buyers.html"); return; }
 
-            const { data: shopper } = await supabase
-                .from("public_shoppers")
-                .select("*")
-                .eq("uid", uid)
-                .maybeSingle();
-
-            if (!shopper) { window.location.href = "buyers.html"; return; }
+            const shopper = await fetchPublicShopper(uid);
+            if (!shopper) { window.location.assign("buyers.html"); return; }
             currentShopper = shopper;
 
             // Parse shopper fee percentage (e.g. "10-12%" → use lower bound)
@@ -734,6 +723,10 @@
             document.getElementById("previewLocation").textContent = shopper.location || "—";
             document.getElementById("previewFee").textContent = shopper.fee || "—";
             document.getElementById("successShopperName").textContent = shopper.name;
+            } catch (err) {
+                console.error("Request page init error:", err);
+                showError(err.message || "Could not load this page. Try signing in again.");
+            }
         }
 
         /* ─── PRICE BREAKDOWN ─── */

@@ -15,6 +15,25 @@ function renameDashboardHtml(out) {
   }
 }
 
+/** Static buyer/auth pages must not get React Fast Refresh (breaks ES modules locally). */
+function stripReactRefreshFromLegacyHtml() {
+  const keepRefresh = /shopper-dashboard(\.dev)?\.html$/i;
+  const refreshBlock =
+    /<script type="module">\s*import\s+\{\s*injectIntoGlobalHook\s*\}\s+from\s+["']\/@react-refresh["'];[\s\S]*?<\/script>\s*/i;
+
+  return {
+    name: "strip-react-refresh-legacy-html",
+    transformIndexHtml: {
+      order: "post",
+      handler(html, ctx) {
+        const file = (ctx.filename || "").replace(/\\/g, "/");
+        if (keepRefresh.test(file)) return html;
+        return html.replace(refreshBlock, "");
+      },
+    },
+  };
+}
+
 /** Copy legacy static assets (css/, images/) into dist on production build. */
 function copyLegacyAssets() {
   return {
@@ -28,7 +47,17 @@ function copyLegacyAssets() {
           cpSync(src, join(out, dir), { recursive: true });
         }
       }
-      for (const file of ["auth.html", "index.html", "verify.html", "buyers.html", "chat.html", "admin.html"]) {
+      for (const file of [
+        "auth.html",
+        "index.html",
+        "verify.html",
+        "buyers.html",
+        "shopper-profile.html",
+        "request.html",
+        "my-orders.html",
+        "chat.html",
+        "admin.html",
+      ]) {
         const src = join(__dirname, file);
         if (existsSync(src)) {
           cpSync(src, join(out, file));
@@ -68,8 +97,8 @@ export default defineConfig(({ command }) => {
     /* Dev: /  |  Build: relative ./assets so login → dashboard works everywhere */
     base: isBuild ? PROD_BASE : "/",
     plugins: [
-      /* Only transform JSX — do not inject React refresh into auth.html / buyers.html */
       react({ include: /\.(jsx|tsx)$/ }),
+      stripReactRefreshFromLegacyHtml(),
       copyLegacyAssets(),
       syncGithubPagesRoot(),
     ],
