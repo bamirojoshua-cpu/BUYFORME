@@ -2160,6 +2160,60 @@ body.notif-drawer-open {
     line-height: 1.5;
 }
 
+/* Settings — log out (visible on mobile; sidebar has desktop logout) */
+.settings-session-card {
+    margin-top: 32px;
+    padding: 20px 22px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.settings-session-card .settings-desc {
+    margin-bottom: 18px;
+}
+
+.btn-settings-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 320px;
+    padding: 14px 20px;
+    border: 1.5px solid var(--red);
+    border-radius: var(--radius-pill);
+    background: var(--red-light);
+    color: var(--red);
+    font-family: 'Sora', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.2s var(--ease),
+        color 0.2s ease,
+        transform 0.2s var(--ease),
+        box-shadow 0.2s ease;
+}
+
+.btn-settings-logout:hover {
+    background: var(--red);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.25);
+}
+
+.btn-settings-logout:active {
+    transform: translateY(0);
+}
+
+@media (min-width: 769px) {
+    .settings-session-card {
+        display: none;
+    }
+}
+
 .pref-label {
     font-size: 0.88rem;
     color: var(--text-muted);
