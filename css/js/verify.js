@@ -5,6 +5,7 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { getShopperDashboardHref } from "./app-paths.js";
 
 
 /* ─────────────────────────────────────────────
@@ -53,7 +54,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (profile.verification_status?.toLowerCase() === "approved") {
-    window.location.href = "shopper-dashboard.html";
+    window.location.href = getShopperDashboardHref();
     return;
   }
 

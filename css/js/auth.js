@@ -6,6 +6,7 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { getShopperDashboardHref } from "./app-paths.js";
 
 
 /* ─────────────────────────────────────────────
@@ -18,11 +19,25 @@ let selectedRole = "buyer";  // "buyer" or "shopper"
 /* ─────────────────────────────────────────────
    2. INIT
 ───────────────────────────────────────────── */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initTabs();
   initRoleSelector();
   initForm();
+  await redirectIfAlreadyLoggedIn();
 });
+
+async function redirectIfAlreadyLoggedIn() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("*")
+    .eq("uid", session.user.id)
+    .maybeSingle();
+
+  if (profile) routeUser(profile.role, profile.verification_status);
+}
 
 
 /* ─────────────────────────────────────────────
@@ -237,7 +252,7 @@ function routeUser(role, verificationStatus) {
     window.location.href = "admin.html";
   } else if (role === "shopper") {
     if (verificationStatus?.toLowerCase() === "approved") {
-      window.location.href = "shopper-dashboard.html";
+      window.location.href = getShopperDashboardHref();
     } else {
       window.location.href = "verify.html";
     }

@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react";
 import { cpSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join, resolve } from "path";
 
-const GHPAGES_BASE = "/BUYFORME/";
+/** Relative base works on GitHub Pages (/BUYFORME/) and localhost. */
+const PROD_BASE = "./";
 
 function renameDashboardHtml(out) {
   const devHtml = join(out, "shopper-dashboard.dev.html");
@@ -64,8 +65,8 @@ export default defineConfig(({ command }) => {
   const isBuild = command === "build";
 
   return {
-    /* GitHub Pages needs /BUYFORME/; local dev uses / so http://localhost:5173/ works */
-    base: isBuild ? GHPAGES_BASE : "/",
+    /* Dev: /  |  Build: relative ./assets so login → dashboard works everywhere */
+    base: isBuild ? PROD_BASE : "/",
     plugins: [react(), copyLegacyAssets(), syncGithubPagesRoot()],
     root: ".",
     publicDir: false,

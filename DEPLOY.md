@@ -22,7 +22,9 @@ Then open:
 
 - **Home:** http://localhost:5173/
 - **Login:** http://localhost:5173/auth.html
-- **Shopper dashboard:** http://localhost:5173/shopper-dashboard.dev.html
+- **Shopper dashboard:** http://localhost:5173/shopper-dashboard.dev.html (auto-used after login on localhost)
+
+After login, shoppers are sent to `shopper-dashboard.dev.html` locally and `shopper-dashboard.html` on GitHub Pages.
 
 Use port **5173** (not plain `localhost` without a port). Stop any old server with `Ctrl+C` and run `npm run dev` again if the page won’t load.
 
