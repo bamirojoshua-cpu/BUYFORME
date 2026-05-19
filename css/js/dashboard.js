@@ -73,7 +73,7 @@ function getShopperChatUserId() {
 }
 
 /* ─── INIT ─── */
-document.addEventListener("DOMContentLoaded", async () => {
+export async function bootstrapShopperDashboard() {
   document.body.addEventListener("click", () => unlockSounds(), { once: true });
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -95,6 +95,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   await renderEarnings();
   loadSettingsIntoForm();
   initTabs();
+  initSettingsTabs();
+  initDashPreferences();
+  initNotificationsPanel();
   initAvatarUpload();
   initShopperVideoUpload();
   updateNotifDot();
@@ -112,9 +115,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("msgConvSearch")?.addEventListener("input", function (e) {
     filterShopperConversations(e.target.value.trim());
   });
-});
+}
+
+const reactRoot = document.getElementById("root");
+if (!reactRoot?.dataset?.react) {
+  document.addEventListener("DOMContentLoaded", bootstrapShopperDashboard);
+}
 
 /* ─── HELPERS ─── */
+function faIcon(name, extraClass = "") {
+  return `<i class="fas ${name}${extraClass ? ` ${extraClass}` : ""}" aria-hidden="true"></i>`;
+}
 function showToast(msg, type = "success") {
   const t = document.getElementById("toast");
   if (!t) return;
@@ -137,6 +148,204 @@ function escapeHtml(t) {
   return (t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+/* ─── UI: skeletons, empty states, appearance, transitions ─── */
+const TAB_REFRESH_MS = 12000;
+const tabLastRefresh = {};
+const PAYOUT_FIELD_SETS = {
+  "Bank Transfer": ["account_name", "account_number", "bank_name", "country"],
+  "Mobile Money": ["account_name", "account_number", "bank_name", "country"],
+  "PayPal": ["email", "account_name"],
+  "Wise / Revolut": ["email", "account_name", "account_number", "country"],
+};
+const PAYOUT_LABELS = {
+  "Bank Transfer": {
+    account_name: "Account Name",
+    account_number: "Account Number / IBAN",
+    bank_name: "Bank Name",
+    country: "Country",
+  },
+  "Mobile Money": {
+    account_name: "Full Name on Account",
+    account_number: "Phone Number",
+    bank_name: "Network / Provider",
+    country: "Country",
+  },
+  "PayPal": {
+    email: "PayPal Email Address",
+    account_name: "Full Name on PayPal Account",
+  },
+  "Wise / Revolut": {
+    email: "Wise / Revolut Email",
+    account_name: "Full Name on Account",
+    account_number: "Account Number / @Tag",
+    country: "Country",
+  },
+};
+const PAYOUT_PROFILE_KEYS = {
+  account_name: "payout_account_name",
+  account_number: "payout_account_number",
+  bank_name: "payout_bank_name",
+  country: "payout_country",
+  email: "payout_email",
+};
+
+function payoutLabelId(field) {
+  return "payoutLabel" + field.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join("");
+}
+
+function getPayoutInput(field) {
+  return document.querySelector(`[data-payout-input="${field}"]`)?.value.trim() || "";
+}
+
+function setPayoutInputsFromProfile(profile) {
+  document.querySelectorAll("[data-payout-input]").forEach(input => {
+    const key = PAYOUT_PROFILE_KEYS[input.dataset.payoutInput];
+    if (key) input.value = profile[key] || "";
+  });
+}
+
+function retriggerAnimation(el, className) {
+  if (!el) return;
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
+
+function activateDashSection(sectionId) {
+  const target = document.getElementById(sectionId);
+  if (!target) return;
+  const current = document.querySelector(".dash-section.active");
+  if (current === target) return;
+
+  document.querySelectorAll(".dash-section").forEach(s => s.classList.remove("active", "dash-animate-in"));
+  target.classList.add("active");
+  retriggerAnimation(target, "dash-animate-in");
+
+  const main = document.querySelector(".dashboard-main");
+  if (main) main.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function shouldRefreshTab(tabId) {
+  const now = Date.now();
+  if (tabLastRefresh[tabId] && now - tabLastRefresh[tabId] < TAB_REFRESH_MS) return false;
+  tabLastRefresh[tabId] = now;
+  return true;
+}
+
+function invalidateTabRefresh(...tabIds) {
+  tabIds.forEach(id => { delete tabLastRefresh[id]; });
+}
+
+function skeletonRequestList(count = 3) {
+  const card = () => `
+    <div class="request-item skeleton-card">
+      <div class="skeleton-block">
+        <span class="skeleton-line w-70"></span>
+        <span class="skeleton-line w-55"></span>
+        <span class="skeleton-line w-40"></span>
+      </div>
+      <span class="skeleton-action"></span>
+    </div>`;
+  return `<div class="skeleton-list">${Array.from({ length: count }, card).join("")}</div>`;
+}
+
+function skeletonConvList(count = 5) {
+  const row = () => `
+    <div class="skeleton-conv-item">
+      <span class="skeleton-avatar"></span>
+      <div class="skeleton-conv-lines">
+        <span class="skeleton-line w-55"></span>
+        <span class="skeleton-line w-85"></span>
+      </div>
+    </div>`;
+  return `<div class="skeleton-conv-list">${Array.from({ length: count }, row).join("")}</div>`;
+}
+
+function skeletonPayoutHistory() {
+  const rows = [1, 2, 3].map(() => `
+    <div class="skeleton-table-row">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>`).join("");
+  return `
+    <div class="payout-history-block">
+      <span class="skeleton-line w-40" style="height:18px;display:block;margin-bottom:14px"></span>
+      <div class="skeleton-table-wrap">${rows}</div>
+    </div>`;
+}
+
+function emptyState({ icon = "fa-inbox", title = "", message, ctaText, section, settingsTab }) {
+  const sub = settingsTab ? `,'${settingsTab}'` : "";
+  const btn = ctaText && section
+    ? `<button type="button" class="btn btn-primary empty-state-cta" onclick="switchToDashTab('${section}'${sub})">${ctaText}</button>`
+    : "";
+  const titleHtml = title ? `<h3 class="empty-title">${title}</h3>` : "";
+  const iconHtml = icon.startsWith("fa-") ? faIcon(icon) : faIcon("fa-inbox");
+  return `
+    <div class="empty-state">
+      <div class="empty-icon">${iconHtml}</div>
+      ${titleHtml}
+      <p>${message}</p>
+      ${btn}
+    </div>`;
+}
+
+function initSettingsTabs() {
+  document.querySelectorAll(".settings-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const id = tab.dataset.settingsTab;
+      document.querySelectorAll(".settings-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".settings-panel").forEach(p => p.classList.remove("active", "settings-animate-in"));
+      tab.classList.add("active");
+      const panel = document.getElementById(`settings-panel-${id}`);
+      if (panel) {
+        panel.classList.add("active");
+        retriggerAnimation(panel, "settings-animate-in");
+      }
+    });
+  });
+}
+
+function syncPrefButtons(pref, value) {
+  document.querySelectorAll(`.pref-toggle-group[data-pref="${pref}"] .pref-toggle-btn`).forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.value === value);
+  });
+}
+
+function initDashPreferences() {
+  const root = document.documentElement;
+  const theme = localStorage.getItem("bfm-theme") || "light";
+  const density = localStorage.getItem("bfm-density") || "comfortable";
+  root.setAttribute("data-theme", theme);
+  root.setAttribute("data-density", density);
+  syncPrefButtons("theme", theme);
+  syncPrefButtons("density", density);
+
+  document.querySelectorAll(".pref-toggle-group[data-pref]").forEach(group => {
+    group.querySelectorAll(".pref-toggle-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pref = group.dataset.pref;
+        const value = btn.dataset.value;
+        if (pref === "theme") {
+          root.setAttribute("data-theme", value);
+          localStorage.setItem("bfm-theme", value);
+        } else if (pref === "density") {
+          root.setAttribute("data-density", value);
+          localStorage.setItem("bfm-density", value);
+        }
+        syncPrefButtons(pref, value);
+      });
+    });
+  });
+}
+
+window.switchToDashTab = function (sectionId, settingsSubTab) {
+  document.querySelector(`.sidebar-menu a[data-tab="${sectionId}"]`)?.click();
+  if (settingsSubTab) {
+    setTimeout(() => {
+      document.querySelector(`.settings-tab[data-settings-tab="${settingsSubTab}"]`)?.click();
+    }, 0);
+  }
+};
 
 function renderSidebarProfile() {
   const name = currentProfile.name || "Shopper";
@@ -163,21 +372,31 @@ function initTabs() {
   tabs.forEach(tab => {
     tab.addEventListener("click", function (e) {
       e.preventDefault();
+      const sectionId = this.dataset.tab;
       tabs.forEach(t => t.classList.remove("active"));
       this.classList.add("active");
-      document.querySelectorAll(".dash-section").forEach(s => s.classList.remove("active"));
-      const target = document.getElementById(this.dataset.tab);
-      if (target) target.classList.add("active");
-      if (this.dataset.tab === "messages-section") {
+      activateDashSection(sectionId);
+
+      const mobileTitle = document.getElementById("mobileDashTitle");
+      if (mobileTitle) mobileTitle.textContent = this.dataset.navTitle || "Dashboard";
+
+      document.querySelector(".sidebar.is-open")?.classList.remove("is-open");
+      document.body.classList.remove("sidebar-open");
+
+      if (sectionId === "messages-section") {
         const b = document.getElementById("msgBadge");
         if (b) b.style.display = "none";
-        renderShopperChatList();
+        if (shouldRefreshTab(sectionId)) renderShopperChatList();
       } else {
         document.querySelector(".messages-section-inner")?.classList.remove("thread-open");
       }
-      if (this.dataset.tab === "requests-section") renderRequests();
-      if (this.dataset.tab === "orders-section")   renderOrders();
-      if (this.dataset.tab === "earnings-section") renderEarnings();
+      if (sectionId === "requests-section" && shouldRefreshTab(sectionId)) renderRequests();
+      if (sectionId === "orders-section" && shouldRefreshTab(sectionId)) renderOrders();
+      if (sectionId === "earnings-section" && shouldRefreshTab(sectionId)) renderEarnings();
+      if (sectionId === "overview-section" && shouldRefreshTab(sectionId)) {
+        renderRequests();
+        renderStats();
+      }
     });
   });
 }
@@ -186,13 +405,17 @@ function initTabs() {
 async function renderRequests() {
   const list = document.getElementById("requestList");
   const ov   = document.getElementById("overviewRequestList");
-  list.innerHTML = ov.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>`;
+  list.innerHTML = ov.innerHTML = skeletonRequestList(3);
 
   const { data: reqs, error } = await supabase
     .from("requests").select("*").eq("shopper_id", currentUser.id).eq("status","pending")
     .order("created_at",{ascending:false});
 
-  if (error) { list.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><p>Failed to load.</p></div>`; return; }
+  if (error) {
+    const err = emptyState({ icon: "fa-circle-exclamation", title: "Couldn't load requests", message: "Check your connection and try again.", ctaText: "Retry", section: "requests-section" });
+    list.innerHTML = ov.innerHTML = err;
+    return;
+  }
 
   document.getElementById("requestCount").textContent     = `${reqs.length} new`;
   document.getElementById("overviewReqCount").textContent = `${reqs.length} new`;
@@ -202,8 +425,16 @@ async function renderRequests() {
   else badge.style.display = "none";
 
   if (reqs.length === 0) {
-    const e = `<div class="empty-state"><div class="empty-icon">📭</div><p>No new requests right now.</p></div>`;
-    list.innerHTML = ov.innerHTML = e; return;
+    const e = emptyState({
+      icon: "fa-inbox",
+      title: "No new requests",
+      message: "When buyers send shopping requests, they'll appear here. Keep your profile complete to get more matches.",
+      ctaText: "Complete profile",
+      section: "settings-section",
+      settingsTab: "profile",
+    });
+    list.innerHTML = ov.innerHTML = e;
+    return;
   }
   list.innerHTML = reqs.map(buildRequestCard).join("");
   ov.innerHTML   = reqs.slice(0,3).map(buildRequestCard).join("");
@@ -234,7 +465,8 @@ window.acceptRequest = async function (id, name) {
   const { error } = await supabase.from("requests").update({status:"accepted"}).eq("id",id);
   if (error) { showToast("Failed to accept.", "error"); return; }
   addNotification(`New order accepted: ${name}`);
-  showToast(`✅ Request accepted: ${name}`);
+  showToast(`Request accepted: ${name}`);
+  invalidateTabRefresh("requests-section", "overview-section", "orders-section");
   await renderRequests(); await renderOrders(); await renderStats();
 };
 
@@ -243,6 +475,7 @@ window.declineRequest = async function (id, name) {
   const { error } = await supabase.from("requests").update({status:"cancelled"}).eq("id",id);
   if (error) { showToast("Failed to decline.", "error"); return; }
   showToast(`Request declined: ${name}`, "error");
+  invalidateTabRefresh("requests-section", "overview-section");
   await renderRequests();
 };
 
@@ -256,19 +489,28 @@ async function getOrders() {
 }
 
 async function renderOrders() {
+  const list = document.getElementById("orderList");
+  list.innerHTML = skeletonRequestList(2);
+
   const orders = await getOrders();
-  const list   = document.getElementById("orderList");
-  document.getElementById("orderCount").textContent = `${orders.length} order${orders.length!==1?"s":""}`;
+  document.getElementById("orderCount").textContent = `${orders.length} order${orders.length !== 1 ? "s" : ""}`;
 
   if (orders.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🛍️</div><p>No orders yet.</p></div>`; return;
+    list.innerHTML = emptyState({
+      icon: "fa-bag-shopping",
+      title: "No orders yet",
+      message: "Accept a request to start your first order. Buyers will pay before you shop.",
+      ctaText: "View requests",
+      section: "requests-section",
+    });
+    return;
   }
 
   list.innerHTML = orders.map(o => {
     const isLocked    = o.status==="accepted" || o.status==="payment";
     const isCompleted = o.status==="delivered";
     let action = "";
-    if (isCompleted)    action = `<button class="btn btn-ghost" disabled>Completed ✅</button>`;
+    if (isCompleted)    action = `<button class="btn btn-ghost" disabled>Completed <i class="fas fa-check"></i></button>`;
     else if (isLocked)  action = `<button class="btn btn-secondary" disabled><i class="fas fa-lock" style="margin-right:6px"></i>Waiting for Payment</button>`;
     else                action = `<button class="btn btn-primary" onclick="cycleOrderStatus('${o.id}','${o.status}')">Update Status</button>`;
 
@@ -295,7 +537,8 @@ window.cycleOrderStatus = async function (id, current) {
   const next = SHOPPER_STATUSES[idx+1];
   const { error } = await supabase.from("requests").update({status:next}).eq("id",id);
   if (error) { showToast("Failed to update.", "error"); return; }
-  showToast(`✅ Updated to: ${next}`);
+  showToast(`Updated to: ${next}`);
+  invalidateTabRefresh("orders-section", "earnings-section", "overview-section");
   await renderOrders(); await renderStats(); await renderEarnings();
 };
 
@@ -306,11 +549,11 @@ function initRealtimeOrders() {
       async (payload) => {
         const u = payload.new;
         if (u.status==="paid") {
-          showToast(`💳 ${u.buyer_name} paid for "${u.product_name}"!`);
+          showToast(`Payment: ${u.buyer_name} paid for "${u.product_name}"!`);
           addNotification(`Payment received from ${u.buyer_name} for "${u.product_name}"`);
         }
         if (u.status==="funded") {
-          showToast(`🏦 Funds released for "${u.product_name}"! Check your payout details.`);
+          showToast(`Funds released for "${u.product_name}"! Check your payout details.`);
           addNotification(`Funds released for "${u.product_name}" — go purchase the item`);
         }
         await renderOrders(); await renderStats(); await renderEarnings();
@@ -321,11 +564,13 @@ function initRealtimeOrders() {
    EARNINGS — real payout history from payouts table
 ══════════════════════════════════════════════ */
 async function renderEarnings() {
+  const list = document.getElementById("earningsList");
+  if (list) list.innerHTML = skeletonPayoutHistory();
+
   const orders    = await getOrders();
   const delivered = orders.filter(o => o.status === "delivered");
-  const active    = orders.filter(o => !["delivered","cancelled"].includes(o.status));
+  const active    = orders.filter(o => !["delivered", "cancelled"].includes(o.status));
 
-  // Fetch real payouts from DB
   const { data: payouts } = await supabase
     .from("payouts")
     .select("*")
@@ -334,80 +579,82 @@ async function renderEarnings() {
 
   allPayouts = payouts || [];
 
-  const totalPaidOut  = allPayouts.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
-  const totalEarned   = delivered.reduce((s,o) => s + (parseFloat(o.budget)||0) * 0.85, 0);
-  const pendingEarned = active.reduce((s,o) => s + (parseFloat(o.budget)||0) * 0.85, 0);
+  const totalPaidOut  = allPayouts.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const pendingEarned = active.reduce((s, o) => s + (parseFloat(o.budget) || 0) * 0.85, 0);
 
-  // This month
   const now = new Date();
   const thisMonthPayouts = allPayouts.filter(p => {
     const d = new Date(p.paid_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const thisMonth = thisMonthPayouts.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+  const thisMonth = thisMonthPayouts.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 
-  document.getElementById("earnTotal").textContent     = `$${totalPaidOut.toFixed(2)}`;
-  document.getElementById("earnMonth").textContent     = `$${thisMonth.toFixed(2)}`;
-  document.getElementById("earnPending").textContent   = `$${pendingEarned.toFixed(2)}`;
+  document.getElementById("earnTotal").textContent      = `$${totalPaidOut.toFixed(2)}`;
+  document.getElementById("earnMonth").textContent      = `$${thisMonth.toFixed(2)}`;
+  document.getElementById("earnPending").textContent    = `$${pendingEarned.toFixed(2)}`;
   document.getElementById("earnCompleted").textContent = delivered.length;
 
-  const list = document.getElementById("earningsList");
+  if (!list) return;
 
-  // Payout history table
   if (allPayouts.length === 0) {
     list.innerHTML = `
-      <h2 class="section-title" style="margin-bottom:12px">Payout History</h2>
-      <div class="empty-state">
-        <div class="empty-icon">💳</div>
-        <p>No payouts received yet.<br>Complete orders to start earning.</p>
+      <div class="payout-history-block">
+        <h2 class="section-title payout-history-title">Payout History</h2>
+        ${emptyState({
+          icon: "fa-credit-card",
+          title: "No payouts yet",
+          message: "Complete orders and add payout details to receive earnings.",
+          ctaText: "Set up payout",
+          section: "settings-section",
+          settingsTab: "payout",
+        })}
       </div>`;
     return;
   }
 
+  const rows = allPayouts.map(p => `
+    <tr>
+      <td>${escapeHtml(p.product_name || "—")}</td>
+      <td class="col-amount">$${parseFloat(p.amount || 0).toFixed(2)}</td>
+      <td class="col-method">${methodIcon(p.method)} ${escapeHtml(p.method || "—")}</td>
+      <td class="col-ref">${escapeHtml(p.reference || "—")}</td>
+      <td class="col-date">${p.paid_at ? new Date(p.paid_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
+      <td><span class="payout-status-received"><i class="fas fa-circle-check" aria-hidden="true"></i> Received</span></td>
+    </tr>`).join("");
+
   list.innerHTML = `
-    <h2 class="section-title" style="margin-bottom:16px">Payout History</h2>
-    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="background:var(--bg)">
-            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Product</th>
-            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Amount</th>
-            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Method</th>
-            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Reference</th>
-            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Date</th>
-            <th style="padding:10px 16px;font-size:0.72rem;color:var(--text-muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${allPayouts.map(p => `
-            <tr style="border-top:1px solid var(--border)">
-              <td style="padding:12px 16px;font-size:0.85rem;font-weight:500">${p.product_name || "—"}</td>
-              <td style="padding:12px 16px;font-size:0.88rem;font-weight:700;color:var(--green)">$${parseFloat(p.amount||0).toFixed(2)}</td>
-              <td style="padding:12px 16px;font-size:0.8rem;color:var(--text-muted)">${methodIcon(p.method)} ${p.method || "—"}</td>
-              <td style="padding:12px 16px;font-size:0.75rem;color:var(--text-muted);font-family:monospace">${p.reference || "—"}</td>
-              <td style="padding:12px 16px;font-size:0.78rem;color:var(--text-muted)">${p.paid_at ? new Date(p.paid_at).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "—"}</td>
-              <td style="padding:12px 16px">
-                <span style="background:#d1fae5;color:#065f46;font-size:0.68rem;font-weight:600;padding:3px 8px;border-radius:6px">Received ✓</span>
-              </td>
-            </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>
-    ${allPayouts.length > 0 ? `
-    <div style="margin-top:14px;padding:14px 18px;background:var(--green-light);border-radius:var(--radius);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:0.85rem;color:var(--green-dark);font-weight:600">💰 Total Received</span>
-      <span style="font-size:1.1rem;font-weight:700;color:var(--green)">$${totalPaidOut.toFixed(2)}</span>
-    </div>` : ""}`;
+    <div class="payout-history-block">
+      <h2 class="section-title payout-history-title">Payout History</h2>
+      <div class="payout-table-wrap">
+        <table class="payout-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Reference</th>
+              <th>Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="payout-total-bar">
+        <span><i class="fas fa-coins"></i> Total Received</span>
+        <span>$${totalPaidOut.toFixed(2)}</span>
+      </div>
+    </div>`;
 }
 
 function methodIcon(method) {
-  if (!method) return "";
+  if (!method) return faIcon("fa-credit-card");
   const m = method.toLowerCase();
-  if (m.includes("paypal"))  return "🅿️";
-  if (m.includes("momo") || m.includes("mobile")) return "📱";
-  if (m.includes("wise") || m.includes("revolut")) return "🌍";
-  if (m.includes("bank"))    return "🏦";
-  return "💳";
+  if (m.includes("paypal")) return faIcon("fa-brands fa-paypal");
+  if (m.includes("momo") || m.includes("mobile")) return faIcon("fa-mobile-screen-button");
+  if (m.includes("wise") || m.includes("revolut")) return faIcon("fa-globe");
+  if (m.includes("bank")) return faIcon("fa-building-columns");
+  return faIcon("fa-credit-card");
 }
 
 /* ─── SETTINGS ─── */
@@ -423,17 +670,12 @@ function loadSettingsIntoForm() {
   document.getElementById("settingCompletionRate").value = currentProfile.completion_rate || "";
   document.getElementById("settingTags").value           = currentProfile.tags            || "";
 
-  // Payout fields
   const methodEl = document.getElementById("payoutMethod");
   if (methodEl && currentProfile.payout_method) {
     methodEl.value = currentProfile.payout_method;
     togglePayoutFields(currentProfile.payout_method);
   }
-  if (document.getElementById("payoutAccountName"))   document.getElementById("payoutAccountName").value   = currentProfile.payout_account_name   || "";
-  if (document.getElementById("payoutAccountNumber")) document.getElementById("payoutAccountNumber").value = currentProfile.payout_account_number || "";
-  if (document.getElementById("payoutBankName"))      document.getElementById("payoutBankName").value      = currentProfile.payout_bank_name      || "";
-  if (document.getElementById("payoutCountry"))       document.getElementById("payoutCountry").value       = currentProfile.payout_country        || "";
-  if (document.getElementById("payoutEmail"))         document.getElementById("payoutEmail").value         = currentProfile.payout_email          || "";
+  setPayoutInputsFromProfile(currentProfile);
 
   const toggle = document.getElementById("notifToggle");
   if (toggle) toggle.className = `toggle-track ${currentProfile.notifications?"on":""}`;
@@ -492,7 +734,7 @@ function renderShopperVideosManager() {
   const videos = parseProfileVideos(currentProfile.profile_videos);
 
   if (videos.length === 0) {
-    list.innerHTML = `<p class="shopper-videos-empty">No videos yet. Upload your first clip.</p>`;
+    list.innerHTML = `<p class="shopper-videos-empty">No videos yet. <button type="button" class="btn btn-ghost" style="margin-top:10px" onclick="document.getElementById(\'shopperVideoInput\').click()">Upload your first clip</button></p>`;
   } else {
     list.innerHTML = videos.map(v => `
       <div class="shopper-video-item" data-id="${v.id}">
@@ -644,21 +886,27 @@ window.deleteShopperVideo = async function (videoId) {
   }
 };
 
-/* Toggle which payout fields show based on method */
-window.togglePayoutFields = function(method) {
-  const bankFields   = document.getElementById("bankFields");
-  const momoFields   = document.getElementById("momoFields");
-  const paypalFields = document.getElementById("paypalFields");
-  const wiseFields   = document.getElementById("wiseFields");
+window.togglePayoutFields = function (method) {
+  const wrap = document.getElementById("payoutFieldsWrap");
+  if (!wrap) return;
 
-  [bankFields, momoFields, paypalFields, wiseFields].forEach(el => {
-    if (el) el.style.display = "none";
+  if (!method) {
+    wrap.hidden = true;
+    return;
+  }
+
+  wrap.hidden = false;
+  const visible = PAYOUT_FIELD_SETS[method] || [];
+  const labels = PAYOUT_LABELS[method] || {};
+
+  document.querySelectorAll(".payout-field").forEach(el => {
+    const field = el.dataset.payoutField;
+    el.hidden = !visible.includes(field);
+    const labelEl = document.getElementById(payoutLabelId(field));
+    if (labelEl && labels[field]) labelEl.textContent = labels[field];
   });
 
-  if (method === "Bank Transfer"  && bankFields)   bankFields.style.display   = "block";
-  if (method === "Mobile Money"   && momoFields)   momoFields.style.display   = "block";
-  if (method === "PayPal"         && paypalFields) paypalFields.style.display = "block";
-  if (method === "Wise / Revolut" && wiseFields)   wiseFields.style.display   = "block";
+  retriggerAnimation(wrap, "payout-fields-animate-in");
 };
 
 window.toggleNotif = function () {
@@ -680,27 +928,23 @@ window.saveSettings = async function () {
   if (error) { showToast("Failed to save.", "error"); return; }
   Object.assign(currentProfile, update);
   renderSidebarProfile();
-  showToast("Profile saved! ✅");
+  showToast("Profile saved!");
 };
 
 window.savePayoutDetails = async function () {
   const method = document.getElementById("payoutMethod")?.value || "";
   if (!method) { showToast("Please select a payout method.", "error"); return; }
 
-  const update = {
-    payout_method:         method,
-    payout_account_name:   document.getElementById("payoutAccountName")?.value.trim()   || "",
-    payout_account_number: document.getElementById("payoutAccountNumber")?.value.trim() || "",
-    payout_bank_name:      document.getElementById("payoutBankName")?.value.trim()      || "",
-    payout_country:        document.getElementById("payoutCountry")?.value.trim()       || "",
-    payout_email:          document.getElementById("payoutEmail")?.value.trim()         || "",
-  };
+  const update = { payout_method: method };
+  for (const [field, profileKey] of Object.entries(PAYOUT_PROFILE_KEYS)) {
+    update[profileKey] = getPayoutInput(field);
+  }
 
   const { error } = await supabase.from("users").update(update).eq("uid", currentUser.id);
   if (error) { showToast("Failed to save payout details.", "error"); return; }
 
   Object.assign(currentProfile, update);
-  showToast("💳 Payout details saved! Admin will use these to send your money.", "success");
+  showToast("Payout details saved! Admin will use these to send your money.", "success");
 };
 
 function initAvatarUpload() {
@@ -732,7 +976,7 @@ async function handleShopperInboxMessage(msg) {
 
   if (fromOther && !inOpenThread) {
     playMessageNotification();
-    showToast(`💬 New message from ${msg.sender_name || "Buyer"}`);
+    showToast(`New message from ${msg.sender_name || "Buyer"}`);
     addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
   }
 
@@ -754,11 +998,19 @@ async function handleShopperInboxMessage(msg) {
 async function renderShopperChatList() {
   const list = document.getElementById("msgConvList");
   if (!list) return;
+  list.innerHTML = skeletonConvList(5);
 
   allShopperConvs = await getConversationSummaries(getShopperChatUserId());
 
   if (allShopperConvs.length === 0) {
-    list.innerHTML = `<div class="msg-conv-empty">No messages yet.<br><br>Buyers will message you from your profile.</div>`;
+    list.innerHTML = emptyState({
+      icon: "fa-comments",
+      title: "No messages yet",
+      message: "Buyers reach out from your public profile. Add videos so buyers trust you faster.",
+      ctaText: "Add profile videos",
+      section: "settings-section",
+      settingsTab: "videos",
+    });
     updateMsgBadge(0);
     return;
   }
@@ -773,7 +1025,12 @@ function renderShopperConvItems(convs, unreadMap = {}) {
   const list = document.getElementById("msgConvList");
   if (!list) return;
   if (convs.length === 0) {
-    list.innerHTML = `<div class="msg-conv-empty">No conversations found.</div>`; return;
+    list.innerHTML = emptyState({
+      icon: "fa-magnifying-glass",
+      title: "No matches",
+      message: "Try a different name or clear your search.",
+    });
+    return;
   }
   list.innerHTML = convs.map(m => {
     const isMine    = String(m.sender_id) === getShopperChatUserId();
@@ -1120,7 +1377,7 @@ async function handleShopperIncomingCall(payload) {
     setConversationPartner(activeChatConvId, activeChatPartner, myId);
   }
 
-  showToast(`📞 Incoming ${isVideo ? "video" : "voice"} call from ${payload.sender_name || "Buyer"}`);
+  showToast(`Incoming ${isVideo ? "video" : "voice"} call from ${payload.sender_name || "Buyer"}`);
 
   await prepareIncomingCallSignaling(supabase, myId, senderId, callType);
 
@@ -1152,23 +1409,80 @@ window.filterShopperConversations = function (query) {
 };
 
 /* ─── NOTIFICATIONS ─── */
-function getNotifications() { return JSON.parse(localStorage.getItem("bfm_notifications")) || []; }
+function getNotifications() {
+  try { return JSON.parse(localStorage.getItem("bfm_notifications")) || []; }
+  catch { return []; }
+}
+
 function addNotification(msg) {
   const n = getNotifications();
-  n.unshift({message:msg, time:Date.now()});
-  localStorage.setItem("bfm_notifications", JSON.stringify(n));
+  n.unshift({ message: msg, time: Date.now() });
+  localStorage.setItem("bfm_notifications", JSON.stringify(n.slice(0, 50)));
   updateNotifDot();
+  if (document.getElementById("notifDrawer")?.classList.contains("is-open")) {
+    renderNotificationsList();
+  }
 }
+
 function updateNotifDot() {
   const dot = document.getElementById("notifDot");
   if (dot) dot.className = getNotifications().length > 0 ? "notif-dot show" : "notif-dot";
 }
+
+function renderNotificationsList() {
+  const list = document.getElementById("notifDrawerList");
+  if (!list) return;
+  const items = getNotifications();
+
+  if (items.length === 0) {
+    list.innerHTML = `
+      <div class="notif-empty">
+        <div class="notif-empty-icon">${faIcon("fa-bell-slash")}</div>
+        <p>You're all caught up</p>
+        <span>New activity will show up here</span>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(item => `
+    <article class="notif-item">
+      <div class="notif-item-icon">${faIcon("fa-bell")}</div>
+      <div class="notif-item-body">
+        <p>${escapeHtml(item.message)}</p>
+        <time>${formatTime(item.time)}</time>
+      </div>
+    </article>`).join("");
+}
+
+function initNotificationsPanel() {
+  document.getElementById("notifDrawerBackdrop")?.addEventListener("click", closeNotifications);
+  document.getElementById("notifDrawerClose")?.addEventListener("click", closeNotifications);
+  document.getElementById("notifClearBtn")?.addEventListener("click", () => {
+    localStorage.removeItem("bfm_notifications");
+    updateNotifDot();
+    renderNotificationsList();
+    showToast("Notifications cleared.");
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeNotifications();
+  });
+}
+
 window.openNotifications = function () {
-  const n = getNotifications();
-  if (n.length === 0) { showToast("No new notifications."); return; }
-  alert("Notifications:\n\n" + n.map(x => `• ${x.message}`).join("\n"));
-  localStorage.removeItem("bfm_notifications");
-  updateNotifDot();
+  renderNotificationsList();
+  const drawer = document.getElementById("notifDrawer");
+  if (!drawer) return;
+  drawer.classList.add("is-open");
+  drawer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("notif-drawer-open");
+};
+
+window.closeNotifications = function () {
+  const drawer = document.getElementById("notifDrawer");
+  if (!drawer) return;
+  drawer.classList.remove("is-open");
+  drawer.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("notif-drawer-open");
 };
 
 /* ─── LOGOUT ─── */

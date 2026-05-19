@@ -35,8 +35,8 @@ iframe {
   min-width: 0;
 }
 
-/* ── Navbars (all pages) ── */
-.navbar {
+/* ── Navbars (all pages) — logo navbars sized in brand.css ── */
+.navbar:not(:has(.brand-link .brand-logo)) {
   min-height: 56px;
   height: auto;
   flex-wrap: wrap;
@@ -46,12 +46,19 @@ iframe {
   padding-bottom: 8px !important;
 }
 
+.navbar:not(.navbar--landing):has(.brand-link .brand-logo),
+.navbar--landing .navbar-inner {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
 .navbar .back-link,
 .navbar .nav-right {
   flex-shrink: 0;
 }
 
-.navbar .brand-link {
+.navbar .brand-link:not(:has(.brand-logo)) {
   max-width: min(55vw, 240px);
 }
 
@@ -91,11 +98,6 @@ table {
 
 /* ── Tablets (iPad, small laptops) ── */
 @media (max-width: 1024px) {
-  .brand-logo {
-    height: 48px;
-    max-width: 200px;
-  }
-
   .container,
   .page-container,
   .page,
@@ -126,21 +128,6 @@ table {
 
 /* ── Phones & small tablets ── */
 @media (max-width: 768px) {
-  .brand-logo {
-    height: 44px;
-    max-width: 170px;
-  }
-
-  .brand-logo--sm {
-    height: 40px;
-    max-width: 150px;
-  }
-
-  .brand-logo--lg {
-    height: 58px;
-    max-width: 220px;
-  }
-
   .navbar {
     padding-left: 12px !important;
     padding-right: 12px !important;
@@ -539,11 +526,6 @@ table {
 }
 
 @media (max-width: 480px) {
-  .brand-logo {
-    height: 38px;
-    max-width: 140px;
-  }
-
   .hero h1 {
     font-size: clamp(1.75rem, 8vw, 2.5rem) !important;
   }

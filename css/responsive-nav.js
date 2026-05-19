@@ -2,7 +2,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-nav-toggle]").forEach(btn => {
     btn.addEventListener("click", () => {
-      if (window.matchMedia("(max-width: 768px)").matches) return;
       const sel = btn.getAttribute("data-nav-toggle");
       const panel = sel ? document.querySelector(sel) : null;
       if (!panel) return;

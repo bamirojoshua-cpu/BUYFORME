@@ -1,7 +1,9 @@
-/* BuyForMe — shared logo (images/logo.png) */
+/* BuyForMe — shared logo (images/logo.png) in circular frames */
+
 .brand-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   text-decoration: none;
   flex-shrink: 0;
   line-height: 0;
@@ -13,25 +15,76 @@ a.logo.brand-link,
   text-decoration: none;
 }
 
+/* Nav bar height token (logo sizes to this) */
+.navbar {
+  --nav-bar-h: 62px;
+}
+
+.navbar:not(.navbar--landing):has(.brand-link .brand-logo) {
+  height: var(--nav-bar-h) !important;
+  min-height: var(--nav-bar-h) !important;
+  max-height: var(--nav-bar-h);
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow: hidden;
+}
+
+.navbar--landing .navbar-inner {
+  --nav-bar-h: 64px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.navbar--landing.scrolled .navbar-inner {
+  --nav-bar-h: 56px;
+}
+
+/* Circular frame — all logo images */
+.brand-link:has(.brand-logo) {
+  --logo-circle: 44px;
+  width: var(--logo-circle);
+  height: var(--logo-circle);
+  min-width: var(--logo-circle);
+  max-width: var(--logo-circle);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  padding: 5px;
+  box-shadow: 0 2px 12px rgba(12, 26, 20, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+}
+
+/* Nav logos — fit inside bar height with margin */
+.navbar .brand-link:has(.brand-logo),
+.navbar-inner .brand-link:has(.brand-logo) {
+  --logo-circle: calc(var(--nav-bar-h, 62px) - 16px);
+  padding: 4px;
+  box-shadow: 0 1px 4px rgba(12, 26, 20, 0.08);
+}
+
+.brand-link:has(.brand-logo--sm) {
+  --logo-circle: 40px;
+  padding: 4px;
+}
+
+.brand-link:has(.brand-logo--lg) {
+  --logo-circle: 72px;
+  padding: 7px;
+}
+
 .brand-logo {
-  height: 52px;
-  width: auto;
-  max-width: 240px;
+  width: 100%;
+  height: 100%;
+  max-width: none !important;
   object-fit: contain;
   display: block;
+  border-radius: 50%;
 }
 
-.brand-logo--sm {
-  height: 44px;
-  max-width: 200px;
-}
-
-.brand-logo--lg {
-  height: 72px;
-  max-width: 280px;
-}
-
-/* Legacy .logo text rules — hide emoji text when image is used */
+/* Legacy text logos — hide when image is present */
 .logo:has(.brand-logo),
 .nav-logo:has(.brand-logo),
 .sidebar-logo .brand:has(.brand-logo) {
@@ -39,7 +92,42 @@ a.logo.brand-link,
   color: transparent;
 }
 
-.navbar .logo,
-.navbar .brand-link {
-  min-width: 0;
+.sidebar-brand,
+.sidebar-logo:has(.brand-link .brand-logo) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sidebar-brand .brand-link:has(.brand-logo),
+.sidebar-logo .brand-link:has(.brand-logo) {
+  margin: 0 auto;
+}
+
+.footer-brand .brand-link:has(.brand-logo) {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 768px) {
+  .navbar:not(.navbar--landing):has(.brand-link .brand-logo) {
+    --nav-bar-h: 56px;
+  }
+
+  .navbar--landing .navbar-inner {
+    --nav-bar-h: 56px;
+  }
+
+  .navbar--landing.scrolled .navbar-inner {
+    --nav-bar-h: 52px;
+  }
+
+  .brand-link:has(.brand-logo--lg) {
+    --logo-circle: 64px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar:not(.navbar--landing):has(.brand-link .brand-logo) {
+    --nav-bar-h: 52px;
+  }
 }
