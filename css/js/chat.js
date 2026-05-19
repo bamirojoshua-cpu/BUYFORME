@@ -27,6 +27,16 @@ import {
   clearIncomingCallPrep,
   rejectIncomingCall,
 } from "./call-webrtc.js";
+import {
+  unlockSounds,
+  playMessageNotification,
+  playIncomingCallRing,
+  stopIncomingCallRing,
+  playOutgoingRingback,
+  stopOutgoingRingback,
+  stopAllCallSounds,
+} from "./app-sounds.js";
+import { showIncomingCallScreen, hideIncomingCallScreen } from "./call-ui.js";
 
 let currentUser          = null;
 let activeConversationId = null;
@@ -76,6 +86,16 @@ async function init() {
 async function handleInboxMessage(msg) {
   const partnerUid = getPartnerUidFromMessage(msg, currentUser.uid);
   const canonicalId = getConvId(currentUser.uid, partnerUid);
+
+  const fromOther = String(msg.sender_id) !== String(currentUser.uid);
+  const inOpenThread =
+    activePartner &&
+    String(activePartner.uid) === partnerUid &&
+    document.getElementById("chatMessages")?.style.display !== "none";
+
+  if (fromOther && !inOpenThread) {
+    playMessageNotification();
+  }
 
   if (
     activePartner &&
@@ -429,7 +449,7 @@ window.startVoiceCall = async function () {
 };
 
 async function startCall(callType) {
-  endActiveCall();
+  endActiveCall(false);
   try {
     await sendCallInvite(supabase, {
       sender_id:   currentUser.uid,
@@ -440,6 +460,7 @@ async function startCall(callType) {
       callType,
       conversation_id: activeConversationId,
     });
+    playOutgoingRingback();
     await new Promise(r => setTimeout(r, 400));
     activeCall = await startOutgoingCall({
       supabase,
@@ -455,18 +476,20 @@ async function startCall(callType) {
 }
 
 window.acceptVideoCall = async function () {
-  document.getElementById("incomingCallBanner")?.remove();
+  hideIncomingCallScreen();
   await acceptCall("video");
 };
 
 window.acceptVoiceCall = async function () {
-  document.getElementById("incomingCallBanner")?.remove();
+  hideIncomingCallScreen();
   await acceptCall("voice");
 };
 
 async function acceptCall(callType) {
+  stopIncomingCallRing();
+  stopOutgoingRingback();
   if (activeCall) {
-    activeCall.end();
+    activeCall.end(false);
     activeCall = null;
   }
   try {
@@ -484,20 +507,27 @@ async function acceptCall(callType) {
 }
 
 window.rejectCall = async function () {
-  if (activeCall) await activeCall.rejectRemote?.();
-  else await rejectIncomingCall();
-  document.getElementById("incomingCallBanner")?.remove();
+  hideIncomingCallScreen();
+  stopAllCallSounds();
+  if (activeCall) {
+    try { await activeCall.rejectRemote?.(); } catch {}
+    activeCall.end();
+    activeCall = null;
+  } else {
+    await rejectIncomingCall();
+  }
 };
 
 window.endCall = function () {
   endActiveCall();
 };
 
-function endActiveCall() {
-  activeCall?.end();
+function endActiveCall(playEndTone = true) {
+  stopAllCallSounds();
+  activeCall?.end(playEndTone);
   activeCall = null;
   clearIncomingCallPrep();
-  document.getElementById("incomingCallBanner")?.remove();
+  hideIncomingCallScreen();
 }
 
 async function handleIncomingCall({ sender_id, sender_name, callType }) {
@@ -521,16 +551,14 @@ async function handleIncomingCall({ sender_id, sender_name, callType }) {
 
   await prepareIncomingCallSignaling(supabase, currentUser.uid, sender_id, type);
 
-  document.getElementById("incomingCallBanner")?.remove();
-  const banner = document.createElement("div");
-  banner.id = "incomingCallBanner";
-  banner.innerHTML = `
-    <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a9e6e;color:#fff;padding:16px 24px;border-radius:16px;z-index:9998;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-width:95vw;flex-wrap:wrap">
-      <span>${isVideo ? "📹" : "📞"} Incoming ${isVideo ? "video" : "voice"} call from <strong>${escapeHtml(sender_name)}</strong></span>
-      <button type="button" onclick="${isVideo ? "acceptVideoCall" : "acceptVoiceCall"}()" style="background:#fff;color:#1a9e6e;border:none;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer">Accept</button>
-      <button type="button" onclick="rejectCall()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer">Decline</button>
-    </div>`;
-  document.body.appendChild(banner);
+  playIncomingCallRing();
+
+  showIncomingCallScreen({
+    partnerName: sender_name,
+    callType: type,
+    onAccept: () => (isVideo ? acceptVideoCall() : acceptVoiceCall()),
+    onDecline: () => rejectCall(),
+  });
 }
 
 async function markAsRead() {
@@ -567,6 +595,8 @@ function escapeHtml(text) {
 
 document.addEventListener("DOMContentLoaded", () => {
   init();
+
+  document.body.addEventListener("click", () => unlockSounds(), { once: true });
 
   document.getElementById("messageInput")?.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }

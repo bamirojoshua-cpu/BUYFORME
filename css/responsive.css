@@ -215,52 +215,161 @@ table {
     font-size: 0.82rem;
   }
 
-  /* Dashboards: slide-out sidebar (shopper + admin) */
+  /* Dashboards: mobile bottom nav pill (shopper + admin) — desktop unchanged */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   .dashboard-grid .sidebar,
   .admin-shell .sidebar {
-    display: flex !important;
+    display: contents !important;
+    position: static !important;
+    width: auto !important;
+    min-height: 0 !important;
+    transform: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* Hide sidebar chrome on mobile; nav lives in bottom pill */
+  .dashboard-grid .sidebar-brand,
+  .dashboard-grid .sidebar-profile,
+  .dashboard-grid .sidebar-logout,
+  .admin-shell .sidebar-logo,
+  .admin-shell .sidebar-footer {
+    display: none !important;
+  }
+
+  .dashboard-grid .sidebar-menu,
+  .admin-shell .sidebar-nav {
     position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: min(280px, 88vw) !important;
-    z-index: 300;
-    transform: translateX(-105%);
-    transition: transform 0.25s ease;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+    left: 50%;
+    bottom: max(12px, env(safe-area-inset-bottom, 12px));
+    transform: translateX(-50%);
+    z-index: 500;
+    width: min(calc(100vw - 24px), 520px);
+    margin: 0;
+    padding: 8px 10px;
+    list-style: none;
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 999px;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.12),
+      0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  .admin-shell .sidebar .brand,
-  .admin-shell .sidebar .tag,
-  .admin-shell .sidebar .nav-item span,
-  .admin-shell .sidebar .nav-badge,
-  .admin-shell .sidebar .admin-name,
-  .admin-shell .sidebar .admin-role {
-    display: revert !important;
+  .dashboard-grid .sidebar-menu::-webkit-scrollbar,
+  .admin-shell .sidebar-nav::-webkit-scrollbar {
+    display: none;
   }
 
-  .dashboard-grid .sidebar.is-open,
-  .admin-shell .sidebar.is-open {
-    transform: translateX(0);
+  .dashboard-grid .sidebar-menu li {
+    margin: 0 !important;
+    flex: 0 0 auto;
+  }
+
+  .admin-shell .nav-section {
+    display: contents;
+  }
+
+  .admin-shell .nav-section-label {
+    display: none !important;
+  }
+
+  .dashboard-grid .sidebar-menu a,
+  .admin-shell .nav-item {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 48px;
+    padding: 8px 10px !important;
+    border-radius: 999px !important;
+    font-size: 0.62rem !important;
+    line-height: 1.1;
+    white-space: nowrap;
+    border: none !important;
+  }
+
+  .dashboard-grid .sidebar-menu a i,
+  .admin-shell .nav-item i {
+    font-size: 1.05rem !important;
+    width: auto !important;
+  }
+
+  .dashboard-grid .sidebar-menu a.active,
+  .admin-shell .nav-item.active {
+    background: var(--green-light, rgba(0, 168, 132, 0.15)) !important;
+    color: var(--green-dark, #128c7e) !important;
+  }
+
+  .dashboard-grid .sidebar-menu a .badge,
+  .admin-shell .nav-item .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    margin-left: 0 !important;
+    min-width: 16px;
+    padding: 1px 5px;
+    font-size: 0.55rem !important;
+  }
+
+  .dashboard-grid .sidebar-menu a {
+    position: relative;
+  }
+
+  .admin-shell .nav-item {
+    position: relative;
+    flex: 0 0 auto;
   }
 
   .dashboard-grid .dashboard-main,
   .admin-shell .main {
-    width: 100%;
+    width: 100% !important;
     min-width: 0;
     margin-left: 0 !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .mobile-dash-bar {
     display: flex !important;
+    justify-content: center;
+  }
+
+  .mobile-dash-bar .menu-btn {
+    display: none !important;
+  }
+
+  .mobile-dash-bar span {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Admin pill: icon-only to fit more links */
+  .admin-shell .nav-item > span:not(.nav-badge) {
+    display: none !important;
+  }
+
+  .admin-shell .nav-item {
+    min-width: 44px !important;
+    padding: 10px 12px !important;
   }
 
   body.sidebar-open::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 250;
+    display: none !important;
   }
 
   /* Admin: stack stats, scroll main */
@@ -322,6 +431,110 @@ table {
   .msg-thread-header {
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  /* Shopper dashboard — mobile messages (fit screen, compact input) */
+  .dashboard-main:has(#messages-section.active) .welcome-card,
+  .dashboard-main:has(#messages-section.active) .stats-cards {
+    display: none !important;
+  }
+
+  #messages-section {
+    margin: 0 -4px;
+  }
+
+  #messages-section .section-title {
+    margin-bottom: 8px;
+    font-size: 1rem;
+  }
+
+  .messages-section-inner {
+    grid-template-columns: 1fr !important;
+    height: calc(100dvh - 140px - env(safe-area-inset-bottom, 0px)) !important;
+    min-height: 280px !important;
+    max-height: calc(100dvh - 140px - env(safe-area-inset-bottom, 0px)) !important;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .messages-section-inner .msg-conv-panel,
+  .messages-section-inner .msg-thread-panel {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .messages-section-inner:not(.thread-open) .msg-thread-panel {
+    display: none !important;
+  }
+
+  .messages-section-inner.thread-open .msg-conv-panel {
+    display: none !important;
+  }
+
+  .messages-section-inner.thread-open .msg-thread-panel {
+    display: flex !important;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .msg-back-btn {
+    display: flex !important;
+  }
+
+  .msg-thread-messages {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .msg-thread-input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom, 8px)) !important;
+    gap: 6px !important;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .msg-thread-input input[type="text"] {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: 0 !important;
+    max-width: 100%;
+    padding: 10px 12px !important;
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+  }
+
+  .msg-icon-btn {
+    width: 40px !important;
+    height: 40px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .msg-thread-send {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+  }
+
+  .msg-thread-send .msg-send-text {
+    display: none !important;
+  }
+
+  .msg-thread-send .msg-send-icon {
+    display: block !important;
+    font-size: 0.95rem;
+  }
+
+  .message {
+    max-width: 85% !important;
   }
 }
 

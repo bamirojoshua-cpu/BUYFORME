@@ -1,9 +1,17 @@
 /* =============================================================
    BuyForMe — call-webrtc.js
-   WebRTC voice/video — remote audio playback + Uber-style controls
+   WebRTC voice/video — WhatsApp-style call UI
    ============================================================= */
 
 import { getConvId } from "./chat-local.js";
+import {
+  playCallConnectedSound,
+  stopOutgoingRingback,
+  stopIncomingCallRing,
+  stopAllCallSounds,
+  playCallEndedSound,
+} from "./app-sounds.js";
+import { getCallInitials, escapeCallHtml } from "./call-ui.js";
 
 const ICE_SERVERS = {
   iceServers: [
@@ -44,6 +52,12 @@ export class WebRTCCall {
     this.overlay = null;
     this.ended = false;
     this.micEnabled = true;
+    this.cameraEnabled = true;
+    this.speakerOn = true;
+    this._facingMode = "user";
+    this._connectedSoundPlayed = false;
+    this._callStartTime = null;
+    this._timerInterval = null;
   }
 
   async start() {
@@ -56,7 +70,7 @@ export class WebRTCCall {
       });
     } catch {
       alert(`${this.isVideo ? "Camera/" : ""}Microphone access denied.`);
-      this.end();
+      this.end(false);
       return;
     }
 
@@ -100,10 +114,11 @@ export class WebRTCCall {
     audio.muted = false;
     try {
       await audio.play();
-    } catch {
-      // Autoplay blocked until user taps — show tap hint
       const hint = document.getElementById("bfmTapToHear");
-      if (hint) hint.style.display = "block";
+      if (hint) hint.style.display = "none";
+    } catch {
+      const hint = document.getElementById("bfmTapToHear");
+      if (hint) hint.style.display = "inline-block";
     }
   }
 
@@ -129,14 +144,56 @@ export class WebRTCCall {
       video.muted = false;
       video.playsInline = true;
       video.play().catch(() => {});
+      if (stream.getVideoTracks().length) this._hideRemotePlaceholder();
     }
 
-    this._setStatus("Connected — you can talk now");
+    this._setStatus("connected");
+    this._onCallConnected();
+  }
+
+  _onCallConnected() {
+    if (this._connectedSoundPlayed) return;
+    const linked =
+      this.pc?.connectionState === "connected" ||
+      this.pc?.iceConnectionState === "connected" ||
+      (this.remoteStream?.getTracks?.().length ?? 0) > 0;
+    if (!linked) return;
+    this._connectedSoundPlayed = true;
+    stopIncomingCallRing();
+    stopOutgoingRingback();
+    playCallConnectedSound();
+    this._startCallTimer();
+  }
+
+  _startCallTimer() {
+    if (this._callStartTime) return;
+    this._callStartTime = Date.now();
+    clearInterval(this._timerInterval);
+    const tick = () => {
+      if (!this._callStartTime) return;
+      const sec = Math.floor((Date.now() - this._callStartTime) / 1000);
+      const m = Math.floor(sec / 60);
+      const s = String(sec % 60).padStart(2, "0");
+      this._setStatus(`${m}:${s}`);
+    };
+    tick();
+    this._timerInterval = setInterval(tick, 1000);
   }
 
   _setStatus(text) {
-    const s = document.getElementById("bfmCallStatus");
-    if (s) s.textContent = text;
+    const el = document.getElementById("bfmCallStatus");
+    if (!el) return;
+    if (text === "connected") {
+      if (this._callStartTime) return;
+      el.textContent = "Connected";
+      return;
+    }
+    const labels = {
+      calling: "Calling…",
+      ringing: "Ringing…",
+      connecting: "Connecting…",
+    };
+    el.textContent = labels[text] || text;
   }
 
   _createPeer() {
@@ -169,15 +226,18 @@ export class WebRTCCall {
 
     this.pc.onconnectionstatechange = () => {
       const st = this.pc?.connectionState;
-      if (st === "connected") this._setStatus("Connected — you can talk now");
-      else if (st === "failed" || st === "disconnected") {
-        this._setStatus("Connection lost — try ending and calling again");
+      if (st === "connected") {
+        this._setStatus("connected");
+        this._onCallConnected();
+      } else if (st === "failed" || st === "disconnected") {
+        clearInterval(this._timerInterval);
+        this._setStatus("Connection lost");
       }
     };
 
     this.pc.oniceconnectionstatechange = () => {
       const st = this.pc?.iceConnectionState;
-      if (st === "failed") this._setStatus("Network issue — try again on Wi‑Fi");
+      if (st === "failed") this._setStatus("Poor connection");
     };
   }
 
@@ -271,7 +331,7 @@ export class WebRTCCall {
     this._ringTimer = setTimeout(() => {
       if (this.ended || !this.isCaller) return;
       if (this.pc && !this.pc.currentRemoteDescription) {
-        this._setStatus("Still ringing… ask them to tap Accept");
+        this._setStatus("ringing");
       }
     }, 25000);
   }
@@ -280,61 +340,199 @@ export class WebRTCCall {
     await this._sendSignal({ type: "reject" });
   }
 
+  _updateCtrlBtn(id, active, offClass = "bfm-call-ctrl-btn--off") {
+    document.getElementById(id)?.classList.toggle(offClass, !active);
+  }
+
   toggleMic() {
     this.micEnabled = !this.micEnabled;
     this.localStream?.getAudioTracks().forEach(t => { t.enabled = this.micEnabled; });
     const btn = document.getElementById("bfmMuteBtn");
     if (btn) {
-      btn.textContent = this.micEnabled ? "🎤 Mute" : "🔇 Unmute";
-      btn.style.background = this.micEnabled ? "rgba(255,255,255,0.15)" : "#e74c3c";
+      btn.classList.toggle("bfm-call-ctrl-btn--off", !this.micEnabled);
+      btn.innerHTML = this.micEnabled
+        ? '<i class="fa-solid fa-microphone"></i>'
+        : '<i class="fa-solid fa-microphone-slash"></i>';
     }
+  }
+
+  toggleCamera() {
+    if (!this.isVideo) return;
+    this.cameraEnabled = !this.cameraEnabled;
+    this.localStream?.getVideoTracks().forEach(t => { t.enabled = this.cameraEnabled; });
+    this._updateCtrlBtn("bfmCamBtn", this.cameraEnabled);
+    const btn = document.getElementById("bfmCamBtn");
+    if (btn) {
+      btn.innerHTML = this.cameraEnabled
+        ? '<i class="fa-solid fa-video"></i>'
+        : '<i class="fa-solid fa-video-slash"></i>';
+    }
+    const pip = document.getElementById("bfmLocalVideo");
+    if (pip) pip.style.opacity = this.cameraEnabled ? "1" : "0.35";
+  }
+
+  async flipCamera() {
+    if (!this.isVideo || !this.localStream) return;
+    this._facingMode = this._facingMode === "user" ? "environment" : "user";
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: this._facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      const newTrack = newStream.getVideoTracks()[0];
+      const oldTrack = this.localStream.getVideoTracks()[0];
+      if (!newTrack || !oldTrack) return;
+      this.localStream.removeTrack(oldTrack);
+      this.localStream.addTrack(newTrack);
+      oldTrack.stop();
+      const sender = this.pc?.getSenders?.().find(s => s.track?.kind === "video");
+      if (sender) await sender.replaceTrack(newTrack);
+      const localVid = document.getElementById("bfmLocalVideo");
+      if (localVid) {
+        localVid.srcObject = this.localStream;
+        localVid.play().catch(() => {});
+      }
+    } catch { /* keep current camera */ }
+  }
+
+  async toggleSpeaker() {
+    this.speakerOn = !this.speakerOn;
+    const audio = document.getElementById("bfmRemoteAudio");
+    if (audio) audio.volume = this.speakerOn ? 1 : 0.35;
+    this._updateCtrlBtn("bfmSpeakerBtn", this.speakerOn, "bfm-call-ctrl-btn--active");
+  }
+
+  _isMobileCallUi() {
+    return typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
+  }
+
+  _controlsHtml(isVideo) {
+    if (this._isMobileCallUi()) {
+      return isVideo ? this._controlsHtmlMobileVideo() : this._controlsHtmlMobileVoice();
+    }
+    return this._controlsHtmlDesktop(isVideo);
+  }
+
+  _controlsHtmlDesktop(isVideo) {
+    const videoCtrls = isVideo ? `
+      <div class="bfm-call-ctrl">
+        <button type="button" class="bfm-call-ctrl-btn" id="bfmFlipBtn" aria-label="Flip camera"><i class="fa-solid fa-rotate"></i></button>
+        <span class="bfm-call-ctrl-label">Flip</span>
+      </div>
+      <div class="bfm-call-ctrl">
+        <button type="button" class="bfm-call-ctrl-btn" id="bfmCamBtn" aria-label="Toggle camera"><i class="fa-solid fa-video"></i></button>
+        <span class="bfm-call-ctrl-label">Video</span>
+      </div>` : "";
+
+    return `
+      <footer class="bfm-call-controls">
+        <div class="bfm-call-controls-row">
+          <div class="bfm-call-ctrl">
+            <button type="button" class="bfm-call-ctrl-btn bfm-call-ctrl-btn--active" id="bfmSpeakerBtn" aria-label="Speaker"><i class="fa-solid fa-volume-high"></i></button>
+            <span class="bfm-call-ctrl-label">Speaker</span>
+          </div>
+          <div class="bfm-call-ctrl">
+            <button type="button" class="bfm-call-ctrl-btn" id="bfmMuteBtn" aria-label="Mute"><i class="fa-solid fa-microphone"></i></button>
+            <span class="bfm-call-ctrl-label">Mute</span>
+          </div>
+          <div class="bfm-call-ctrl">
+            <button type="button" class="bfm-call-ctrl-btn bfm-call-ctrl-btn--end" id="bfmEndCallBtn" aria-label="End call"><i class="fa-solid fa-phone-slash"></i></button>
+            <span class="bfm-call-ctrl-label">End</span>
+          </div>
+          ${videoCtrls}
+        </div>
+      </footer>`;
+  }
+
+  _controlsHtmlMobileVoice() {
+    return `
+      <footer class="bfm-call-controls bfm-call-controls--mobile">
+        <div class="bfm-call-controls-row bfm-call-controls-row--wa-voice">
+          <button type="button" class="bfm-call-ctrl-btn bfm-call-ctrl-btn--active" id="bfmSpeakerBtn" aria-label="Speaker"><i class="fa-solid fa-volume-high"></i></button>
+          <button type="button" class="bfm-call-ctrl-btn bfm-call-ctrl-btn--end" id="bfmEndCallBtn" aria-label="End call"><i class="fa-solid fa-phone-slash"></i></button>
+          <button type="button" class="bfm-call-ctrl-btn" id="bfmMuteBtn" aria-label="Mute"><i class="fa-solid fa-microphone"></i></button>
+        </div>
+      </footer>`;
+  }
+
+  _controlsHtmlMobileVideo() {
+    return `
+      <footer class="bfm-call-controls bfm-call-controls--mobile">
+        <div class="bfm-call-controls-row bfm-call-controls-row--wa-video">
+          <button type="button" class="bfm-call-ctrl-btn" id="bfmFlipBtn" aria-label="Flip camera"><i class="fa-solid fa-rotate"></i></button>
+          <button type="button" class="bfm-call-ctrl-btn" id="bfmCamBtn" aria-label="Toggle camera"><i class="fa-solid fa-video"></i></button>
+          <button type="button" class="bfm-call-ctrl-btn bfm-call-ctrl-btn--end" id="bfmEndCallBtn" aria-label="End call"><i class="fa-solid fa-phone-slash"></i></button>
+          <button type="button" class="bfm-call-ctrl-btn" id="bfmMuteBtn" aria-label="Mute"><i class="fa-solid fa-microphone"></i></button>
+          <button type="button" class="bfm-call-ctrl-btn bfm-call-ctrl-btn--active" id="bfmSpeakerBtn" aria-label="Speaker"><i class="fa-solid fa-volume-high"></i></button>
+        </div>
+      </footer>`;
+  }
+
+  _hideRemotePlaceholder() {
+    document.getElementById("bfmRemotePlaceholder")?.style.setProperty("display", "none");
   }
 
   _buildOverlay() {
     document.getElementById("bfmCallOverlay")?.remove();
+    const initials = getCallInitials(this.partnerName);
+    const safeName = escapeCallHtml(this.partnerName);
+    const statusText = this.isCaller ? "Calling…" : "Connecting…";
+
     const overlay = document.createElement("div");
     overlay.id = "bfmCallOverlay";
-    overlay.innerHTML = `
-      <div style="position:fixed;inset:0;background:#0f1c18;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px">
-        <p style="color:#fff;font-family:'Sora',sans-serif;font-size:1.05rem;margin:0">
-          ${this.isVideo ? "📹 Video" : "📞 Voice"} call — ${this.partnerName}
-        </p>
-        ${this.isVideo ? `
-        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center">
-          <div style="text-align:center">
-            <p style="color:#888;font-size:0.7rem;margin:0 0 4px">You</p>
-            <video id="bfmLocalVideo" autoplay muted playsinline style="width:min(140px,38vw);border-radius:12px;background:#222;transform:scaleX(-1)"></video>
+    const mobileUi = this._isMobileCallUi();
+    overlay.className = `bfm-call-screen${this.isVideo ? " bfm-call-screen--video" : ""}${mobileUi ? " bfm-call-screen--mobile" : ""}`;
+    document.body.classList.add("bfm-call-active");
+
+    if (this.isVideo) {
+      overlay.innerHTML = `
+        <div class="bfm-call-remote-wrap" id="bfmRemoteWrap">
+          <video id="bfmRemoteVideo" autoplay playsinline></video>
+          <div class="bfm-call-remote-placeholder" id="bfmRemotePlaceholder">
+            <div class="bfm-call-avatar">${initials}</div>
           </div>
-          <div style="text-align:center">
-            <p style="color:#888;font-size:0.7rem;margin:0 0 4px">${this.partnerName}</p>
-            <video id="bfmRemoteVideo" autoplay playsinline style="width:min(220px,55vw);border-radius:12px;background:#222"></video>
-          </div>
-        </div>` : `
-        <div style="width:96px;height:96px;border-radius:50%;background:#1a9e6e;display:flex;align-items:center;justify-content:center;font-size:2.2rem;color:#fff;font-family:'Sora',sans-serif;font-weight:700">
-          ${(this.partnerName || "?")[0].toUpperCase()}
-        </div>`}
-        <p style="color:#9ab;font-size:0.88rem;margin:0" id="bfmCallStatus">${this.isCaller ? "Calling…" : "Connecting…"}</p>
-        <p id="bfmTapToHear" style="display:none;color:#f1c40f;font-size:0.82rem;margin:0;cursor:pointer;text-decoration:underline">
-          Tap here if you can't hear them
-        </p>
-        <audio id="bfmRemoteAudio" autoplay playsinline style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></audio>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-          <button type="button" id="bfmMuteBtn" style="padding:10px 18px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:24px;font-size:0.85rem;cursor:pointer">🎤 Mute</button>
-          <button type="button" id="bfmEndCallBtn" style="padding:10px 24px;background:#e74c3c;color:#fff;border:none;border-radius:24px;font-size:0.9rem;cursor:pointer;font-weight:600">End call</button>
         </div>
-      </div>`;
+        <div class="bfm-call-pip">
+          <video id="bfmLocalVideo" autoplay muted playsinline></video>
+        </div>
+        <header class="bfm-call-top">
+          <h1 class="bfm-call-top-name">${safeName}</h1>
+          <p class="bfm-call-top-status" id="bfmCallStatus">${statusText}</p>
+        </header>
+        <audio id="bfmRemoteAudio" class="bfm-call-hidden-audio" autoplay playsinline></audio>
+        <button type="button" class="bfm-call-tap-hint" id="bfmTapToHear">Tap to hear audio</button>
+        ${this._controlsHtml(true)}`;
+    } else {
+      overlay.innerHTML = `
+        <div class="bfm-call-voice-body">
+          <div class="bfm-call-avatar">${initials}</div>
+          <h1 class="bfm-call-voice-name">${safeName}</h1>
+          <p class="bfm-call-voice-status" id="bfmCallStatus">${statusText}</p>
+          <button type="button" class="bfm-call-tap-hint" id="bfmTapToHear">Tap to hear audio</button>
+        </div>
+        <audio id="bfmRemoteAudio" class="bfm-call-hidden-audio" autoplay playsinline></audio>
+        ${this._controlsHtml(false)}`;
+    }
+
     document.body.appendChild(overlay);
     this.overlay = overlay;
 
     document.getElementById("bfmEndCallBtn")?.addEventListener("click", () => this.end());
     document.getElementById("bfmMuteBtn")?.addEventListener("click", () => this.toggleMic());
+    document.getElementById("bfmSpeakerBtn")?.addEventListener("click", () => this.toggleSpeaker());
+    document.getElementById("bfmCamBtn")?.addEventListener("click", () => this.toggleCamera());
+    document.getElementById("bfmFlipBtn")?.addEventListener("click", () => this.flipCamera());
     document.getElementById("bfmTapToHear")?.addEventListener("click", () => this._unlockAudioPlayback());
   }
 
-  end() {
+  end(playEndTone = true) {
     if (this.ended) return;
     this.ended = true;
     clearTimeout(this._ringTimer);
+    clearInterval(this._timerInterval);
+    this._timerInterval = null;
+    this._callStartTime = null;
+    stopAllCallSounds();
 
     this.remoteStream?.getTracks().forEach(t => t.stop());
     this.remoteStream = null;
@@ -353,14 +551,16 @@ export class WebRTCCall {
     this.iceQueue = [];
 
     document.getElementById("bfmCallOverlay")?.remove();
+    document.body.classList.remove("bfm-call-active");
     this.overlay = null;
+    if (playEndTone) playCallEndedSound();
   }
 }
 
 let incomingPrep = null;
 
 export async function prepareIncomingCallSignaling(supabase, myUserId, partnerUserId, callType) {
-  incomingPrep?.end();
+  incomingPrep?.end(false);
   incomingPrep = new WebRTCCall({
     supabase,
     myUserId,
@@ -373,11 +573,12 @@ export async function prepareIncomingCallSignaling(supabase, myUserId, partnerUs
 }
 
 export function clearIncomingCallPrep() {
-  incomingPrep?.end();
+  incomingPrep?.end(false);
   incomingPrep = null;
 }
 
 export async function rejectIncomingCall() {
+  stopAllCallSounds();
   if (incomingPrep) {
     try { await incomingPrep.rejectRemote(); } catch {}
     incomingPrep.end();

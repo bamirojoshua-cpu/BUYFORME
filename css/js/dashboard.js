@@ -32,6 +32,16 @@ import {
   clearIncomingCallPrep,
   rejectIncomingCall,
 } from "./call-webrtc.js";
+import {
+  unlockSounds,
+  playMessageNotification,
+  playIncomingCallRing,
+  stopIncomingCallRing,
+  playOutgoingRingback,
+  stopOutgoingRingback,
+  stopAllCallSounds,
+} from "./app-sounds.js";
+import { showIncomingCallScreen, hideIncomingCallScreen } from "./call-ui.js";
 
 /* ─── STATE ─── */
 let currentUser    = null;
@@ -64,6 +74,8 @@ function getShopperChatUserId() {
 
 /* ─── INIT ─── */
 document.addEventListener("DOMContentLoaded", async () => {
+  document.body.addEventListener("click", () => unlockSounds(), { once: true });
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) { window.location.href = "auth.html"; return; }
   currentUser = session.user;
@@ -160,6 +172,8 @@ function initTabs() {
         const b = document.getElementById("msgBadge");
         if (b) b.style.display = "none";
         renderShopperChatList();
+      } else {
+        document.querySelector(".messages-section-inner")?.classList.remove("thread-open");
       }
       if (this.dataset.tab === "requests-section") renderRequests();
       if (this.dataset.tab === "orders-section")   renderOrders();
@@ -710,7 +724,14 @@ async function handleShopperInboxMessage(msg) {
   const partnerUid = getPartnerUidFromMessage(msg, myId);
   const canonicalId = getConvId(myId, partnerUid);
 
-  if (String(msg.sender_id) !== myId) {
+  const fromOther = String(msg.sender_id) !== myId;
+  const inOpenThread =
+    activeChatPartner &&
+    String(activeChatPartner.uid) === partnerUid &&
+    document.getElementById("msgThreadMessages")?.style.display !== "none";
+
+  if (fromOther && !inOpenThread) {
+    playMessageNotification();
     showToast(`💬 New message from ${msg.sender_name || "Buyer"}`);
     addNotification(`Message from ${msg.sender_name}: "${getPreviewText(msg.content || "")}"`);
   }
@@ -799,10 +820,22 @@ window.openShopperChat = async function (otherUid, otherName) {
   document.getElementById("msgThreadInput").style.display    = "flex";
   document.getElementById("msgThreadHav").textContent   = (otherName||"?")[0].toUpperCase();
   document.getElementById("msgThreadHname").textContent = otherName;
+  document.querySelector(".messages-section-inner")?.classList.add("thread-open");
   shopperThreadIds = new Set();
   await loadShopperMessages();
   await markShopperRead();
   await renderShopperChatList();
+};
+
+window.backToShopperConvList = function () {
+  document.querySelector(".messages-section-inner")?.classList.remove("thread-open");
+  document.getElementById("msgThreadEmpty").style.display    = "flex";
+  document.getElementById("msgThreadHeader").style.display   = "none";
+  document.getElementById("msgThreadMessages").style.display = "none";
+  document.getElementById("msgThreadInput").style.display    = "none";
+  activeChatPartner = null;
+  activeChatConvId = null;
+  renderShopperChatList();
 };
 
 async function loadShopperMessages() {
@@ -998,27 +1031,34 @@ window.startShopperVoiceCall = async function () {
   await startShopperCall("voice");
 };
 window.acceptShopperVideoCall = async function () {
-  document.getElementById("shopperIncomingBanner")?.remove();
+  hideIncomingCallScreen();
   await acceptShopperCall("video");
 };
 window.acceptShopperVoiceCall = async function () {
-  document.getElementById("shopperIncomingBanner")?.remove();
+  hideIncomingCallScreen();
   await acceptShopperCall("voice");
 };
 window.rejectShopperCall = async function () {
-  if (shopperActiveCall) await shopperActiveCall.rejectRemote?.();
-  else await rejectIncomingCall();
-  document.getElementById("shopperIncomingBanner")?.remove();
+  hideIncomingCallScreen();
+  stopAllCallSounds();
+  if (shopperActiveCall) {
+    try { await shopperActiveCall.rejectRemote?.(); } catch {}
+    shopperActiveCall.end();
+    shopperActiveCall = null;
+  } else {
+    await rejectIncomingCall();
+  }
 };
-window.endShopperCall = function () {
-  shopperActiveCall?.end();
+window.endShopperCall = function (playEndTone = true) {
+  stopAllCallSounds();
+  shopperActiveCall?.end(playEndTone);
   shopperActiveCall = null;
   clearIncomingCallPrep();
-  document.getElementById("shopperIncomingBanner")?.remove();
+  hideIncomingCallScreen();
 };
 
 async function startShopperCall(callType) {
-  window.endShopperCall();
+  window.endShopperCall(false);
   try {
     await sendCallInvite(supabase, {
       sender_id: getShopperChatUserId(),
@@ -1029,6 +1069,7 @@ async function startShopperCall(callType) {
       callType,
       conversation_id: activeChatConvId,
     });
+    playOutgoingRingback();
     await new Promise(r => setTimeout(r, 400));
     shopperActiveCall = await startOutgoingCall({
       supabase,
@@ -1044,8 +1085,10 @@ async function startShopperCall(callType) {
 }
 
 async function acceptShopperCall(callType) {
+  stopIncomingCallRing();
+  stopOutgoingRingback();
   if (shopperActiveCall) {
-    shopperActiveCall.end();
+    shopperActiveCall.end(false);
     shopperActiveCall = null;
   }
   try {
@@ -1081,16 +1124,14 @@ async function handleShopperIncomingCall(payload) {
 
   await prepareIncomingCallSignaling(supabase, myId, senderId, callType);
 
-  document.getElementById("shopperIncomingBanner")?.remove();
-  const banner = document.createElement("div");
-  banner.id = "shopperIncomingBanner";
-  banner.innerHTML = `
-    <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a9e6e;color:#fff;padding:16px 24px;border-radius:16px;z-index:9998;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,0.2)">
-      <span>${isVideo?"📹":"📞"} Incoming ${isVideo?"video":"voice"} call from <strong>${payload.sender_name || "Buyer"}</strong></span>
-      <button onclick="${isVideo?"acceptShopperVideoCall":"acceptShopperVoiceCall"}()" style="background:#fff;color:#1a9e6e;border:none;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer">Accept</button>
-      <button onclick="rejectShopperCall()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer">Decline</button>
-    </div>`;
-  document.body.appendChild(banner);
+  playIncomingCallRing();
+
+  showIncomingCallScreen({
+    partnerName: payload.sender_name || "Buyer",
+    callType,
+    onAccept: () => (isVideo ? acceptShopperVideoCall() : acceptShopperVoiceCall()),
+    onDecline: () => rejectShopperCall(),
+  });
 }
 
 async function markShopperRead() {

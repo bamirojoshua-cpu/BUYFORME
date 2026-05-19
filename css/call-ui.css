@@ -1,0 +1,517 @@
+/* BuyForMe — WhatsApp-style voice & video call UI */
+
+:root {
+  --bfm-call-bg: #0b141a;
+  --bfm-call-bg2: #111b21;
+  --bfm-call-green: #00a884;
+  --bfm-call-red: #ff3b30;
+  --bfm-call-control: rgba(255, 255, 255, 0.12);
+  --bfm-call-control-hover: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Active call (voice + video) ── */
+.bfm-call-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bfm-call-bg);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  color: #e9edef;
+  overflow: hidden;
+}
+
+.bfm-call-screen--video {
+  background: #000;
+}
+
+.bfm-call-remote-wrap {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.bfm-call-remote-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #111;
+}
+
+.bfm-call-remote-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(165deg, #1f2c34 0%, #0b141a 55%, #0b141a 100%);
+  gap: 12px;
+}
+
+.bfm-call-pip {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top, 12px));
+  right: max(12px, env(safe-area-inset-right, 12px));
+  width: min(112px, 28vw);
+  height: min(160px, 38vw);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  z-index: 3;
+  background: #222;
+}
+
+.bfm-call-pip video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.bfm-call-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  padding: max(48px, calc(env(safe-area-inset-top, 0px) + 36px)) 20px 48px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.65) 0%, transparent 100%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.bfm-call-top-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+.bfm-call-top-status {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  color: rgba(233, 237, 239, 0.85);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+
+.bfm-call-voice-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px 200px;
+  background: linear-gradient(165deg, #1f2c34 0%, #0b141a 50%, #0b141a 100%);
+}
+
+.bfm-call-voice-body .bfm-call-tap-hint {
+  margin-top: 8px;
+}
+
+.bfm-call-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00a884, #128c7e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.75rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.bfm-call-avatar--lg {
+  width: 140px;
+  height: 140px;
+  font-size: 3.2rem;
+}
+
+.bfm-call-voice-name {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 600;
+}
+
+.bfm-call-voice-status {
+  margin: 10px 0 0;
+  font-size: 1rem;
+  color: #8696a0;
+}
+
+.bfm-call-tap-hint {
+  display: none;
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: rgba(241, 196, 15, 0.15);
+  color: #f1c40f;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: none;
+  pointer-events: auto;
+}
+
+.bfm-call-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 20px 16px max(28px, calc(env(safe-area-inset-bottom, 0px) + 24px));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
+}
+
+.bfm-call-controls-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(20px, 6vw, 36px);
+  flex-wrap: wrap;
+}
+
+.bfm-call-ctrl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 64px;
+}
+
+.bfm-call-ctrl-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bfm-call-control);
+  color: #fff;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.bfm-call-ctrl-btn:hover {
+  background: var(--bfm-call-control-hover);
+}
+
+.bfm-call-ctrl-btn:active {
+  transform: scale(0.94);
+}
+
+.bfm-call-ctrl-btn--active {
+  background: #fff;
+  color: #111b21;
+}
+
+.bfm-call-ctrl-btn--off {
+  background: #fff;
+  color: #111b21;
+}
+
+.bfm-call-ctrl-btn--end {
+  width: 64px;
+  height: 64px;
+  background: var(--bfm-call-red);
+  font-size: 1.35rem;
+}
+
+.bfm-call-ctrl-btn--end:hover {
+  background: #e6352b;
+}
+
+.bfm-call-ctrl-label {
+  font-size: 0.72rem;
+  color: rgba(233, 237, 239, 0.9);
+  text-align: center;
+  max-width: 72px;
+  line-height: 1.2;
+}
+
+/* ── Incoming call (full screen) ── */
+.bfm-incoming-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: linear-gradient(165deg, #1f2c34 0%, #0b141a 45%, #0b141a 100%);
+  font-family: "Inter", system-ui, sans-serif;
+  color: #e9edef;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: bfmCallFadeIn 0.25s ease;
+}
+
+@keyframes bfmCallFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bfm-incoming-top {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px 24px;
+  text-align: center;
+}
+
+.bfm-incoming-type {
+  margin: 0 0 28px;
+  font-size: 0.95rem;
+  color: #8696a0;
+  letter-spacing: 0.02em;
+}
+
+.bfm-incoming-name {
+  margin: 20px 0 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.bfm-incoming-sub {
+  margin: 8px 0 0;
+  font-size: 1rem;
+  color: #8696a0;
+}
+
+.bfm-incoming-actions {
+  width: 100%;
+  padding: 24px 32px max(40px, calc(env(safe-area-inset-bottom, 0px) + 32px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.bfm-incoming-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.bfm-incoming-action-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, filter 0.15s;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.bfm-incoming-action-btn:active {
+  transform: scale(0.92);
+}
+
+.bfm-incoming-action-btn--decline {
+  background: var(--bfm-call-red);
+}
+
+.bfm-incoming-action-btn--accept {
+  background: var(--bfm-call-green);
+}
+
+.bfm-incoming-action-label {
+  font-size: 0.85rem;
+  color: #aebac1;
+}
+
+.bfm-call-hidden-audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Lock page scroll while call UI is open */
+body.bfm-call-active {
+  overflow: hidden !important;
+  position: fixed;
+  width: 100%;
+}
+
+/* ── Mobile only (≤768px) — WhatsApp-style; desktop rules above unchanged ── */
+@media (max-width: 768px) {
+  /* Incoming call */
+  .bfm-incoming-screen--mobile .bfm-incoming-top {
+    padding-top: max(56px, env(safe-area-inset-top, 0px));
+  }
+
+  .bfm-incoming-screen--mobile .bfm-call-avatar--lg {
+    width: 128px;
+    height: 128px;
+    font-size: 2.8rem;
+  }
+
+  .bfm-incoming-screen--mobile .bfm-incoming-name {
+    font-size: 1.5rem;
+  }
+
+  .bfm-incoming-screen--mobile .bfm-incoming-actions {
+    padding: 32px 48px max(48px, calc(env(safe-area-inset-bottom, 0px) + 40px));
+    max-width: 100%;
+  }
+
+  .bfm-incoming-screen--mobile .bfm-incoming-action-btn {
+    width: 72px;
+    height: 72px;
+    font-size: 1.65rem;
+  }
+
+  .bfm-incoming-screen--mobile .bfm-incoming-action-btn--accept {
+    width: 80px;
+    height: 80px;
+  }
+
+  /* Active voice call */
+  .bfm-call-screen--mobile.bfm-call-screen:not(.bfm-call-screen--video) .bfm-call-voice-body {
+    padding: max(72px, env(safe-area-inset-top, 0px) + 48px) 24px 160px;
+    justify-content: flex-start;
+    padding-top: 18vh;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-avatar {
+    width: 140px;
+    height: 140px;
+    font-size: 3rem;
+    margin-bottom: 24px;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-voice-name {
+    font-size: 1.75rem;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-voice-status,
+  .bfm-call-screen--mobile .bfm-call-top-status {
+    font-size: 0.95rem;
+  }
+
+  /* Video call — full bleed */
+  .bfm-call-screen--mobile.bfm-call-screen--video .bfm-call-pip {
+    width: 100px;
+    height: 140px;
+    top: max(16px, env(safe-area-inset-top, 0px) + 8px);
+    right: max(12px, env(safe-area-inset-right, 0px));
+    border-radius: 14px;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-top {
+    padding: max(52px, calc(env(safe-area-inset-top, 0px) + 40px)) 16px 32px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, transparent 100%);
+  }
+
+  .bfm-call-screen--mobile .bfm-call-top-name {
+    font-size: 1.1rem;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-top-status {
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+
+  /* Mobile control bar — icon row, no labels */
+  .bfm-call-screen--mobile .bfm-call-controls--mobile {
+    padding: 16px 12px max(24px, calc(env(safe-area-inset-bottom, 0px) + 20px));
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-voice {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    max-width: 320px;
+    margin: 0 auto;
+    gap: 8px;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-voice .bfm-call-ctrl-btn {
+    width: 52px;
+    height: 52px;
+    font-size: 1.15rem;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-voice .bfm-call-ctrl-btn--end {
+    width: 68px;
+    height: 68px;
+    font-size: 1.4rem;
+    background: var(--bfm-call-red);
+    box-shadow: 0 4px 20px rgba(255, 59, 48, 0.45);
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 100%;
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video .bfm-call-ctrl-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1.05rem;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video .bfm-call-ctrl-btn--end {
+    width: 64px;
+    height: 64px;
+    font-size: 1.35rem;
+    background: var(--bfm-call-red);
+    box-shadow: 0 4px 20px rgba(255, 59, 48, 0.45);
+    flex-shrink: 0;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video .bfm-call-ctrl-btn--active {
+    background: #fff;
+    color: #111b21;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video .bfm-call-ctrl-btn--off {
+    background: #fff;
+    color: #111b21;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-tap-hint {
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    max-width: 90%;
+  }
+}
+
+@media (max-width: 380px) {
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video .bfm-call-ctrl-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 0.95rem;
+  }
+
+  .bfm-call-screen--mobile .bfm-call-controls-row--wa-video .bfm-call-ctrl-btn--end {
+    width: 58px;
+    height: 58px;
+  }
+}

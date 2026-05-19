@@ -10,6 +10,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="css/brand.css">
+    <link rel="stylesheet" href="css/call-ui.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="icon" href="images/logo.png" type="image/png">
     <style>
@@ -816,11 +817,34 @@
             cursor: pointer;
             transition: background 0.15s;
             font-family: 'Inter', sans-serif;
-            flex-shrink: 0
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px
         }
 
         .msg-thread-send:hover {
             background: var(--green-dark)
+        }
+
+        .msg-thread-send .msg-send-icon {
+            display: none
+        }
+
+        .msg-back-btn {
+            display: none;
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--bg);
+            border-radius: 50%;
+            color: var(--text);
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.95rem
         }
 
         /* EARNINGS */
@@ -1285,6 +1309,7 @@
                             <p>Select a conversation to reply</p>
                         </div>
                         <div class="msg-thread-header" id="msgThreadHeader" style="display:none">
+                            <button type="button" class="msg-back-btn" id="msgBackBtn" onclick="backToShopperConvList()" aria-label="Back to conversations"><i class="fas fa-arrow-left"></i></button>
                             <div class="msg-thread-hav" id="msgThreadHav">?</div>
                             <div>
                                 <div class="msg-thread-hname" id="msgThreadHname">—</div>
@@ -1306,7 +1331,10 @@
                             <button class="msg-icon-btn" id="shopperVoiceBtn" onclick="toggleShopperVoice()"
                                 title="Record voice note"><i class="fas fa-microphone"></i></button>
                             <input type="text" id="shopperChatInput" placeholder="Type a reply...">
-                            <button class="msg-thread-send" onclick="sendShopperMessage()">Send</button>
+                            <button type="button" class="msg-thread-send" onclick="sendShopperMessage()" aria-label="Send message">
+                                <i class="fas fa-paper-plane msg-send-icon" aria-hidden="true"></i>
+                                <span class="msg-send-text">Send</span>
+                            </button>
                         </div>
                     </div>
                 </div>
