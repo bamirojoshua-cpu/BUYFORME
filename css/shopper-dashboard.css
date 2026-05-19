@@ -2160,9 +2160,14 @@ body.notif-drawer-open {
     line-height: 1.5;
 }
 
-/* Settings — log out (visible on mobile; sidebar has desktop logout) */
+/* Settings — log out (mobile: top banner + bottom card; desktop: sidebar) */
+.settings-mobile-logout {
+    display: none;
+}
+
 .settings-session-card {
     margin-top: 32px;
+    margin-bottom: 24px;
     padding: 20px 22px;
     background: var(--white);
     border: 1px solid var(--border);
@@ -2206,6 +2211,27 @@ body.notif-drawer-open {
 
 .btn-settings-logout:active {
     transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+    .settings-mobile-logout {
+        display: block;
+        margin-bottom: 18px;
+    }
+
+    .settings-mobile-logout .btn-settings-logout {
+        max-width: none;
+        width: 100%;
+    }
+
+    #settings-section {
+        padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .settings-session-card {
+        margin-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+        scroll-margin-bottom: 120px;
+    }
 }
 
 @media (min-width: 769px) {
