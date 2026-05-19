@@ -205,6 +205,27 @@ table {
   /* Dashboards: mobile bottom nav pill (shopper + admin) — desktop unchanged */
   .dashboard-grid {
     grid-template-columns: 1fr !important;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  /* Main was grid-column:2 for desktop — on 1-col grid that creates empty left gutter */
+  .dashboard-grid .dashboard-main,
+  .dashboard-grid .mobile-dash-bar {
+    grid-column: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .dashboard-grid .mobile-dash-bar {
+    grid-row: 1 !important;
+  }
+
+  .dashboard-grid .dashboard-main {
+    grid-row: 2 !important;
   }
 
   .dashboard-grid .sidebar,
@@ -217,6 +238,8 @@ table {
     border: none !important;
     box-shadow: none !important;
     overflow: visible !important;
+    grid-column: 1 !important;
+    grid-row: auto !important;
   }
 
   /* Hide sidebar chrome on mobile; nav lives in bottom pill */
@@ -328,7 +351,16 @@ table {
     width: 100% !important;
     min-width: 0;
     margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* React root wrapper — full width on mobile */
+  #root > div {
+    width: 100%;
+    max-width: 100%;
   }
 
   .mobile-dash-bar {
