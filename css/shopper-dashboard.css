@@ -31,10 +31,12 @@ body {
 .dashboard-grid {
     display: grid;
     grid-template-columns: var(--sidebar-w) 1fr;
-    min-height: 100vh
+    grid-template-rows: 1fr;
+    align-items: start;
+    min-height: 100vh;
 }
 
-/* SIDEBAR */
+/* SIDEBAR — sticky: align-self:start required in grid layouts */
 .sidebar {
     background: var(--white);
     border-right: 1px solid var(--border);
@@ -43,8 +45,16 @@ body {
     padding: 28px 0;
     position: sticky;
     top: 0;
+    align-self: start;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: var(--sidebar-w);
     height: 100vh;
-    overflow-y: auto
+    max-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    z-index: 100;
+    -webkit-overflow-scrolling: touch;
 }
 
 .sidebar-profile {
@@ -174,9 +184,18 @@ body {
 }
 
 /* MAIN */
+.mobile-dash-bar {
+    display: none;
+    grid-column: 2;
+    grid-row: 1;
+}
+
 .dashboard-main {
+    grid-column: 2;
+    grid-row: 1;
     padding: 28px 32px;
-    overflow-y: auto
+    min-width: 0;
+    min-height: 100vh;
 }
 
 .dash-section {
@@ -1219,6 +1238,11 @@ body {
     padding: 20px 0 24px;
     box-shadow: var(--shadow-sm);
     border-right: 1px solid rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    max-height: 100vh;
 }
 
 .sidebar-menu {
@@ -1271,6 +1295,8 @@ body {
     padding: 28px 36px 40px;
     max-width: 1200px;
     scroll-behavior: smooth;
+    grid-column: 2;
+    grid-row: 1;
 }
 
 .overview-top {
