@@ -9,40 +9,84 @@
         href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="css/verified-badge.css">
+    <link rel="stylesheet" href="css/buyer-theme.css">
+    <link rel="stylesheet" href="css/buyer-shell.css">
     <link rel="stylesheet" href="css/buyers.css">
     <link rel="stylesheet" href="css/brand.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="icon" href="images/logo.png" type="image/png">
 </head>
 
-<body class="buyers-page">
+<body class="buyer-app" data-buyer-tab="discover">
 
-    <div class="buyers-bg" aria-hidden="true"></div>
+    <div id="buyer-content">
+        <section class="hero buyer-animate-in" aria-labelledby="welcomeMsg">
+            <div class="hero__copy">
+                <span class="hero__badge"><i class="fas fa-shield-halved"></i> Verified shoppers only</span>
+                <h1 id="welcomeMsg">Welcome back</h1>
+                <p class="hero__sub">Shop abroad with trusted personal shoppers — browse, request, and track in one place.</p>
+            </div>
+            <div class="hero__actions">
+                <a href="my-orders.html" class="hero-cta hero-cta--primary btn-pill btn-pill--primary">
+                    <i class="fas fa-box"></i> My orders
+                </a>
+                <a href="chat.html" class="hero-cta hero-cta--secondary btn-pill btn-pill--secondary">
+                    <i class="fas fa-comments"></i> Messages
+                </a>
+            </div>
+        </section>
 
-    <header class="buyers-nav navbar">
-        <a href="index.html" class="brand-link logo" aria-label="BuyForMe home">
-            <img src="images/logo.png" alt="BuyForMe" class="brand-logo">
-        </a>
+        <details class="how-it-works-wrap buyer-animate-in">
+            <summary class="how-it-works-toggle"><i class="fas fa-circle-info"></i> How BuyForMe works</summary>
+            <div class="how-it-works">
+                <div class="how-step"><span class="how-step__num">1</span><strong>Pick a shopper</strong><span>Browse verified shoppers by country & specialty</span></div>
+                <div class="how-step"><span class="how-step__num">2</span><strong>Send a request</strong><span>Describe what you want and your budget</span></div>
+                <div class="how-step"><span class="how-step__num">3</span><strong>Pay when accepted</strong><span>Secure payment, then track your order</span></div>
+            </div>
+        </details>
 
-        <div class="buyers-nav__actions">
-            <a href="my-orders.html" class="nav-pill nav-pill--ghost" title="My orders">
-                <i class="fas fa-bag-shopping"></i>
-                <span class="nav-pill__label">Orders</span>
-            </a>
-            <a href="chat.html" class="nav-icon-btn" title="Messages" aria-label="Messages">
-                <i class="fas fa-message"></i>
-            </a>
-            <button type="button" class="nav-avatar" id="userAvatar" title="Account settings"
-                onclick="toggleSettings()" aria-label="Open account settings"></button>
-            <button type="button" class="nav-logout" onclick="handleLogout()">
-                <i class="fas fa-right-from-bracket"></i>
-                <span>Log out</span>
-            </button>
-        </div>
-    </header>
+        <section class="featured-section buyer-animate-in" id="featuredSection" hidden>
+            <div class="buyer-section-head">
+                <h2 class="buyer-section-title"><i class="fas fa-fire"></i> Top shoppers</h2>
+            </div>
+            <div class="featured-scroll" id="featuredGrid"></div>
+        </section>
 
-    <!-- Settings drawer -->
+        <section class="discover buyer-animate-in" aria-label="Find shoppers">
+            <div class="discover__toolbar buyer-card">
+                <label class="search-field" for="searchBar">
+                    <i class="fas fa-magnifying-glass search-field__icon" aria-hidden="true"></i>
+                    <input type="search" id="searchBar" class="search-bar buyer-input"
+                        placeholder="Search name, city, or specialty…" autocomplete="off">
+                </label>
+                <div class="discover__toolbar-row">
+                    <div class="filters-scroll">
+                        <div class="filters" id="filterPills" role="tablist" aria-label="Filter shoppers"></div>
+                    </div>
+                    <label class="sort-field">
+                        <span class="sort-field__label">Sort</span>
+                        <select id="sortSelect" class="buyer-select sort-select">
+                            <option value="rating">Top rated</option>
+                            <option value="reviews">Most reviews</option>
+                            <option value="fee">Lowest fee</option>
+                            <option value="name">Name A–Z</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="discover__header">
+                <h2 class="buyer-section-title">
+                    <i class="fas fa-users"></i>
+                    Verified shoppers
+                </h2>
+                <span class="count-pill" id="resultCount" aria-live="polite"></span>
+            </div>
+
+            <div class="shopper-grid" id="shopperGrid" aria-busy="true"></div>
+        </section>
+    </div>
+
     <div class="settings-overlay" id="settingsOverlay" onclick="closeSettings(event)" aria-hidden="true">
         <aside class="settings-panel" role="dialog" aria-labelledby="settingsTitle" onclick="event.stopPropagation()">
             <div class="settings-panel__head">
@@ -54,7 +98,6 @@
                     <i class="fas fa-xmark"></i>
                 </button>
             </div>
-
             <nav class="settings-tabs" aria-label="Settings sections">
                 <button type="button" class="settings-tab active" data-tab="profile" onclick="switchTab('profile')">
                     <i class="fas fa-user"></i> Profile
@@ -66,60 +109,11 @@
                     <i class="fas fa-wallet"></i> Payments
                 </button>
             </nav>
-
-            <div class="settings-form" id="settingsForm">
-                <label for="settingName">Full name</label>
-                <input type="text" id="settingName" placeholder="Your name" autocomplete="name">
-                <label for="settingEmail">Email</label>
-                <input type="email" id="settingEmail" placeholder="you@email.com" autocomplete="email">
-                <button type="button" class="btn-save" onclick="saveProfile()">
-                    <i class="fas fa-check"></i> Save changes
-                </button>
-                <p class="settings-msg" id="profileMsg" role="status"></p>
-            </div>
+            <div class="settings-form" id="settingsForm"></div>
         </aside>
     </div>
 
-    <main class="buyers-main">
-        <section class="hero" aria-labelledby="welcomeMsg">
-            <div class="hero__copy">
-                <span class="hero__badge"><i class="fas fa-shield-halved"></i> Verified shoppers only</span>
-                <h1 id="welcomeMsg">Welcome back</h1>
-                <p class="hero__sub">Shop abroad with trusted personal shoppers — browse, request, and track in one place.</p>
-            </div>
-            <div class="hero__actions">
-                <a href="my-orders.html" class="hero-cta hero-cta--primary">
-                    <i class="fas fa-box"></i> My orders
-                </a>
-                <a href="chat.html" class="hero-cta hero-cta--secondary">
-                    <i class="fas fa-comments"></i> Messages
-                </a>
-            </div>
-        </section>
-
-        <section class="discover" aria-label="Find shoppers">
-            <div class="discover__toolbar">
-                <label class="search-field" for="searchBar">
-                    <i class="fas fa-magnifying-glass search-field__icon" aria-hidden="true"></i>
-                    <input type="search" id="searchBar" class="search-bar"
-                        placeholder="Search name, city, or specialty…" autocomplete="off">
-                </label>
-                <div class="filters-scroll">
-                    <div class="filters" id="filterPills" role="tablist" aria-label="Filter shoppers"></div>
-                </div>
-            </div>
-
-            <div class="discover__header">
-                <h2 class="section-title">
-                    <i class="fas fa-users"></i>
-                    Verified shoppers
-                </h2>
-                <span class="result-count" id="resultCount" aria-live="polite"></span>
-            </div>
-
-            <div class="shopper-grid" id="shopperGrid" aria-busy="true"></div>
-        </section>
-    </main>
+    <div class="buyer-toast" id="buyerToast" role="status"></div>
 
     <script type="module" src="css/js/buyers.js"></script>
 </body>

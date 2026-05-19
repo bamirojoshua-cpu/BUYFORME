@@ -37,6 +37,7 @@ import {
   stopAllCallSounds,
 } from "./app-sounds.js";
 import { showIncomingCallScreen, hideIncomingCallScreen } from "./call-ui.js";
+import { initBuyerShell } from "./buyer-shell.js";
 
 let currentUser          = null;
 let activeConversationId = null;
@@ -57,16 +58,9 @@ function scheduleRefreshConversations() {
 }
 
 async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { window.location.href = "auth.html"; return; }
-
-  const { data: profile } = await supabase
-    .from("users").select("*").eq("uid", session.user.id).maybeSingle();
-  if (!profile) { window.location.href = "auth.html"; return; }
-
+  const profile = await initBuyerShell("messages", { title: "Messages", chat: true });
+  if (!profile) return;
   currentUser = profile;
-  const nav = document.getElementById("navAvatar");
-  if (nav) nav.textContent = (currentUser.name || "B")[0].toUpperCase();
 
   subscribeInbox(supabase, currentUser.uid, {
     onMessage: handleInboxMessage,

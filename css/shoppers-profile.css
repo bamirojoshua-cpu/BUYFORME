@@ -1,6 +1,4 @@
-/* =============================================================
-   BuyForMe — Shopper Profile CSS
-   ============================================================= */
+/* Shopper profile — buyer view */
 
 *,
 *::before,
@@ -10,41 +8,15 @@
     padding: 0;
 }
 
-:root {
-    --green: #1a9e6e;
-    --green-dark: #127a54;
-    --green-light: #e6f7f1;
-    --amber: #f59e0b;
-    --amber-light: #fef3c7;
-    --red: #ef4444;
-    --red-light: #fee2e2;
-    --text: #0f1c18;
-    --text-muted: #5a7268;
-    --border: #dde8e4;
-    --bg: #f4f8f6;
-    --white: #ffffff;
-    --radius: 14px;
+.profile-page #buyer-content {
+    padding: 0;
+    max-width: none;
 }
 
-body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-}
-
-/* ── NAVBAR ── */
-.navbar {
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    padding: 0 32px;
-    height: 62px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+.profile-page-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 100px;
 }
 
 .logo,
@@ -548,4 +520,53 @@ body {
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text);
+}
+
+.profile-mobile-cta {
+    display: none;
+    position: fixed;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    z-index: 90;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    gap: 10px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.profile-mobile-cta .btn-pill--secondary {
+    width: 52px;
+    padding: 12px;
+}
+
+.profile-mobile-cta .btn-pill--primary {
+    flex: 1;
+}
+
+.action-card .btn-request,
+.action-card .btn-message {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.card {
+    border-radius: var(--radius-lg);
+}
+
+@media (max-width: 900px) {
+    .profile-mobile-cta {
+        display: flex;
+    }
+
+    .profile-sidebar-col .action-card .btn-request,
+    .profile-sidebar-col .action-card .btn-message {
+        display: none;
+    }
+
+    .profile-page-inner {
+        padding-bottom: 120px;
+    }
 }

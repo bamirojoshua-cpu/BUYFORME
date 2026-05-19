@@ -5,6 +5,7 @@
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
+import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 
 let currentUser = { id: "", name: "Buyer", email: "", role: "buyer" };
 let allShoppers = [];
@@ -34,6 +35,7 @@ const bannerGradients = [
 
 let activeFilter = "All";
 let searchTerm = "";
+let sortBy = "rating";
 
 function escapeHtml(text) {
   return String(text ?? "")
@@ -60,42 +62,7 @@ function showGridLoading() {
   `).join("");
 }
 
-async function initAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session) {
-    window.location.assign("auth.html");
-    return;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("users")
-    .select("*")
-    .eq("uid", session.user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("Buyer profile load error:", profileError);
-    await supabase.auth.signOut();
-    window.location.assign("auth.html");
-    return;
-  }
-
-  if (!profile) {
-    window.location.assign("auth.html");
-    return;
-  }
-
-  const role = String(profile.role || "").toLowerCase();
-  if (role === "shopper") {
-    if (profile.verification_status?.toLowerCase() === "approved") {
-      window.location.assign(getShopperDashboardHref());
-    } else {
-      window.location.assign("verify.html");
-    }
-    return;
-  }
-
+function mapProfile(profile) {
   currentUser = {
     id: profile.uid,
     name: profile.name || "Buyer",
@@ -107,12 +74,22 @@ async function initAuth() {
     currency: profile.currency || "",
     payment: profile.payment || "",
   };
+}
+
+async function initAuth() {
+  const profile = await initBuyerShell("discover");
+  if (!profile) return;
+  mapProfile(profile);
 
   updateNavUser();
   renderFilters();
   showGridLoading();
   await loadShoppers();
-  prefillProfile();
+  switchTab("profile");
+
+  if (new URLSearchParams(window.location.search).get("settings") === "1") {
+    toggleSettings();
+  }
 }
 
 async function loadShoppers() {
@@ -135,14 +112,71 @@ async function loadShoppers() {
   }
 
   allShoppers = data || [];
+  renderFeatured();
   renderShoppers();
 }
 
+function parseFee(feeStr) {
+  if (!feeStr) return 999;
+  const m = String(feeStr).match(/\d+/);
+  return m ? parseInt(m[0], 10) : 999;
+}
+
+function sortShoppers(list) {
+  const copy = [...list];
+  switch (sortBy) {
+    case "reviews":
+      return copy.sort((a, b) => (Number(b.review_count) || 0) - (Number(a.review_count) || 0));
+    case "fee":
+      return copy.sort((a, b) => parseFee(a.fee) - parseFee(b.fee));
+    case "name":
+      return copy.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    case "rating":
+    default:
+      return copy.sort((a, b) => {
+        const ar = a.rating === "New" ? 0 : parseFloat(a.rating) || 0;
+        const br = b.rating === "New" ? 0 : parseFloat(b.rating) || 0;
+        return br - ar;
+      });
+  }
+}
+
+function renderFeatured() {
+  const section = document.getElementById("featuredSection");
+  const grid = document.getElementById("featuredGrid");
+  if (!section || !grid || allShoppers.length === 0) return;
+
+  const top = sortShoppers([...allShoppers]).slice(0, 8);
+  section.hidden = false;
+  grid.innerHTML = top
+    .map((s) => {
+      const initial = (s.name || "S")[0].toUpperCase();
+      const av = s.avatar_url
+        ? `<img src="${escapeHtml(s.avatar_url)}" alt="">`
+        : initial;
+      return `
+      <article class="featured-card" data-shopper-id="${escapeHtml(s.uid)}" tabindex="0">
+        <div class="featured-card__avatar">${av}</div>
+        <p class="featured-card__name">${escapeHtml(s.name || "Shopper")}</p>
+        <p class="featured-card__meta">${escapeHtml(s.location || "—")}</p>
+      </article>`;
+    })
+    .join("");
+
+  grid.querySelectorAll(".featured-card").forEach((card) => {
+    const go = () => goToProfile(card.dataset.shopperId);
+    card.addEventListener("click", go);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") go();
+    });
+  });
+}
+
 function updateNavUser() {
-  const avatar = document.getElementById("userAvatar");
-  const welcomeMsg = document.getElementById("welcomeMsg");
   const initial = (currentUser.name || "B")[0].toUpperCase();
-  if (avatar) avatar.textContent = initial;
+  const shellAvatar = document.getElementById("shellAvatar");
+  if (shellAvatar) shellAvatar.textContent = initial;
+  const welcomeMsg = document.getElementById("welcomeMsg");
   if (welcomeMsg) {
     welcomeMsg.textContent = `Welcome back, ${currentUser.name.split(" ")[0]}`;
   }
@@ -176,7 +210,7 @@ function renderFilters() {
 }
 
 function renderShoppers() {
-  const visible = allShoppers.filter((s) => {
+  const visible = sortShoppers(allShoppers.filter((s) => {
     const location = (s.location || "").toLowerCase();
     const name = (s.name || "").toLowerCase();
     const about = (s.about || "").toLowerCase();
@@ -195,7 +229,7 @@ function renderShoppers() {
       tags.includes(searchTerm);
 
     return matchFilter && matchSearch;
-  });
+  }));
 
   const resultCount = document.getElementById("resultCount");
   if (resultCount) {
@@ -262,7 +296,7 @@ function renderShoppers() {
           : `<i class="fas fa-star"></i>${escapeHtml(String(rating))}`;
 
       return `
-      <article class="shopper-card" style="animation-delay:${delay}s">
+      <article class="shopper-card" style="animation-delay:${delay}s" data-shopper-id="${escapeHtml(s.uid)}" tabindex="0">
         <div class="card-banner" style="--banner-from:${from};--banner-to:${to};background:linear-gradient(135deg,${from},${to})">
           <div class="card-avatar">${avatarInner}</div>
         </div>
@@ -278,16 +312,44 @@ function renderShoppers() {
           </div>
           ${fee ? `<p class="card-fee"><i class="fas fa-percent"></i> Service fee: ${fee}</p>` : ""}
           ${tagsHTML}
-          <button type="button" class="btn-view-profile" data-shopper-id="${escapeHtml(s.uid)}">
-            View profile <i class="fas fa-arrow-right"></i>
-          </button>
+          ${s.response_time ? `<p class="card-response"><i class="fas fa-clock"></i> Responds ${escapeHtml(s.response_time)}</p>` : ""}
+          <div class="card-actions-row">
+            <button type="button" class="btn-view-profile" data-action="profile" data-shopper-id="${escapeHtml(s.uid)}">
+              View profile <i class="fas fa-arrow-right"></i>
+            </button>
+            <button type="button" class="btn-card-msg" data-action="message" data-shopper-id="${escapeHtml(s.uid)}" data-shopper-name="${escapeHtml(s.name || "Shopper")}" aria-label="Message shopper">
+              <i class="fas fa-message"></i>
+            </button>
+          </div>
         </div>
       </article>`;
     })
     .join("");
 
-  grid.querySelectorAll("[data-shopper-id]").forEach((btn) => {
-    btn.addEventListener("click", () => goToProfile(btn.dataset.shopperId));
+  grid.querySelectorAll(".shopper-card").forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      goToProfile(card.dataset.shopperId);
+    });
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.target.closest("button")) goToProfile(card.dataset.shopperId);
+    });
+  });
+
+  grid.querySelectorAll('[data-action="profile"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      goToProfile(btn.dataset.shopperId);
+    });
+  });
+
+  grid.querySelectorAll('[data-action="message"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const uid = btn.dataset.shopperId;
+      const name = btn.dataset.shopperName || "Shopper";
+      window.location.assign(`chat.html?with=${encodeURIComponent(uid)}&name=${encodeURIComponent(name)}`);
+    });
   });
 }
 
@@ -392,6 +454,7 @@ window.saveProfile = async function () {
   currentUser.email = email;
   updateNavUser();
   setSettingsMsg(msg, "Profile updated successfully.", "success");
+  showBuyerToast("Profile saved");
 };
 
 window.saveShipping = async function () {
@@ -416,6 +479,7 @@ window.saveShipping = async function () {
   currentUser.city = city;
   currentUser.country = country;
   setSettingsMsg(msg, "Address saved successfully.", "success");
+  showBuyerToast("Address saved");
 };
 
 window.savePayments = async function () {
@@ -438,6 +502,7 @@ window.savePayments = async function () {
   currentUser.currency = currency;
   currentUser.payment = payment;
   setSettingsMsg(msg, "Payment info saved successfully.", "success");
+  showBuyerToast("Payment info saved");
 };
 
 window.handleLogout = async function () {
@@ -459,6 +524,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 200);
     });
   }
+
+  document.getElementById("sortSelect")?.addEventListener("change", (e) => {
+    sortBy = e.target.value;
+    renderShoppers();
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {

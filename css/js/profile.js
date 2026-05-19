@@ -4,13 +4,16 @@
 
 import { supabase } from "./supabase.js";
 import { requireBuyerSession, fetchPublicShopper } from "./buyer-session.js";
+import { initBuyerShell } from "./buyer-shell.js";
 import { nameWithVerifiedBadge, plainNameFromElement } from "./verified-badge.js";
 
 let shopperUid = null;
 
 async function initProfile() {
   try {
-    await requireBuyerSession();
+    const authed = await requireBuyerSession();
+    if (!authed) return;
+    await initBuyerShell("profile", { title: "Shopper profile", skipAuth: true });
 
     const uid = new URLSearchParams(window.location.search).get("id");
     if (!uid) {

@@ -1,0 +1,341 @@
+/* BuyForMe — buyer app shell (sidebar + main + bottom nav) */
+
+.buyer-app-body {
+  font-family: "Inter", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.buyer-app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(26, 158, 110, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 95% 0%, rgba(59, 130, 246, 0.06), transparent 50%),
+    linear-gradient(180deg, var(--bg) 0%, #e4ede8 100%);
+  pointer-events: none;
+}
+
+.buyer-app-grid {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  align-items: start;
+  min-height: 100vh;
+}
+
+.buyer-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  width: var(--sidebar-w);
+  height: 100vh;
+  max-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  z-index: 200;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  transition: transform var(--dur) var(--ease);
+}
+
+.buyer-sidebar__brand {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.buyer-sidebar__user {
+  text-align: center;
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.buyer-sidebar__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  color: #fff;
+  font-family: "Sora", sans-serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px var(--green-glow);
+}
+
+.buyer-sidebar__name {
+  font-family: "Sora", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.buyer-sidebar__role {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  margin-top: 2px;
+}
+
+.buyer-nav {
+  list-style: none;
+  padding: 0 12px;
+  flex: 1;
+}
+
+.buyer-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+  transition: background var(--dur), color var(--dur), transform var(--dur);
+}
+
+.buyer-nav a i {
+  width: 18px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.buyer-nav a:hover {
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+
+.buyer-nav a.active {
+  background: linear-gradient(135deg, var(--green-light), #d1fae5);
+  color: var(--green-dark);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--green-muted);
+}
+
+.buyer-nav .nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--red);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.buyer-nav .nav-badge.show {
+  display: inline-flex;
+}
+
+.buyer-sidebar__foot {
+  padding: 12px 20px 0;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+.buyer-sidebar__logout {
+  width: 100%;
+  padding: 11px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background var(--dur), color var(--dur), border-color var(--dur);
+}
+
+.buyer-sidebar__logout:hover {
+  background: var(--red-light);
+  color: var(--red);
+  border-color: transparent;
+}
+
+.buyer-main {
+  min-width: 0;
+  min-height: 100vh;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+.buyer-app--chat .buyer-main {
+  padding-bottom: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.buyer-mobile-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 150;
+}
+
+.buyer-menu-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.buyer-mobile-title {
+  font-family: "Sora", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.buyer-main-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 32px) clamp(16px, 3vw, 28px) 40px;
+  animation: buyerFadeIn 0.4s var(--ease);
+}
+
+.buyer-main-inner--narrow {
+  max-width: 720px;
+}
+
+.buyer-main-inner--chat {
+  max-width: none;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: none;
+}
+
+.buyer-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 400;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  justify-content: space-around;
+  gap: 4px;
+}
+
+.buyer-bottom-nav a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text-soft);
+  font-size: 0.65rem;
+  font-weight: 600;
+  transition: color var(--dur), background var(--dur);
+  position: relative;
+}
+
+.buyer-bottom-nav a i {
+  font-size: 1.15rem;
+}
+
+.buyer-bottom-nav a.active {
+  color: var(--green-dark);
+  background: var(--green-light);
+}
+
+.buyer-bottom-nav .nav-badge {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 22px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--red);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.buyer-bottom-nav .nav-badge.show {
+  display: inline-flex;
+}
+
+.buyer-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 20, 16, 0.4);
+  z-index: 180;
+  backdrop-filter: blur(2px);
+}
+
+.buyer-sidebar-overlay.open {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .buyer-app-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .buyer-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .buyer-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .buyer-mobile-bar {
+    display: flex;
+  }
+
+  .buyer-bottom-nav {
+    display: flex;
+  }
+
+  .buyer-main {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+}

@@ -1,0 +1,40 @@
+/* Buyer messages — full-height chat inside shell */
+
+.buyer-app--chat .buyer-main {
+  padding-bottom: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.buyer-app--chat .chat-layout {
+  flex: 1;
+  min-height: 0;
+  height: calc(100vh - var(--buyer-mobile-bar, 0px));
+}
+
+@media (max-width: 900px) {
+  .buyer-app--chat .chat-layout {
+    height: calc(100vh - 56px - 72px - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.conv-sidebar-header {
+  font-family: "Sora", sans-serif;
+}
+
+.conv-item {
+  border-radius: 0;
+  transition: background var(--dur) var(--ease);
+}
+
+.send-btn {
+  border-radius: var(--radius-pill) !important;
+}
+
+.chat-input-row input[type="text"] {
+  border-radius: var(--radius-pill) !important;
+}
+
+.input-action-btn {
+  border-radius: 50% !important;
+}

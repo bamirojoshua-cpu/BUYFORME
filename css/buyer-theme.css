@@ -1,0 +1,390 @@
+/* BuyForMe — shared buyer design system (matches shopper dashboard polish) */
+
+@import url("verified-badge.css");
+
+:root {
+  --green: #1a9e6e;
+  --green-dark: #127a54;
+  --green-deep: #0f5c36;
+  --green-light: #e6f7f1;
+  --green-muted: #bbf7d0;
+  --green-glow: rgba(26, 158, 110, 0.35);
+  --blue: #3b82f6;
+  --blue-light: #dbeafe;
+  --amber: #f59e0b;
+  --amber-light: #fef3c7;
+  --red: #ef4444;
+  --red-light: #fee2e2;
+  --verified: #1877f2;
+  --text: #0f1c18;
+  --text-muted: #5a7268;
+  --text-soft: #8aa399;
+  --border: rgba(15, 42, 32, 0.08);
+  --border-strong: rgba(15, 42, 32, 0.14);
+  --bg: #eef4f1;
+  --surface: #ffffff;
+  --surface-2: #f8fbf9;
+  --sidebar-w: 268px;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 2px 8px rgba(12, 26, 20, 0.06);
+  --shadow-md: 0 8px 28px rgba(12, 26, 20, 0.08);
+  --shadow-lg: 0 16px 48px rgba(12, 26, 20, 0.1);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 0.28s;
+}
+
+@keyframes buyerFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes buyerSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.buyer-animate-in {
+  animation: buyerFadeIn var(--dur) var(--ease) backwards;
+}
+
+/* ── Typography blocks ── */
+.buyer-page-head {
+  margin-bottom: 22px;
+}
+
+.buyer-page-head h1 {
+  font-family: "Sora", sans-serif;
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+
+.buyer-page-head p {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.buyer-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.buyer-section-title {
+  font-family: "Sora", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.buyer-section-title i {
+  color: var(--green);
+  font-size: 0.95rem;
+}
+
+.count-pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--green-light);
+  color: var(--green-dark);
+  border: 1px solid var(--green-muted);
+}
+
+/* ── Pill buttons (fully rounded) ── */
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: var(--radius-pill);
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur), background var(--dur), color var(--dur);
+}
+
+.btn-pill:hover {
+  transform: translateY(-2px);
+}
+
+.btn-pill:active {
+  transform: translateY(0);
+}
+
+.btn-pill--primary {
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+  color: #fff;
+  box-shadow: 0 4px 16px var(--green-glow);
+}
+
+.btn-pill--primary:hover {
+  box-shadow: 0 8px 24px var(--green-glow);
+}
+
+.btn-pill--secondary {
+  background: var(--surface);
+  color: var(--green-dark);
+  border: 1.5px solid var(--green-muted);
+}
+
+.btn-pill--secondary:hover {
+  background: var(--green-light);
+}
+
+.btn-pill--amber {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+.btn-pill--ghost {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-strong);
+}
+
+.btn-pill--sm {
+  padding: 8px 16px;
+  font-size: 0.8rem;
+}
+
+/* ── Chips / filter pills ── */
+.chip-pill {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--dur) var(--ease);
+  white-space: nowrap;
+}
+
+.chip-pill:hover {
+  border-color: var(--green-muted);
+  color: var(--green-dark);
+  background: var(--green-light);
+}
+
+.chip-pill.active {
+  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 14px var(--green-glow);
+}
+
+/* ── Cards ── */
+.buyer-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur);
+}
+
+.buyer-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.buyer-card--flat {
+  box-shadow: none;
+}
+
+/* ── Status badges ── */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.status-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.status-pending { background: var(--amber-light); color: #92400e; }
+.status-accepted { background: var(--blue-light); color: #1e40af; }
+.status-paid,
+.status-purchased { background: var(--green-light); color: var(--green-dark); }
+.status-delivering { background: #e0f2fe; color: #0369a1; }
+.status-delivered { background: var(--green-light); color: var(--green-deep); }
+.status-cancelled { background: var(--red-light); color: #b91c1c; }
+
+/* ── Form controls ── */
+.buyer-input,
+.buyer-select,
+.buyer-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  outline: none;
+  transition: border-color var(--dur), box-shadow var(--dur), background var(--dur);
+}
+
+.buyer-input:focus,
+.buyer-select:focus,
+.buyer-textarea:focus {
+  border-color: var(--green);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(26, 158, 110, 0.12);
+}
+
+.buyer-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+/* ── Empty state ── */
+.buyer-empty {
+  text-align: center;
+  padding: 48px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+}
+
+.buyer-empty__icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--green-light);
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+/* ── Toast ── */
+.buyer-toast {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  background: var(--green-deep);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: var(--radius-pill);
+  font-size: 0.88rem;
+  font-weight: 600;
+  z-index: 5000;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.35s var(--ease);
+  max-width: min(92vw, 420px);
+  text-align: center;
+}
+
+.buyer-toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+.buyer-app--chat .buyer-toast {
+  bottom: 24px;
+}
+
+/* ── How it works ── */
+.how-it-works {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.how-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  transition: transform var(--dur) var(--ease);
+}
+
+.how-step:hover {
+  transform: translateY(-2px);
+}
+
+.how-step__num {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-weight: 700;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.how-step strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+  font-family: "Sora", sans-serif;
+}
+
+.how-step span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 700px) {
+  .how-it-works {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buyer-animate-in,
+  .btn-pill:hover {
+    animation: none;
+    transform: none;
+  }
+}

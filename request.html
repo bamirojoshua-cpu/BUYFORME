@@ -9,7 +9,9 @@
         href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="css/verified-badge.css">
+    <link rel="stylesheet" href="css/buyer-theme.css">
+    <link rel="stylesheet" href="css/buyer-shell.css">
+    <link rel="stylesheet" href="css/buyer-request.css">
     <link rel="stylesheet" href="css/brand.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="icon" href="images/logo.png" type="image/png">
@@ -502,16 +504,10 @@
     </style>
 </head>
 
-<body>
+<body class="buyer-app request-page" data-buyer-tab="discover">
 
-    <nav class="navbar">
-        <a href="index.html" class="brand-link logo"><img src="images/logo.png" alt="BuyForMe" class="brand-logo"></a>
-        <a href="javascript:history.back()" class="back-link">
-            <i class="fas fa-arrow-left"></i> Back
-        </a>
-    </nav>
-
-    <div class="page">
+    <div id="buyer-content" class="buyer-main-inner buyer-main-inner--narrow">
+    <div class="page request-page-inner">
 
         <div class="shopper-preview" id="shopperPreview">
             <div class="shopper-avatar" id="previewAvatar">A</div>
@@ -529,9 +525,15 @@
             </div>
         </div>
 
-        <div class="page-header">
-            <h1>Send Purchase Request</h1>
-            <p>Describe exactly what you need. Your shopper will confirm before purchasing anything.</p>
+        <header class="buyer-page-head">
+            <h1>Send purchase request</h1>
+            <p>Describe what you need — your shopper confirms before buying.</p>
+        </header>
+
+        <div class="request-wizard-steps" id="wizardSteps">
+            <div class="wizard-step active" data-step="1">1. Product</div>
+            <div class="wizard-step" data-step="2">2. Delivery</div>
+            <div class="wizard-step" data-step="3">3. Review</div>
         </div>
 
         <div class="notice-box">
@@ -671,6 +673,7 @@
         </div>
 
     </div>
+    </div>
 
     <div class="toast" id="toast"></div>
 
@@ -679,8 +682,10 @@
         import { PAYSTACK_PUBLIC_KEY } from "./css/js/config.js";
         import { requireBuyerSession, fetchPublicShopper } from "./css/js/buyer-session.js";
         import { nameWithVerifiedBadge } from "./css/js/verified-badge.js";
+        import { initBuyerShell } from "./css/js/buyer-shell.js";
 
         const PLATFORM_FEE_PERCENT = 5;
+        let wizardStep = 1;
 
         /* ─── STATE ─── */
         let currentUser = null;
@@ -688,8 +693,18 @@
         let shopperFeePercent = 10; // default, overridden by shopper's actual fee
 
         /* ─── INIT ─── */
+        function setWizardStep(n) {
+            wizardStep = n;
+            document.querySelectorAll(".wizard-step").forEach((el) => {
+                const s = Number(el.dataset.step);
+                el.classList.toggle("active", s === n);
+                el.classList.toggle("done", s < n);
+            });
+        }
+
         async function init() {
             try {
+            await initBuyerShell("request", { title: "Send request", narrow: true, skipAuth: true });
             const buyer = await requireBuyerSession();
             if (!buyer) return;
             currentUser = buyer.profile;
