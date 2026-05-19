@@ -1,14 +1,17 @@
 /* Shared verified shopper badge (Facebook-style check next to name) */
 
 export const VERIFIED_BADGE_SRC = "images/verified-badge.png";
+const VERIFIED_BADGE_VERSION = "2";
 
 /** Resolve image URL for GitHub Pages subpaths and Vite dev */
 export function getVerifiedBadgeSrc() {
-  if (typeof document === "undefined") return VERIFIED_BADGE_SRC;
+  if (typeof document === "undefined") return `${VERIFIED_BADGE_SRC}?v=${VERIFIED_BADGE_VERSION}`;
   try {
-    return new URL(VERIFIED_BADGE_SRC, document.baseURI).href;
+    const url = new URL(VERIFIED_BADGE_SRC, document.baseURI);
+    url.searchParams.set("v", VERIFIED_BADGE_VERSION);
+    return url.href;
   } catch {
-    return VERIFIED_BADGE_SRC;
+    return `${VERIFIED_BADGE_SRC}?v=${VERIFIED_BADGE_VERSION}`;
   }
 }
 
