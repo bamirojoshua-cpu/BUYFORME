@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { cpSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join, resolve } from "path";
 
-const BASE = "/BUYFORME/";
+const GHPAGES_BASE = "/BUYFORME/";
 
 function renameDashboardHtml(out) {
   const devHtml = join(out, "shopper-dashboard.dev.html");
@@ -60,27 +60,37 @@ function syncGithubPagesRoot() {
   };
 }
 
-export default defineConfig({
-  base: BASE,
-  plugins: [react(), copyLegacyAssets(), syncGithubPagesRoot()],
-  root: ".",
-  publicDir: false,
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        "shopper-dashboard": resolve(__dirname, "shopper-dashboard.dev.html"),
-      },
-      output: {
-        entryFileNames: "assets/shopper-dashboard.js",
-        chunkFileNames: "assets/[name].js",
-        assetFileNames: "assets/[name][extname]",
+export default defineConfig(({ command }) => {
+  const isBuild = command === "build";
+
+  return {
+    /* GitHub Pages needs /BUYFORME/; local dev uses / so http://localhost:5173/ works */
+    base: isBuild ? GHPAGES_BASE : "/",
+    plugins: [react(), copyLegacyAssets(), syncGithubPagesRoot()],
+    root: ".",
+    publicDir: false,
+    build: {
+      outDir: "dist",
+      emptyOutDir: true,
+      rollupOptions: {
+        input: {
+          "shopper-dashboard": resolve(__dirname, "shopper-dashboard.dev.html"),
+        },
+        output: {
+          entryFileNames: "assets/shopper-dashboard.js",
+          chunkFileNames: "assets/[name].js",
+          assetFileNames: "assets/[name][extname]",
+        },
       },
     },
-  },
-  server: {
-    port: 5173,
-    open: "/shopper-dashboard.dev.html",
-  },
+    server: {
+      port: 5173,
+      strictPort: true,
+      open: "/index.html",
+    },
+    preview: {
+      port: 4173,
+      strictPort: true,
+    },
+  };
 });

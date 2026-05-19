@@ -14,10 +14,17 @@ This updates `shopper-dashboard.html` and `assets/` at the repo root for GitHub 
 ## Local development
 
 ```bash
+npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/shopper-dashboard.dev.html`
+Then open:
+
+- **Home:** http://localhost:5173/
+- **Login:** http://localhost:5173/auth.html
+- **Shopper dashboard:** http://localhost:5173/shopper-dashboard.dev.html
+
+Use port **5173** (not plain `localhost` without a port). Stop any old server with `Ctrl+C` and run `npm run dev` again if the page won’t load.
 
 ## GitHub Pages setup (recommended)
 
