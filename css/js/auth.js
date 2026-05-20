@@ -41,6 +41,24 @@ async function fetchUserProfile(uid) {
 }
 
 async function redirectIfAlreadyLoggedIn() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("logged_out") === "1") {
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+      Object.keys(localStorage).forEach(key => {
+        if (key === "bfm-auth" || key.startsWith("bfm-auth")) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+    if (window.history.replaceState) {
+      window.history.replaceState({}, "", "auth.html");
+    }
+    return;
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
 

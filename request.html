@@ -4,845 +4,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Send Request | BuyForMe</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
-        rel="stylesheet">
+    <title>Send Request — BuyForMe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="css/buyer-theme.css">
     <link rel="stylesheet" href="css/buyer-shell.css">
+    <link rel="stylesheet" href="css/verified-badge.css">
     <link rel="stylesheet" href="css/buyer-request.css">
     <link rel="stylesheet" href="css/brand.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="icon" href="images/logo.png" type="image/png">
-    <!-- Paystack -->
-    <script src="https://js.paystack.co/v1/inline.js"></script>
-    <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        :root {
-            --green: #1a9e6e;
-            --green-dark: #127a54;
-            --green-light: #e6f7f1;
-            --amber: #f59e0b;
-            --amber-light: #fef3c7;
-            --red: #ef4444;
-            --red-light: #fee2e2;
-            --text: #0f1c18;
-            --text-muted: #5a7268;
-            --border: #dde8e4;
-            --bg: #f4f8f6;
-            --white: #ffffff;
-            --radius: 14px;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
-
-        .navbar {
-            background: var(--white);
-            border-bottom: 1px solid var(--border);
-            padding: 0 32px;
-            height: 62px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: var(--green);
-            text-decoration: none;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            padding: 7px 14px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.15s;
-        }
-
-        .back-link:hover {
-            border-color: var(--green);
-            color: var(--green);
-        }
-
-        .page {
-            max-width: 680px;
-            margin: 0 auto;
-            padding: 48px 24px 60px;
-        }
-
-        .shopper-preview {
-            background: var(--white);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 18px 20px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 24px;
-        }
-
-        .shopper-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--green), var(--green-dark));
-            color: white;
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-
-        .shopper-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 50%;
-        }
-
-        .shopper-info {
-            flex: 1;
-        }
-
-        .shopper-info h4 {
-            font-family: 'Sora', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 3px;
-        }
-
-        .shopper-info p {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .shopper-info h4.name-with-verified {
-            margin-bottom: 3px;
-        }
-
-        .page-header {
-            margin-bottom: 28px;
-        }
-
-        .page-header h1 {
-            font-family: 'Sora', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            margin-bottom: 6px;
-        }
-
-        .page-header p {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-
-        .form-card {
-            background: var(--white);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 32px;
-            margin-bottom: 16px;
-        }
-
-        .form-card h3 {
-            font-family: 'Sora', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .form-card h3 i {
-            color: var(--green);
-            font-size: 0.85rem;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 0.78rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 7px;
-        }
-
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 11px 14px;
-            border: 1.5px solid var(--border);
-            border-radius: 9px;
-            font-size: 0.92rem;
-            color: var(--text);
-            background: var(--bg);
-            outline: none;
-            font-family: 'Inter', sans-serif;
-            transition: border-color 0.15s;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            border-color: var(--green);
-            background: var(--white);
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 110px;
-            line-height: 1.6;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        .field-hint {
-            font-size: 0.74rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        .budget-display {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .budget-display input {
-            flex: 1;
-        }
-
-        .currency-select {
-            width: 90px;
-            flex-shrink: 0;
-        }
-
-        /* Price breakdown */
-        .price-breakdown {
-            background: var(--green-light);
-            border: 1px solid #b6e5d4;
-            border-radius: 10px;
-            padding: 16px 18px;
-            margin-top: 16px;
-            display: none;
-        }
-
-        .price-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
-        .price-row:last-child {
-            margin-bottom: 0;
-            padding-top: 10px;
-            border-top: 1px solid #b6e5d4;
-        }
-
-        .price-row.total {
-            font-weight: 700;
-            font-size: 1rem;
-            color: var(--green-dark);
-            font-family: 'Sora', sans-serif;
-        }
-
-        .price-label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .price-label .buyforme-badge {
-            font-size: 0.65rem;
-            background: var(--green);
-            color: white;
-            padding: 1px 6px;
-            border-radius: 10px;
-            font-weight: 600;
-        }
-
-        .error-msg {
-            font-size: 0.82rem;
-            color: var(--red);
-            background: var(--red-light);
-            border: 1px solid #fca5a5;
-            border-radius: 8px;
-            padding: 10px 14px;
-            margin-bottom: 16px;
-            display: none;
-        }
-
-        .error-msg.show {
-            display: block;
-        }
-
-        .notice-box {
-            background: var(--amber-light);
-            border: 1px solid #fcd34d;
-            border-radius: 10px;
-            padding: 14px 18px;
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-            margin-bottom: 24px;
-            font-size: 0.82rem;
-            color: #92400e;
-            line-height: 1.6;
-        }
-
-        .notice-box i {
-            margin-top: 2px;
-            flex-shrink: 0;
-            color: var(--amber);
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 14px;
-            background: var(--green);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: 'Sora', sans-serif;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-submit:hover {
-            background: var(--green-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(26, 158, 110, 0.25);
-        }
-
-        .btn-submit:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .success-state {
-            display: none;
-            text-align: center;
-            padding: 60px 20px;
-        }
-
-        .success-state.show {
-            display: block;
-        }
-
-        .success-icon {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            background: var(--green-light);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8rem;
-            color: var(--green);
-            margin: 0 auto 20px;
-        }
-
-        .success-state h2 {
-            font-family: 'Sora', sans-serif;
-            font-size: 1.4rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-        }
-
-        .success-state p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            line-height: 1.7;
-            max-width: 400px;
-            margin: 0 auto 28px;
-        }
-
-        .success-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .btn-orders {
-            padding: 12px 24px;
-            background: var(--green);
-            color: white;
-            border: none;
-            border-radius: 9px;
-            font-size: 0.88rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            font-family: 'Inter', sans-serif;
-            transition: background 0.15s;
-        }
-
-        .btn-orders:hover {
-            background: var(--green-dark);
-        }
-
-        .btn-back {
-            padding: 12px 24px;
-            background: var(--bg);
-            color: var(--text);
-            border: 1.5px solid var(--border);
-            border-radius: 9px;
-            font-size: 0.88rem;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            font-family: 'Inter', sans-serif;
-            transition: all 0.15s;
-        }
-
-        .btn-back:hover {
-            border-color: var(--green);
-            color: var(--green);
-        }
-
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 0.88rem;
-            color: white;
-            background: var(--green);
-            z-index: 1000;
-            opacity: 0;
-            transform: translateY(-8px);
-            transition: all 0.25s;
-            pointer-events: none;
-        }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        @media (max-width: 600px) {
-            .navbar {
-                padding: 0 16px;
-            }
-
-            .page {
-                padding: 28px 16px 40px;
-            }
-
-            .form-card {
-                padding: 20px;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
 </head>
 
-<body class="buyer-app request-page" data-buyer-tab="discover">
+<body class="buyer-app request-page">
 
-    <div id="buyer-content" class="buyer-main-inner buyer-main-inner--narrow">
-    <div class="page request-page-inner">
+    <div id="buyer-content" class="buyer-main-inner request-page-inner">
+        <a href="buyers.html" class="request-back" id="backToProfile">
+            <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to profile
+        </a>
 
-        <div class="shopper-preview" id="shopperPreview">
-            <div class="shopper-avatar" id="previewAvatar">A</div>
-            <div class="shopper-info">
-                <h4 id="previewName">Loading shopper...</h4>
-                <p>
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span id="previewLocation">—</span>
-                </p>
-            </div>
-            <div style="font-size:0.78rem;color:var(--text-muted);text-align:right">
-                <div style="font-family:'Sora',serif;font-weight:700;font-size:1rem;color:var(--green)" id="previewFee">
-                    —</div>
-                <div>service fee</div>
-            </div>
-        </div>
-
-        <header class="buyer-page-head">
+        <header class="buyer-page-head buyer-animate-in">
             <h1>Send purchase request</h1>
-            <p>Describe what you need — your shopper confirms before buying.</p>
+            <p>Three quick steps — your shopper confirms before any payment.</p>
         </header>
 
-        <div class="request-wizard-steps" id="wizardSteps">
-            <div class="wizard-step active" data-step="1">1. Product</div>
-            <div class="wizard-step" data-step="2">2. Delivery</div>
-            <div class="wizard-step" data-step="3">3. Review</div>
-        </div>
-
-        <div class="notice-box">
-            <i class="fas fa-info-circle"></i>
-            <span>Your shopper will <strong>send you photos and videos</strong> from the store before making any
-                purchase. You stay in full control at every step.</span>
-        </div>
-
-        <div class="error-msg" id="errorMsg"></div>
-
-        <div id="formState">
-            <div class="form-card">
-                <h3><i class="fas fa-box"></i> Product Details</h3>
-                <div class="form-group">
-                    <label>Product Name <span style="color:var(--red)">*</span></label>
-                    <input type="text" id="productName" placeholder="e.g. iPhone 15 Pro Max, Zara puffer jacket">
-                </div>
-                <div class="form-group">
-                    <label>Store or Website</label>
-                    <input type="text" id="storeName" placeholder="e.g. Zara Istanbul, Apple Store, Amazon">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Quantity <span style="color:var(--red)">*</span></label>
-                        <input type="number" id="quantity" value="1" min="1" max="100">
-                    </div>
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select id="category">
-                            <option value="">Select category</option>
-                            <option>Fashion & Clothing</option>
-                            <option>Electronics</option>
-                            <option>Shoes & Bags</option>
-                            <option>Jewellery & Accessories</option>
-                            <option>Home & Decor</option>
-                            <option>Beauty & Cosmetics</option>
-                            <option>Wholesale / Bulk</option>
-                            <option>Other</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Additional Notes</label>
-                    <textarea id="notes" placeholder="Colour, size, specific model, brand preferences..."></textarea>
-                    <div class="field-hint">The more detail you give, the easier it is for your shopper to get it
-                        exactly right.</div>
-                </div>
-            </div>
-
-            <div class="form-card">
-                <h3><i class="fas fa-wallet"></i> Budget & Payment</h3>
-                <div class="form-group">
-                    <label>Estimated Product Budget <span style="color:var(--red)">*</span></label>
-                    <div class="budget-display">
-                        <select class="currency-select" id="currency">
-                            <option value="USD">$ USD</option>
-                            <option value="GBP">£ GBP</option>
-                            <option value="EUR">€ EUR</option>
-                            <option value="NGN">₦ NGN</option>
-                            <option value="GHS">₵ GHS</option>
-                            <option value="KES">KES</option>
-                        </select>
-                        <input type="number" id="budget" placeholder="0.00" min="1" oninput="updateFeeEstimate()">
-                    </div>
-                    <div class="field-hint">Enter the estimated cost of the product only.</div>
-                </div>
-
-                <!-- PRICE BREAKDOWN -->
-                <div class="price-breakdown" id="priceBreakdown">
-                    <div class="price-row">
-                        <span class="price-label">Product Budget</span>
-                        <span id="breakdownBudget">—</span>
-                    </div>
-                    <div class="price-row">
-                        <span class="price-label">Shopper Service Fee <span id="breakdownFeePercent"></span></span>
-                        <span id="breakdownShopperFee">—</span>
-                    </div>
-                    <div class="price-row">
-                        <span class="price-label">
-                            BuyForMe Platform Fee
-                            <span class="buyforme-badge">5%</span>
-                        </span>
-                        <span id="breakdownPlatformFee">—</span>
-                    </div>
-                    <div class="price-row total">
-                        <span>Total to Pay</span>
-                        <span id="breakdownTotal">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-card" style="margin-bottom:24px">
-                <h3><i class="fas fa-map-marker-alt"></i> Delivery Details</h3>
-                <div class="form-group">
-                    <label>Full Delivery Address <span style="color:var(--red)">*</span></label>
-                    <input type="text" id="address" placeholder="Street address, city, country">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Country</label>
-                        <input type="text" id="country" placeholder="e.g. Nigeria, Ghana, Kenya">
-                    </div>
-                    <div class="form-group">
-                        <label>Phone Number</label>
-                        <input type="tel" id="phone" placeholder="+234 800 000 0000">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Preferred Delivery Timeline</label>
-                    <select id="timeline">
-                        <option value="">No preference</option>
-                        <option>As soon as possible</option>
-                        <option>Within 1 week</option>
-                        <option>Within 2 weeks</option>
-                        <option>Within 1 month</option>
-                        <option>Flexible</option>
-                    </select>
-                </div>
-            </div>
-
-            <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">
-                <i class="fas fa-paper-plane"></i> Send Request to Shopper
+        <nav class="request-wizard-steps" id="wizardSteps" aria-label="Request steps">
+            <button type="button" class="wizard-step active" data-step="1" aria-current="step">
+                <span class="wizard-step__num">1</span>
+                <span class="wizard-step__label">Product</span>
             </button>
+            <button type="button" class="wizard-step" data-step="2">
+                <span class="wizard-step__num">2</span>
+                <span class="wizard-step__label">Delivery</span>
+            </button>
+            <button type="button" class="wizard-step" data-step="3">
+                <span class="wizard-step__num">3</span>
+                <span class="wizard-step__label">Budget &amp; send</span>
+            </button>
+        </nav>
+
+        <div class="request-progress" id="requestProgress" aria-hidden="true">
+            <div class="request-progress__bar" id="requestProgressBar"></div>
         </div>
 
-        <div class="success-state" id="successState">
-            <div class="success-icon"><i class="fas fa-check"></i></div>
-            <h2>Request Sent!</h2>
-            <p>Your request has been sent to <strong id="successShopperName">your shopper</strong>. They'll review it
-                and get back to you. Once accepted, you'll be prompted to make payment.</p>
-            <div class="success-actions">
-                <a href="my-orders.html" class="btn-orders">
-                    <i class="fas fa-shopping-bag"></i> View My Orders
-                </a>
-                <a href="buyers.html" class="btn-back">Browse More Shoppers</a>
+        <div class="request-layout">
+            <div class="request-form-col">
+                <div class="notice-box buyer-animate-in">
+                    <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                    <span>Your shopper sends <strong>photos and videos</strong> from the store before buying. You stay in control at every step.</span>
+                </div>
+
+                <div class="request-error" id="errorMsg" role="alert"></div>
+
+                <div id="formState">
+                    <!-- Step 1: Product -->
+                    <section class="wizard-panel active buyer-card" data-panel="1" aria-labelledby="step1-title">
+                        <h2 class="form-card__title" id="step1-title">
+                            <i class="fas fa-box" aria-hidden="true"></i> What do you want?
+                        </h2>
+                        <div class="form-group">
+                            <label for="productName">Product name <span class="req">*</span></label>
+                            <input type="text" id="productName" class="buyer-input" placeholder="e.g. iPhone 15 Pro, Zara puffer jacket" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="storeName">Store or website</label>
+                            <input type="text" id="storeName" class="buyer-input" placeholder="e.g. Zara Istanbul, Apple Store, Amazon">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="quantity">Quantity <span class="req">*</span></label>
+                                <input type="number" id="quantity" class="buyer-input" value="1" min="1" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="category">Category</label>
+                                <select id="category" class="buyer-select">
+                                    <option value="">Select category</option>
+                                    <option>Fashion &amp; Clothing</option>
+                                    <option>Electronics</option>
+                                    <option>Shoes &amp; Bags</option>
+                                    <option>Jewellery &amp; Accessories</option>
+                                    <option>Home &amp; Decor</option>
+                                    <option>Beauty &amp; Cosmetics</option>
+                                    <option>Wholesale / Bulk</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="notes">Details for your shopper</label>
+                            <textarea id="notes" class="buyer-textarea" rows="4" placeholder="Size, colour, model, links, alternatives…"></textarea>
+                            <p class="field-hint"><span id="notesCount">0 / 500</span> — more detail helps them get it right.</p>
+                        </div>
+                    </section>
+
+                    <!-- Step 2: Delivery -->
+                    <section class="wizard-panel buyer-card" data-panel="2" hidden aria-labelledby="step2-title">
+                        <h2 class="form-card__title" id="step2-title">
+                            <i class="fas fa-truck" aria-hidden="true"></i> Where should it go?
+                        </h2>
+                        <p class="form-card__sub">We pre-fill from your account when possible — edit if needed.</p>
+                        <div class="form-group">
+                            <label for="address">Full delivery address <span class="req">*</span></label>
+                            <input type="text" id="address" class="buyer-input" placeholder="Street, city, state">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="country">Country</label>
+                                <input type="text" id="country" class="buyer-input" placeholder="e.g. Nigeria, Ghana, Kenya">
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Phone</label>
+                                <input type="tel" id="phone" class="buyer-input" placeholder="+234 800 000 0000">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="timeline">Preferred timeline</label>
+                            <select id="timeline" class="buyer-select">
+                                <option value="">No preference</option>
+                                <option>As soon as possible</option>
+                                <option>Within 1 week</option>
+                                <option>Within 2 weeks</option>
+                                <option>Within 1 month</option>
+                                <option>Flexible</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <!-- Step 3: Budget & review -->
+                    <section class="wizard-panel buyer-card" data-panel="3" hidden aria-labelledby="step3-title">
+                        <h2 class="form-card__title" id="step3-title">
+                            <i class="fas fa-wallet" aria-hidden="true"></i> Budget &amp; review
+                        </h2>
+                        <div class="form-group">
+                            <label for="budget">Estimated product budget <span class="req">*</span></label>
+                            <div class="budget-row">
+                                <select id="currency" class="buyer-select budget-row__currency" aria-label="Currency">
+                                    <option value="USD">USD $</option>
+                                    <option value="GBP">GBP £</option>
+                                    <option value="EUR">EUR €</option>
+                                    <option value="NGN">NGN ₦</option>
+                                    <option value="GHS">GHS ₵</option>
+                                    <option value="KES">KES</option>
+                                </select>
+                                <input type="number" id="budget" class="buyer-input" placeholder="0.00" min="1" step="0.01">
+                            </div>
+                            <p class="field-hint">Product cost only — fees are calculated below.</p>
+                        </div>
+
+                        <div class="price-breakdown" id="priceBreakdown">
+                            <div class="price-row">
+                                <span>Product budget</span>
+                                <span id="breakdownBudget">—</span>
+                            </div>
+                            <div class="price-row">
+                                <span>Shopper fee <span id="breakdownFeePercent"></span></span>
+                                <span id="breakdownShopperFee">—</span>
+                            </div>
+                            <div class="price-row">
+                                <span>BuyForMe platform <span class="fee-badge">5%</span></span>
+                                <span id="breakdownPlatformFee">—</span>
+                            </div>
+                            <div class="price-row price-row--total">
+                                <span>Estimated total</span>
+                                <span id="breakdownTotal">—</span>
+                            </div>
+                        </div>
+
+                        <div class="review-block">
+                            <h3 class="review-block__title">Review before sending</h3>
+                            <div id="reviewSummary" class="review-summary"></div>
+                        </div>
+                    </section>
+
+                    <div class="wizard-nav">
+                        <button type="button" class="btn-pill btn-pill--secondary" id="wizardBack" hidden>
+                            <i class="fas fa-arrow-left" aria-hidden="true"></i> Back
+                        </button>
+                        <button type="button" class="btn-pill btn-pill--primary" id="wizardNext">
+                            <i class="fas fa-arrow-right" aria-hidden="true"></i> Continue
+                        </button>
+                        <button type="button" class="btn-pill btn-pill--primary wizard-nav__submit" id="submitBtn" hidden>
+                            <i class="fas fa-paper-plane" aria-hidden="true"></i> Send request
+                        </button>
+                    </div>
+                </div>
+
+                <div class="success-state buyer-card" id="successState" hidden>
+                    <div class="success-icon"><i class="fas fa-check" aria-hidden="true"></i></div>
+                    <h2>Request sent!</h2>
+                    <p>Your request went to <strong id="successShopperName">your shopper</strong>. They'll review it and respond soon. You'll pay only after they accept.</p>
+                    <div class="success-actions">
+                        <a href="my-orders.html" class="btn-pill btn-pill--primary">
+                            <i class="fas fa-bag-shopping" aria-hidden="true"></i> View my orders
+                        </a>
+                        <a href="buyers.html" class="btn-pill btn-pill--secondary">Browse shoppers</a>
+                    </div>
+                </div>
             </div>
+
+            <aside class="request-aside" id="requestAside">
+                <div class="shopper-preview buyer-card">
+                    <div class="shopper-avatar" id="previewAvatar">—</div>
+                    <div class="shopper-preview__meta">
+                        <h3 id="previewName">Loading…</h3>
+                        <p id="previewLocation">—</p>
+                        <p class="shopper-preview__fee"><span id="previewFee">—</span> service fee</p>
+                    </div>
+                </div>
+
+                <div class="request-summary-card buyer-card">
+                    <h3 class="request-summary-card__title"><i class="fas fa-list-check" aria-hidden="true"></i> Your request</h3>
+                    <ul class="request-summary-list" id="requestSummaryList">
+                        <li class="request-summary-empty">Fill in the form — your summary updates here.</li>
+                    </ul>
+                </div>
+
+                <div class="price-breakdown price-breakdown--aside" id="priceBreakdownAside">
+                    <h3 class="price-breakdown__title">Cost estimate</h3>
+                    <div class="price-row">
+                        <span>Product</span>
+                        <span id="breakdownBudgetAside">—</span>
+                    </div>
+                    <div class="price-row">
+                        <span>Shopper <span id="breakdownFeePercentAside"></span></span>
+                        <span id="breakdownShopperFeeAside">—</span>
+                    </div>
+                    <div class="price-row">
+                        <span>Platform <span class="fee-badge">5%</span></span>
+                        <span id="breakdownPlatformFeeAside">—</span>
+                    </div>
+                    <div class="price-row price-row--total">
+                        <span>Total</span>
+                        <span id="breakdownTotalAside">—</span>
+                    </div>
+                </div>
+
+                <div class="request-how buyer-card">
+                    <h3 class="request-how__title">What happens next</h3>
+                    <ol class="request-how__list">
+                        <li><strong>Sent</strong> — Shopper gets your request</li>
+                        <li><strong>Accept</strong> — They confirm they can buy it</li>
+                        <li><strong>Pay</strong> — You pay securely via BuyForMe</li>
+                        <li><strong>Shop</strong> — Photos/video before purchase</li>
+                        <li><strong>Deliver</strong> — Item ships to your address</li>
+                    </ol>
+                </div>
+            </aside>
         </div>
-
-    </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <div class="request-sticky-cta" id="requestStickyCta">
+        <button type="button" class="btn-pill btn-pill--secondary" id="stickyBackBtn" hidden>
+            <i class="fas fa-arrow-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="btn-pill btn-pill--primary" id="stickyNextBtn">
+            <i class="fas fa-arrow-right" aria-hidden="true"></i> Continue
+        </button>
+    </div>
 
-    <script type="module">
-        import { supabase } from "./css/js/supabase.js";
-        import { PAYSTACK_PUBLIC_KEY } from "./css/js/config.js";
-        import { requireBuyerSession, fetchPublicShopper } from "./css/js/buyer-session.js";
-        import { nameWithVerifiedBadge } from "./css/js/verified-badge.js";
-        import { initBuyerShell } from "./css/js/buyer-shell.js";
-
-        const PLATFORM_FEE_PERCENT = 5;
-        let wizardStep = 1;
-
-        /* ─── STATE ─── */
-        let currentUser = null;
-        let currentShopper = null;
-        let shopperFeePercent = 10; // default, overridden by shopper's actual fee
-
-        /* ─── INIT ─── */
-        function setWizardStep(n) {
-            wizardStep = n;
-            document.querySelectorAll(".wizard-step").forEach((el) => {
-                const s = Number(el.dataset.step);
-                el.classList.toggle("active", s === n);
-                el.classList.toggle("done", s < n);
-            });
-        }
-
-        async function init() {
-            try {
-            await initBuyerShell("request", { title: "Send request", narrow: true, skipAuth: true });
-            const buyer = await requireBuyerSession();
-            if (!buyer) return;
-            currentUser = buyer.profile;
-
-            const uid = new URLSearchParams(window.location.search).get("id");
-            if (!uid) { window.location.assign("buyers.html"); return; }
-
-            const shopper = await fetchPublicShopper(uid);
-            if (!shopper) { window.location.assign("buyers.html"); return; }
-            currentShopper = shopper;
-
-            // Parse shopper fee percentage (e.g. "10-12%" → use lower bound)
-            if (shopper.fee) {
-                const match = shopper.fee.match(/\d+/);
-                if (match) shopperFeePercent = parseInt(match[0]);
-            }
-
-            // Fill shopper preview
-            const avatarEl = document.getElementById("previewAvatar");
-            if (shopper.avatar_url) {
-                avatarEl.innerHTML = `<img src="${shopper.avatar_url}" alt="avatar">`;
-            } else {
-                avatarEl.textContent = (shopper.name || "S")[0].toUpperCase();
-            }
-            document.getElementById("previewName").innerHTML = nameWithVerifiedBadge(
-                shopper.name || "Shopper",
-                { tag: "span", className: "preview-name-verified", size: 18 }
-            );
-            document.getElementById("previewLocation").textContent = shopper.location || "—";
-            document.getElementById("previewFee").textContent = shopper.fee || "—";
-            document.getElementById("successShopperName").textContent = shopper.name;
-            } catch (err) {
-                console.error("Request page init error:", err);
-                showError(err.message || "Could not load this page. Try signing in again.");
-            }
-        }
-
-        /* ─── PRICE BREAKDOWN ─── */
-        window.updateFeeEstimate = function () {
-            const budget = parseFloat(document.getElementById("budget").value);
-            const currency = document.getElementById("currency").value;
-            const box = document.getElementById("priceBreakdown");
-
-            if (!budget || budget <= 0) { box.style.display = "none"; return; }
-
-            const shopperFee = budget * (shopperFeePercent / 100);
-            const platformFee = budget * (PLATFORM_FEE_PERCENT / 100);
-            const total = budget + shopperFee + platformFee;
-
-            document.getElementById("breakdownBudget").textContent = `${currency} ${budget.toFixed(2)}`;
-            document.getElementById("breakdownFeePercent").textContent = `(${shopperFeePercent}%)`;
-            document.getElementById("breakdownShopperFee").textContent = `${currency} ${shopperFee.toFixed(2)}`;
-            document.getElementById("breakdownPlatformFee").textContent = `${currency} ${platformFee.toFixed(2)}`;
-            document.getElementById("breakdownTotal").textContent = `${currency} ${total.toFixed(2)}`;
-
-            box.style.display = "block";
-        };
-
-        /* ─── VALIDATION ─── */
-        function validate() {
-            const product = document.getElementById("productName").value.trim();
-            const quantity = document.getElementById("quantity").value;
-            const budget = document.getElementById("budget").value;
-            const address = document.getElementById("address").value.trim();
-
-            if (!product) { showError("Please enter the product name."); return false; }
-            if (!quantity || quantity < 1) { showError("Please enter a valid quantity."); return false; }
-            if (!budget || budget <= 0) { showError("Please enter your budget."); return false; }
-            if (!address) { showError("Please enter your delivery address."); return false; }
-            return true;
-        }
-
-        /* ─── SUBMIT ─── */
-        window.handleSubmit = async function () {
-            hideError();
-            if (!validate()) return;
-
-            const btn = document.getElementById("submitBtn");
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending...`;
-
-            const budget = parseFloat(document.getElementById("budget").value);
-            const shopperFee = budget * (shopperFeePercent / 100);
-            const platformFee = budget * (PLATFORM_FEE_PERCENT / 100);
-            const totalAmount = budget + shopperFee + platformFee;
-
-            const { error } = await supabase
-                .from("requests")
-                .insert({
-                    buyer_id: currentUser.uid,
-                    buyer_name: currentUser.name,
-                    shopper_id: currentShopper.uid,
-                    shopper_name: currentShopper.name,
-                    shopper_location: currentShopper.location || "",
-                    product_name: document.getElementById("productName").value.trim(),
-                    store_name: document.getElementById("storeName").value.trim(),
-                    quantity: parseInt(document.getElementById("quantity").value),
-                    category: document.getElementById("category").value,
-                    notes: document.getElementById("notes").value.trim(),
-                    budget: budget,
-                    shopper_fee: shopperFee,
-                    platform_fee: platformFee,
-                    total_amount: totalAmount,
-                    currency: document.getElementById("currency").value,
-                    address: document.getElementById("address").value.trim(),
-                    country: document.getElementById("country").value.trim(),
-                    phone: document.getElementById("phone").value.trim(),
-                    timeline: document.getElementById("timeline").value,
-                    status: "pending"
-                });
-
-            if (error) {
-                console.error("Request error:", JSON.stringify(error));
-                showError("Failed to send request. Please try again.");
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fas fa-paper-plane"></i> Send Request to Shopper`;
-                return;
-            }
-
-            document.getElementById("formState").style.display = "none";
-            document.getElementById("successState").classList.add("show");
-        };
-
-        /* ─── HELPERS ─── */
-        function showError(msg) {
-            const el = document.getElementById("errorMsg");
-            el.textContent = msg;
-            el.classList.add("show");
-            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-
-        function hideError() {
-            document.getElementById("errorMsg").classList.remove("show");
-        }
-
-        document.addEventListener("DOMContentLoaded", init);
-    </script>
-
+    <script type="module" src="css/js/request.js"></script>
 </body>
 
 </html>

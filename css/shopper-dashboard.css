@@ -14,6 +14,11 @@
     --bg: #eef4f1;
     --white: #ffffff;
     --sidebar-w: 268px;
+    --sidebar-w-collapsed: 76px;
+    --sidebar-float-gap: 14px;
+    --sidebar-float-radius: 24px;
+    --dur: 0.28s;
+    --radius-sm: 10px;
     --radius: 16px;
     --radius-lg: 22px;
     --radius-pill: 999px;
@@ -31,32 +36,39 @@ body {
 }
 
 .dashboard-grid {
-    display: grid;
-    grid-template-columns: var(--sidebar-w) 1fr;
-    grid-template-rows: 1fr;
-    align-items: start;
+    display: block;
     min-height: 100vh;
 }
 
-/* SIDEBAR — sticky: align-self:start required in grid layouts */
+/* SIDEBAR — fixed floating panel; main content scrolls independently */
 .sidebar {
-    background: var(--white);
-    border-right: 1px solid var(--border);
+    position: fixed;
+    left: var(--sidebar-float-gap);
+    top: var(--sidebar-float-gap);
+    bottom: var(--sidebar-float-gap);
+    width: var(--sidebar-w);
+    height: auto;
+    max-height: calc(100dvh - var(--sidebar-float-gap) * 2);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--sidebar-float-radius);
+    box-shadow:
+        0 4px 6px rgba(12, 26, 20, 0.04),
+        0 20px 48px rgba(12, 26, 20, 0.12);
     display: flex;
     flex-direction: column;
-    padding: 28px 0;
-    position: sticky;
-    top: 0;
-    align-self: start;
-    grid-column: 1;
-    grid-row: 1 / -1;
-    width: var(--sidebar-w);
-    height: 100vh;
-    max-height: 100vh;
+    padding: 20px 0 24px;
     overflow-x: hidden;
     overflow-y: auto;
-    z-index: 100;
+    z-index: 200;
     -webkit-overflow-scrolling: touch;
+    transition: width var(--dur) var(--ease);
+}
+
+body.shopper-sidebar-collapsed .sidebar {
+    overflow: visible;
 }
 
 .sidebar-profile {
@@ -160,10 +172,41 @@ body {
 }
 
 .sidebar-brand {
-    padding: 16px 12px 8px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 14px 14px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 8px;
+}
+
+.sidebar-brand .brand-link {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+}
+
+.sidebar-collapse-btn {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: background 0.2s var(--ease), color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.sidebar-collapse-btn:hover {
+    background: var(--green-light);
+    color: var(--green-dark);
+    border-color: rgba(26, 158, 110, 0.35);
 }
 
 .sidebar-logout {
@@ -180,7 +223,11 @@ body {
     color: var(--text-muted);
     font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.15s
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .btn-logout:hover {
@@ -196,11 +243,154 @@ body {
 }
 
 .dashboard-main {
-    grid-column: 2;
-    grid-row: 1;
+    margin-left: calc(var(--sidebar-w) + var(--sidebar-float-gap) * 2);
     padding: 28px 32px;
     min-width: 0;
     min-height: 100vh;
+    box-sizing: border-box;
+    transition: margin-left var(--dur) var(--ease);
+}
+
+/* ── Collapsed sidebar (desktop) ── */
+body.shopper-sidebar-collapsed .sidebar {
+    width: var(--sidebar-w-collapsed);
+}
+
+body.shopper-sidebar-collapsed .dashboard-main {
+    margin-left: calc(var(--sidebar-w-collapsed) + var(--sidebar-float-gap) * 2);
+}
+
+body.shopper-sidebar-collapsed .sidebar-brand {
+    flex-direction: column;
+    align-items: center;
+    padding: 0 10px 12px;
+    gap: 10px;
+}
+
+body.shopper-sidebar-collapsed .sidebar-brand .brand-link {
+    flex: none;
+}
+
+body.shopper-sidebar-collapsed .sidebar-profile {
+    padding: 0 10px 16px;
+}
+
+body.shopper-sidebar-collapsed .sidebar-name-row,
+body.shopper-sidebar-collapsed .sidebar-menu .nav-label,
+body.shopper-sidebar-collapsed .btn-logout .logout-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+body.shopper-sidebar-collapsed .avatar-large {
+    width: 42px;
+    height: 42px;
+    font-size: 1rem;
+    margin-bottom: 0;
+}
+
+body.shopper-sidebar-collapsed .sidebar-menu {
+    padding: 0 8px;
+}
+
+body.shopper-sidebar-collapsed .sidebar-menu a {
+    justify-content: center;
+    padding: 12px 10px;
+    gap: 0;
+}
+
+body.shopper-sidebar-collapsed .sidebar-menu a .badge {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    margin-left: 0;
+}
+
+body.shopper-sidebar-collapsed .sidebar-logout {
+    padding: 0 10px;
+}
+
+body.shopper-sidebar-collapsed .btn-logout {
+    padding: 11px;
+    gap: 0;
+}
+
+/* Tooltips when collapsed */
+.sidebar [data-tooltip] {
+    position: relative;
+}
+
+.sidebar [data-tooltip]::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 4px);
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: var(--text);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s var(--ease);
+    z-index: 310;
+}
+
+.sidebar [data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 14px);
+    transform: translateY(-50%) translateX(-4px);
+    padding: 7px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--text);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
+    z-index: 310;
+    box-shadow: var(--shadow-md);
+}
+
+body.shopper-sidebar-collapsed .sidebar [data-tooltip]:hover::before,
+body.shopper-sidebar-collapsed .sidebar [data-tooltip]:focus-visible::before,
+body.shopper-sidebar-collapsed .sidebar [data-tooltip]:hover::after,
+body.shopper-sidebar-collapsed .sidebar [data-tooltip]:focus-visible::after {
+    opacity: 1;
+}
+
+body.shopper-sidebar-collapsed .sidebar [data-tooltip]:hover::after,
+body.shopper-sidebar-collapsed .sidebar [data-tooltip]:focus-visible::after {
+    transform: translateY(-50%) translateX(0);
+}
+
+@media (min-width: 769px) and (hover: hover) {
+    .sidebar-collapse-btn[data-tooltip]:hover::before,
+    .sidebar-collapse-btn[data-tooltip]:focus-visible::before,
+    .sidebar-collapse-btn[data-tooltip]:hover::after,
+    .sidebar-collapse-btn[data-tooltip]:focus-visible::after {
+        opacity: 1;
+    }
+
+    .sidebar-collapse-btn[data-tooltip]:hover::after,
+    .sidebar-collapse-btn[data-tooltip]:focus-visible::after {
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar-collapse-btn {
+        display: none !important;
+    }
 }
 
 .dash-section {
@@ -1237,17 +1427,6 @@ body {
         radial-gradient(ellipse 80% 50% at 100% 0%, rgba(26, 158, 110, 0.08) 0%, transparent 50%),
         radial-gradient(ellipse 60% 40% at 0% 100%, rgba(18, 122, 84, 0.06) 0%, transparent 50%),
         var(--bg);
-}
-
-.sidebar {
-    padding: 20px 0 24px;
-    box-shadow: var(--shadow-sm);
-    border-right: 1px solid rgba(0, 0, 0, 0.05);
-    position: sticky;
-    top: 0;
-    align-self: start;
-    height: 100vh;
-    max-height: 100vh;
 }
 
 .sidebar-menu {
@@ -2298,7 +2477,11 @@ html[data-theme="dark"] body {
 }
 
 html[data-theme="dark"] .sidebar {
-    box-shadow: none;
+    background: rgba(22, 32, 28, 0.94);
+    border-color: var(--border);
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.2),
+        0 20px 48px rgba(0, 0, 0, 0.35);
 }
 
 html[data-theme="dark"] .skeleton-line,

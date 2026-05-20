@@ -2,6 +2,7 @@
 
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
+import { initBuyerNotifications, refreshBuyerBadges, stopBuyerNotifications } from "./buyer-notifications.js";
 
 const NAV_ITEMS = [
   { key: "discover", href: "buyers.html", icon: "fa-compass", label: "Discover" },
@@ -10,21 +11,69 @@ const NAV_ITEMS = [
   { key: "account", href: "buyers.html?settings=1", icon: "fa-user", label: "Account" },
 ];
 
+const SIDEBAR_COLLAPSED_KEY = "buyforme-buyer-sidebar-collapsed";
+const DESKTOP_SIDEBAR_MQ = "(min-width: 901px)";
+
 let shellUser = null;
+let sidebarCollapseBound = false;
+
+/** Clear Supabase auth storage and end the buyer session. */
+export async function performBuyerLogout() {
+  if (!confirm("Are you sure you want to log out?")) return;
+
+  try {
+    stopBuyerNotifications();
+  } catch (e) {
+    console.warn("stopBuyerNotifications:", e);
+  }
+
+  try {
+    const { error } = await supabase.auth.signOut({ scope: "global" });
+    if (error) console.warn("signOut:", error.message);
+  } catch (e) {
+    console.warn("signOut:", e);
+  }
+
+  shellUser = null;
+  delete document.body.dataset.shellInit;
+
+  try {
+    Object.keys(localStorage).forEach(key => {
+      if (key === "bfm-auth" || key.startsWith("bfm-auth")) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch {
+    /* ignore */
+  }
+
+  window.location.replace("auth.html?logged_out=1");
+}
 
 export function showBuyerToast(message, duration = 4000) {
+  const text = String(message || "").trim();
+  if (!text) return;
+
   let el = document.getElementById("buyerToast");
   if (!el) {
     el = document.createElement("div");
     el.id = "buyerToast";
     el.className = "buyer-toast";
     el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.setAttribute("aria-hidden", "true");
     document.body.appendChild(el);
   }
-  el.textContent = message;
+
+  el.textContent = text;
+  el.setAttribute("aria-hidden", "false");
   el.classList.add("show");
   clearTimeout(el._hideTimer);
-  el._hideTimer = setTimeout(() => el.classList.remove("show"), duration);
+  el._hideTimer = setTimeout(() => {
+    el.classList.remove("show");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }, duration);
 }
 
 async function ensureBuyerAuth() {
@@ -65,8 +114,10 @@ function buildNavLinks(activeKey) {
     const badge = item.badge
       ? `<span class="nav-badge" id="shell-${item.badge}"></span>`
       : "";
-    return `<li><a href="${item.href}" class="${active}" data-nav="${item.key}">
-      <i class="fas ${item.icon}"></i> ${item.label} ${badge}
+    return `<li><a href="${item.href}" class="${active}" data-nav="${item.key}"
+      aria-label="${escapeHtml(item.label)}" data-tooltip="${escapeHtml(item.label)}">
+      <i class="fas ${item.icon}" aria-hidden="true"></i>
+      <span class="nav-label">${item.label}</span>${badge}
     </a></li>`;
   }).join("");
 }
@@ -86,7 +137,17 @@ function injectShell(activeKey, title) {
     <div class="buyer-sidebar-overlay" id="buyerSidebarOverlay"></div>
     <aside class="buyer-sidebar" id="buyerSidebar" aria-label="Buyer navigation">
       <div class="buyer-sidebar__brand">
-        <a href="index.html" class="brand-link"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
+        <a href="index.html" class="brand-link" data-tooltip="Home" aria-label="Home"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
+        <div class="buyer-sidebar__brand-actions">
+        <button type="button" class="buyer-notif-bell" id="buyerNotifBell" aria-label="Notifications">
+          <i class="fas fa-bell" aria-hidden="true"></i>
+          <span class="buyer-notif-dot" id="buyerNotifDot"></span>
+        </button>
+        <button type="button" class="buyer-sidebar__collapse" id="buyerSidebarCollapse"
+          aria-label="Collapse sidebar" aria-expanded="true" data-tooltip="Collapse sidebar">
+          <i class="fas fa-angles-left" aria-hidden="true"></i>
+        </button>
+        </div>
       </div>
       <div class="buyer-sidebar__user">
         <div class="buyer-sidebar__avatar" id="shellAvatar">${initial}</div>
@@ -95,8 +156,9 @@ function injectShell(activeKey, title) {
       </div>
       <ul class="buyer-nav">${buildNavLinks(activeKey)}</ul>
       <div class="buyer-sidebar__foot">
-        <button type="button" class="buyer-sidebar__logout" id="shellLogout">
-          <i class="fas fa-right-from-bracket"></i> Log out
+        <button type="button" class="buyer-sidebar__logout" id="shellLogout" aria-label="Log out" data-tooltip="Log out">
+          <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
+          <span class="logout-label">Log out</span>
         </button>
       </div>
     </aside>
@@ -106,6 +168,10 @@ function injectShell(activeKey, title) {
           <i class="fas fa-bars"></i>
         </button>
         <span class="buyer-mobile-title">${escapeHtml(title || "BuyForMe")}</span>
+        <button type="button" class="buyer-notif-bell buyer-notif-bell--mobile" id="buyerNotifBellMobile" aria-label="Notifications">
+          <i class="fas fa-bell" aria-hidden="true"></i>
+          <span class="buyer-notif-dot" id="buyerNotifDotMobile"></span>
+        </button>
       </div>
       <div id="buyer-main-slot"></div>
     </div>
@@ -117,7 +183,11 @@ function injectShell(activeKey, title) {
   bottomNav.innerHTML = NAV_ITEMS.map((item) => {
     const active = item.key === activeKey ? "active" : "";
     const badge = item.badge ? `<span class="nav-badge" id="bottom-${item.badge}"></span>` : "";
-    return `<a href="${item.href}" class="${active}"><i class="fas ${item.icon}"></i>${item.label}${badge}</a>`;
+    return `<a href="${item.href}" class="${active}" aria-label="${escapeHtml(item.label)}"
+      data-tooltip="${escapeHtml(item.label)}">
+      <i class="fas ${item.icon}" aria-hidden="true"></i>
+      <span class="bottom-nav-label">${item.label}</span>${badge}
+    </a>`;
   }).join("");
 
   const content = document.getElementById("buyer-content");
@@ -132,9 +202,8 @@ function injectShell(activeKey, title) {
     content.classList.add("buyer-main-inner");
   }
 
-  document.getElementById("shellLogout")?.addEventListener("click", async () => {
-    await supabase.auth.signOut();
-    window.location.assign("auth.html");
+  document.getElementById("shellLogout")?.addEventListener("click", () => {
+    performBuyerLogout();
   });
 
   const sidebar = document.getElementById("buyerSidebar");
@@ -152,6 +221,82 @@ function injectShell(activeKey, title) {
   document.querySelectorAll(".buyer-nav a, .buyer-bottom-nav a").forEach((a) => {
     a.addEventListener("click", closeMenu);
   });
+
+  applyStoredSidebarState();
+  setupSidebarCollapse();
+}
+
+function isDesktopSidebar() {
+  return window.matchMedia(DESKTOP_SIDEBAR_MQ).matches;
+}
+
+function isSidebarCollapsedStored() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setSidebarCollapsed(collapsed) {
+  const btn = document.getElementById("buyerSidebarCollapse");
+  const onDesktop = isDesktopSidebar();
+
+  document.body.classList.toggle("buyer-sidebar-collapsed", collapsed && onDesktop);
+
+  if (btn) {
+    const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    btn.setAttribute("aria-label", label);
+    btn.dataset.tooltip = label;
+    const icon = btn.querySelector("i");
+    if (icon) {
+      icon.className = collapsed ? "fas fa-angles-right" : "fas fa-angles-left";
+    }
+  }
+
+  if (onDesktop) {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function applyStoredSidebarState() {
+  if (isDesktopSidebar() && isSidebarCollapsedStored()) {
+    document.body.classList.add("buyer-sidebar-collapsed");
+    const btn = document.getElementById("buyerSidebarCollapse");
+    if (btn) {
+      btn.setAttribute("aria-expanded", "false");
+      btn.setAttribute("aria-label", "Expand sidebar");
+      btn.dataset.tooltip = "Expand sidebar";
+      const icon = btn.querySelector("i");
+      if (icon) icon.className = "fas fa-angles-right";
+    }
+  }
+}
+
+function setupSidebarCollapse() {
+  const btn = document.getElementById("buyerSidebarCollapse");
+  if (!btn || sidebarCollapseBound) return;
+
+  btn.addEventListener("click", () => {
+    if (!isDesktopSidebar()) return;
+    const collapsed = document.body.classList.contains("buyer-sidebar-collapsed");
+    setSidebarCollapsed(!collapsed);
+  });
+
+  window.addEventListener("resize", () => {
+    if (isDesktopSidebar()) {
+      applyStoredSidebarState();
+    } else {
+      document.body.classList.remove("buyer-sidebar-collapsed");
+    }
+  });
+
+  sidebarCollapseBound = true;
 }
 
 function escapeHtml(text) {
@@ -165,11 +310,7 @@ function escapeHtml(text) {
 async function updateNavBadges() {
   if (!shellUser?.uid) return;
 
-  const { count: pendingOrders } = await supabase
-    .from("requests")
-    .select("*", { count: "exact", head: true })
-    .eq("buyer_id", shellUser.uid)
-    .in("status", ["accepted", "delivering"]);
+  const counts = await refreshBuyerBadges();
 
   const setBadge = (id, n) => {
     document.querySelectorAll(`#shell-${id}, #bottom-${id}`).forEach((el) => {
@@ -183,16 +324,24 @@ async function updateNavBadges() {
     });
   };
 
-  setBadge("ordersBadge", pendingOrders || 0);
+  setBadge("ordersBadge", counts.orders);
+  setBadge("messagesBadge", counts.messages);
 }
 
 /**
  * @param {"discover"|"orders"|"messages"|"account"|"profile"|"request"} activeTab
- * @param {{ title?: string, narrow?: boolean, chat?: boolean, skipAuth?: boolean }} options
+ * @param {{ title?: string, narrow?: boolean, chat?: boolean, skipAuth?: boolean, user?: object }} options
  */
 export async function initBuyerShell(activeTab, options = {}) {
+  if (options.user) shellUser = options.user;
+
   if (document.body.dataset.shellInit === "1") {
     await updateNavBadges();
+    setupSidebarCollapse();
+    applyStoredSidebarState();
+    if (shellUser?.uid) {
+      initBuyerNotifications(shellUser, { toast: showBuyerToast });
+    }
     return shellUser;
   }
   document.body.dataset.shellInit = "1";
@@ -203,6 +352,8 @@ export async function initBuyerShell(activeTab, options = {}) {
   if (!options.skipAuth) {
     const ok = await ensureBuyerAuth();
     if (!ok) return null;
+  } else if (!shellUser?.uid) {
+    console.warn("initBuyerShell: skipAuth without user — shell UI only");
   }
 
   const titles = {
@@ -228,6 +379,14 @@ export async function initBuyerShell(activeTab, options = {}) {
   document.body.classList.add("buyer-app-body");
 
   await updateNavBadges();
+  if (shellUser?.uid) {
+    initBuyerNotifications(shellUser, { toast: showBuyerToast });
+  }
+
+  document.addEventListener("bfm-buyer-badges", () => {
+    updateNavBadges();
+  });
+
   return shellUser;
 }
 

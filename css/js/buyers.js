@@ -5,7 +5,7 @@
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
-import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
+import { initBuyerShell, showBuyerToast, performBuyerLogout } from "./buyer-shell.js";
 
 let currentUser = { id: "", name: "Buyer", email: "", role: "buyer" };
 let allShoppers = [];
@@ -400,13 +400,25 @@ window.switchTab = function (tab) {
   if (!form) return;
 
   if (tab === "profile") {
+    const notifOn = currentUser.notifications !== false;
     form.innerHTML = `
       <label for="settingName">Full name</label>
       <input type="text" id="settingName" value="${escapeHtml(currentUser.name)}" placeholder="Your name" autocomplete="name">
       <label for="settingEmail">Email</label>
       <input type="email" id="settingEmail" value="${escapeHtml(currentUser.email)}" placeholder="you@email.com" autocomplete="email">
+      <div class="settings-toggle-row toggle-row">
+        <span>Push &amp; in-app notifications</span>
+        <button type="button" class="toggle-track ${notifOn ? "on" : ""}" id="buyerNotifToggle" aria-pressed="${notifOn}">
+          <span class="toggle-thumb"></span>
+        </button>
+      </div>
+      <p class="settings-hint">Alerts for new messages, order updates, and activity in the notification bell.</p>
       <button type="button" class="btn-save" onclick="saveProfile()"><i class="fas fa-check"></i> Save changes</button>
       <p class="settings-msg" id="profileMsg" role="status"></p>`;
+    document.getElementById("buyerNotifToggle")?.addEventListener("click", function () {
+      this.classList.toggle("on");
+      this.setAttribute("aria-pressed", this.classList.contains("on"));
+    });
   } else if (tab === "shipping") {
     form.innerHTML = `
       <label for="settingAddress">Street address</label>
@@ -440,9 +452,11 @@ window.saveProfile = async function () {
 
   setSettingsMsg(msg, "Saving…", null);
 
+  const notifications = document.getElementById("buyerNotifToggle")?.classList.contains("on") ?? true;
+
   const { error } = await supabase
     .from("users")
-    .update({ name, email })
+    .update({ name, email, notifications })
     .eq("uid", currentUser.id);
 
   if (error) {
@@ -452,6 +466,11 @@ window.saveProfile = async function () {
 
   currentUser.name = name;
   currentUser.email = email;
+  currentUser.notifications = notifications;
+
+  if (notifications && typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
   updateNavUser();
   setSettingsMsg(msg, "Profile updated successfully.", "success");
   showBuyerToast("Profile saved");
@@ -505,10 +524,7 @@ window.savePayments = async function () {
   showBuyerToast("Payment info saved");
 };
 
-window.handleLogout = async function () {
-  await supabase.auth.signOut();
-  window.location.assign("auth.html");
-};
+window.handleLogout = performBuyerLogout;
 
 document.addEventListener("DOMContentLoaded", () => {
   initAuth();

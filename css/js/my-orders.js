@@ -11,7 +11,6 @@ let paymentInProgress = false;
 let selectedStars = 0;
 let selectedShopperId = null;
 let selectedShopperName = null;
-let realtimeChannel = null;
 
 /* ─── STATUS CONFIG ─── */
 const statusConfig = {
@@ -27,20 +26,40 @@ const statusConfig = {
 const progressSteps = ["Request Sent", "Accepted", "Paid", "Purchased", "In Transit", "Delivered"];
 
 /* ─── AUTH + INIT ─── */
+function buyerUid() {
+    return currentUser?.uid || currentUser?.id || null;
+}
+
 async function init() {
     const profile = await initBuyerShell("orders", { title: "My Orders" });
     if (!profile) return;
     currentUser = profile;
 
+    if (!buyerUid()) {
+        console.error("My Orders: missing buyer uid on profile", profile);
+        showBuyerToast("Could not load your account. Try signing in again.");
+        return;
+    }
+
     await loadOrders();
-    subscribeRealtime();
+
+    document.addEventListener("bfm-order-updated", e => {
+        const updated = e.detail;
+        if (!updated?.id) return;
+        const idx = allOrders.findIndex(o => o.id === updated.id);
+        if (idx !== -1) allOrders[idx] = updated;
+        else allOrders.unshift(updated);
+        renderOrders();
+    });
 }
+
+document.addEventListener("DOMContentLoaded", init);
 
 /* ─── LOAD ORDERS ─── */
 async function loadOrders() {
     const { data, error } = await supabase
         .from("requests").select("*")
-        .eq("buyer_id", currentUser.uid)
+        .eq("buyer_id", buyerUid())
         .order("created_at", { ascending: false });
 
     if (error) { console.error("Load orders error:", error); allOrders = []; }
@@ -48,50 +67,6 @@ async function loadOrders() {
     renderOrders();
 }
 window.loadOrders = loadOrders;
-
-/* ─── REALTIME ───────────────────────────────────────────────
-   Listens for any status update on this buyer's orders and
-   re-renders automatically — no refresh needed.
-──────────────────────────────────────────────────────────── */
-function subscribeRealtime() {
-    if (realtimeChannel) supabase.removeChannel(realtimeChannel);
-
-    realtimeChannel = supabase
-        .channel("buyer-orders-" + currentUser.uid)
-        .on(
-            "postgres_changes",
-            {
-                event: "UPDATE",
-                schema: "public",
-                table: "requests",
-                filter: `buyer_id=eq.${currentUser.uid}`
-            },
-            async (payload) => {
-                const updated = payload.new;
-
-                // Update just this order in the local array
-                const idx = allOrders.findIndex(o => o.id === updated.id);
-                if (idx !== -1) allOrders[idx] = updated;
-                else allOrders.unshift(updated);
-
-                renderOrders();
-                showStatusToast(updated.status, updated.product_name);
-            }
-        )
-        .subscribe();
-}
-
-function showStatusToast(status, product) {
-    const messages = {
-        accepted: `✅ Your request for "${product}" was accepted!`,
-        paid: `💳 Payment confirmed for "${product}"`,
-        purchased: `🛍️ Your shopper bought "${product}"`,
-        delivering: `🚚 "${product}" is on its way!`,
-        delivered: `🎉 "${product}" has been delivered!`,
-    };
-    const msg = messages[status];
-    if (msg) showBuyerToast(msg);
-}
 
 /* ─── FILTER ─── */
 window.filterOrders = function (filter, btn) {
@@ -113,6 +88,7 @@ function renderOrders() {
 
     const list = document.getElementById("ordersList");
     const meta = document.getElementById("ordersMeta");
+    if (!list) return;
     if (meta) meta.textContent = `${filtered.length} order${filtered.length !== 1 ? "s" : ""}`;
 
     if (filtered.length === 0) {
@@ -293,7 +269,7 @@ window.submitReview = async function () {
 
     const { error } = await supabase.from("reviews").insert({
         shopper_id: selectedShopperId,
-        buyer_id: currentUser.uid,
+        buyer_id: buyerUid(),
         buyer_name: currentUser.name,
         stars: selectedStars,
         text: text

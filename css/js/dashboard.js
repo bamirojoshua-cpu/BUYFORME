@@ -25,6 +25,7 @@ import {
   compressImageToBlob,
   uploadChatBlob,
   subscribeInbox,
+  unsubscribeInbox,
 } from "./chat-local.js";
 import {
   startOutgoingCall,
@@ -64,6 +65,10 @@ let shopperActiveCall = null;
 let shopperThreadIds  = new Set();
 let shopperRefreshTimer = null;
 
+const SHOPPER_SIDEBAR_COLLAPSED_KEY = "buyforme-shopper-sidebar-collapsed";
+const SHOPPER_DESKTOP_SIDEBAR_MQ = "(min-width: 769px)";
+let shopperSidebarCollapseBound = false;
+
 function scheduleShopperRefreshList() {
   clearTimeout(shopperRefreshTimer);
   shopperRefreshTimer = setTimeout(() => renderShopperChatList(), 120);
@@ -96,6 +101,7 @@ export async function bootstrapShopperDashboard() {
   await renderEarnings();
   loadSettingsIntoForm();
   initTabs();
+  initShopperSidebarCollapse();
   initSettingsTabs();
   initDashPreferences();
   initNotificationsPanel();
@@ -374,6 +380,72 @@ async function renderStats() {
   document.getElementById("statRating").textContent   = currentProfile.rating || "—";
 }
 
+/* ─── SIDEBAR COLLAPSE ─── */
+function isShopperDesktopSidebar() {
+  return window.matchMedia(SHOPPER_DESKTOP_SIDEBAR_MQ).matches;
+}
+
+function isShopperSidebarCollapsedStored() {
+  try {
+    return localStorage.getItem(SHOPPER_SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setShopperSidebarCollapsed(collapsed) {
+  const btn = document.getElementById("shopperSidebarCollapse");
+  const onDesktop = isShopperDesktopSidebar();
+
+  document.body.classList.toggle("shopper-sidebar-collapsed", collapsed && onDesktop);
+
+  if (btn) {
+    const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    btn.setAttribute("aria-label", label);
+    btn.dataset.tooltip = label;
+    const icon = btn.querySelector("i");
+    if (icon) icon.className = collapsed ? "fas fa-angles-right" : "fas fa-angles-left";
+  }
+
+  if (onDesktop) {
+    try {
+      localStorage.setItem(SHOPPER_SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function applyStoredShopperSidebarState() {
+  if (isShopperDesktopSidebar() && isShopperSidebarCollapsedStored()) {
+    setShopperSidebarCollapsed(true);
+  }
+}
+
+function initShopperSidebarCollapse() {
+  const btn = document.getElementById("shopperSidebarCollapse");
+  if (!btn || shopperSidebarCollapseBound) return;
+
+  applyStoredShopperSidebarState();
+
+  btn.addEventListener("click", () => {
+    if (!isShopperDesktopSidebar()) return;
+    const collapsed = document.body.classList.contains("shopper-sidebar-collapsed");
+    setShopperSidebarCollapsed(!collapsed);
+  });
+
+  window.addEventListener("resize", () => {
+    if (isShopperDesktopSidebar()) {
+      applyStoredShopperSidebarState();
+    } else {
+      document.body.classList.remove("shopper-sidebar-collapsed");
+    }
+  });
+
+  shopperSidebarCollapseBound = true;
+}
+
 /* ─── TABS ─── */
 function initTabs() {
   const tabs = document.querySelectorAll(".sidebar-menu a[data-tab]");
@@ -384,9 +456,6 @@ function initTabs() {
       tabs.forEach(t => t.classList.remove("active"));
       this.classList.add("active");
       activateDashSection(sectionId);
-
-      const mobileTitle = document.getElementById("mobileDashTitle");
-      if (mobileTitle) mobileTitle.textContent = this.dataset.navTitle || "Dashboard";
 
       document.querySelector(".sidebar.is-open")?.classList.remove("is-open");
       document.body.classList.remove("sidebar-open");
@@ -1495,6 +1564,30 @@ window.closeNotifications = function () {
 
 /* ─── LOGOUT ─── */
 window.handleLogout = async function () {
-  await supabase.auth.signOut();
-  window.location.href = "auth.html";
+  if (!confirm("Are you sure you want to log out?")) return;
+
+  try {
+    unsubscribeInbox(supabase);
+  } catch (e) {
+    console.warn("unsubscribeInbox:", e);
+  }
+
+  try {
+    const { error } = await supabase.auth.signOut({ scope: "global" });
+    if (error) console.warn("signOut:", error.message);
+  } catch (e) {
+    console.warn("signOut:", e);
+  }
+
+  try {
+    Object.keys(localStorage).forEach((key) => {
+      if (key === "bfm-auth" || key.startsWith("bfm-auth")) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch {
+    /* ignore */
+  }
+
+  window.location.replace("auth.html?logged_out=1");
 };

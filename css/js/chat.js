@@ -18,7 +18,6 @@ import {
   setConversationPartner,
   compressImageToBlob,
   uploadChatBlob,
-  subscribeInbox,
 } from "./chat-local.js";
 import {
   startOutgoingCall,
@@ -29,7 +28,6 @@ import {
 } from "./call-webrtc.js";
 import {
   unlockSounds,
-  playMessageNotification,
   playIncomingCallRing,
   stopIncomingCallRing,
   playOutgoingRingback,
@@ -38,6 +36,8 @@ import {
 } from "./app-sounds.js";
 import { showIncomingCallScreen, hideIncomingCallScreen } from "./call-ui.js";
 import { initBuyerShell } from "./buyer-shell.js";
+import { nameWithVerifiedBadge } from "./verified-badge.js";
+import { registerBuyerChatHandlers, setActiveChatPartner } from "./buyer-notifications.js";
 
 let currentUser          = null;
 let activeConversationId = null;
@@ -51,10 +51,156 @@ let audioChunks   = [];
 let isRecording   = false;
 let threadMessageIds = new Set();
 let refreshConvTimer = null;
+/** @type {Map<string, object>} */
+let shopperByUid = new Map();
 
 function scheduleRefreshConversations() {
   clearTimeout(refreshConvTimer);
   refreshConvTimer = setTimeout(() => loadConversations(), 120);
+}
+
+function normalizeShopperPartner(s) {
+  return {
+    uid: String(s.uid),
+    name: s.name || "Shopper",
+    role: "shopper",
+    verified: true,
+    avatar_url: s.avatar_url || null,
+    location: s.location || "",
+    rating: s.rating ?? null,
+    review_count: s.review_count ?? 0,
+    fee: s.fee || "",
+    response_time: s.response_time || "",
+  };
+}
+
+async function loadShopperDirectory() {
+  const { data, error } = await supabase.from("public_shoppers").select("*");
+  if (error) {
+    console.warn("loadShopperDirectory:", error);
+    return;
+  }
+  shopperByUid = new Map((data || []).map(s => [String(s.uid), normalizeShopperPartner(s)]));
+}
+
+function getEnrichedPartner(uid, fallback = null) {
+  const key = String(uid);
+  const fromDir = shopperByUid.get(key);
+  if (fromDir) return { ...fallback, ...fromDir, uid: key };
+  return fallback ? { ...fallback, uid: key } : { uid: key, name: "User", role: "user" };
+}
+
+function isVerifiedShopper(partner) {
+  return Boolean(partner?.verified || shopperByUid.has(String(partner?.uid)));
+}
+
+function renderAvatarInto(el, partner) {
+  if (!el) return;
+  const initial = (partner?.name || "?")[0].toUpperCase();
+  if (partner?.avatar_url) {
+    el.innerHTML = `<img src="${escapeHtml(partner.avatar_url)}" alt="">`;
+    el.classList.add("has-photo");
+  } else {
+    el.textContent = initial;
+    el.classList.remove("has-photo");
+  }
+}
+
+function partnerSubtitle(partner) {
+  if (!isVerifiedShopper(partner)) {
+    const role = partner?.role || "User";
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  }
+  const parts = [];
+  if (partner.location) parts.push(partner.location);
+  if (partner.rating && partner.rating !== "New") {
+    parts.push(`★ ${partner.rating}`);
+  } else if (partner.rating === "New") {
+    parts.push("New · Verified");
+  } else {
+    parts.push("Verified shopper");
+  }
+  if (partner.response_time) parts.push(partner.response_time);
+  return parts.join(" · ");
+}
+
+function renderPartnerNameHtml(partner, badgeSize = 16) {
+  const name = partner?.name || "Unknown";
+  if (isVerifiedShopper(partner)) {
+    return nameWithVerifiedBadge(name, { tag: "span", className: "conv-name-verified", size: badgeSize });
+  }
+  return escapeHtml(name);
+}
+
+function renderChatHeader(partner) {
+  const link = document.getElementById("chatHeaderProfileLink");
+  const avatar = document.getElementById("chatHeaderAvatar");
+  const nameEl = document.getElementById("chatHeaderName");
+  const subEl = document.getElementById("chatHeaderSub");
+
+  const profileUrl =
+    isVerifiedShopper(partner) || partner?.role === "shopper"
+      ? `shopper-profile.html?id=${encodeURIComponent(partner.uid)}`
+      : null;
+
+  if (link) {
+    if (profileUrl) {
+      link.href = profileUrl;
+      link.hidden = false;
+    } else {
+      link.removeAttribute("href");
+      link.hidden = true;
+    }
+  }
+
+  renderAvatarInto(avatar, partner);
+
+  if (nameEl) {
+    if (isVerifiedShopper(partner)) {
+      nameEl.innerHTML = nameWithVerifiedBadge(partner.name || "Shopper", {
+        tag: "span",
+        className: "chat-header__name-verified",
+        size: 18,
+      });
+    } else {
+      nameEl.textContent = partner.name || "User";
+    }
+  }
+
+  if (subEl) subEl.textContent = partnerSubtitle(partner);
+}
+
+function isThreadOpen() {
+  const thread = document.getElementById("chatThread");
+  return thread && !thread.hidden;
+}
+
+function setThreadVisible(visible) {
+  const empty = document.getElementById("chatEmptyState");
+  const thread = document.getElementById("chatThread");
+  const win = document.getElementById("chatWindow");
+
+  if (visible) {
+    if (empty) {
+      empty.hidden = true;
+      empty.style.display = "none";
+    }
+    if (thread) {
+      thread.hidden = false;
+      thread.style.display = "flex";
+    }
+    win?.classList.add("chat-window--open");
+  } else {
+    if (empty) {
+      empty.hidden = false;
+      empty.style.display = "";
+    }
+    if (thread) {
+      thread.hidden = true;
+      thread.style.display = "none";
+    }
+    win?.classList.remove("chat-window--open");
+  }
 }
 
 async function init() {
@@ -62,15 +208,12 @@ async function init() {
   if (!profile) return;
   currentUser = profile;
 
-  subscribeInbox(supabase, currentUser.uid, {
+  registerBuyerChatHandlers({
     onMessage: handleInboxMessage,
     onCallInvite: handleInboxCallInvite,
   });
 
-  if (typeof Notification !== "undefined" && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {});
-  }
-
+  await loadShopperDirectory();
   await loadConversations();
 
   const withUid = new URLSearchParams(window.location.search).get("with");
@@ -85,11 +228,7 @@ async function handleInboxMessage(msg) {
   const inOpenThread =
     activePartner &&
     String(activePartner.uid) === partnerUid &&
-    document.getElementById("chatMessages")?.style.display !== "none";
-
-  if (fromOther && !inOpenThread) {
-    playMessageNotification();
-  }
+    isThreadOpen();
 
   if (
     activePartner &&
@@ -121,7 +260,7 @@ async function loadConversations() {
   allConversations = await getConversationSummaries(currentUser.uid);
 
   if (allConversations.length === 0) {
-    list.innerHTML = `<div class="conv-empty">No conversations yet.<br><br>Go to a shopper's profile and click <strong>Send Message</strong> to start chatting.</div>`;
+    list.innerHTML = `<p class="conv-empty">No conversations yet.<br><br>Go to a shopper profile and tap <strong>Message</strong> to start chatting.</p>`;
     return;
   }
 
@@ -134,29 +273,36 @@ function renderConvList(conversations, unreadMap = {}) {
   if (!list) return;
 
   if (conversations.length === 0) {
-    list.innerHTML = `<div class="conv-empty">No conversations found.</div>`;
+    list.innerHTML = `<p class="conv-empty">No conversations found.</p>`;
     return;
   }
 
   list.innerHTML = conversations.map(m => {
-    const isMine    = String(m.sender_id) === String(currentUser.uid);
-    const partner   = m._partner;
-    const otherName = partner?.name || (isMine ? m.receiver_name : m.sender_name);
-    const otherId   = partner?.uid  || (isMine ? m.receiver_id   : m.sender_id);
-    const preview   = getPreviewText(m.content || "");
-    const time      = formatTime(m.created_at);
+    const isMine = String(m.sender_id) === String(currentUser.uid);
+    const otherId = m._partner?.uid || (isMine ? m.receiver_id : m.sender_id);
+    const partner = getEnrichedPartner(otherId, m._partner);
+    const preview = getPreviewText(m.content || "");
+    const time = formatTime(m.created_at);
     const canonicalId = getConvId(currentUser.uid, otherId);
-    const unread    = unreadMap[canonicalId] || unreadMap[m.conversation_id] || 0;
-    const isActive  = activeConversationId === canonicalId;
+    const unread = unreadMap[canonicalId] || unreadMap[m.conversation_id] || 0;
+    const isActive = activeConversationId === canonicalId;
+    const avatarHtml = partner.avatar_url
+      ? `<img src="${escapeHtml(partner.avatar_url)}" alt="">`
+      : (partner.name || "?")[0].toUpperCase();
+    const avatarClass = partner.avatar_url ? " conv-avatar--photo" : "";
+    const locationLine = partner.location
+      ? `<p class="conv-location">${escapeHtml(partner.location)}</p>`
+      : "";
 
     return `
-      <div class="conv-item ${isActive ? "active" : ""}" onclick="openConversation('${otherId}')">
-        <div class="conv-avatar">${(otherName || "?")[0].toUpperCase()}</div>
+      <div class="conv-item ${isActive ? "active" : ""}${unread > 0 ? " has-unread" : ""}" data-partner-id="${escapeHtml(String(otherId))}" role="listitem" tabindex="0">
+        <div class="conv-avatar${avatarClass}">${avatarHtml}</div>
         <div class="conv-info">
           <div class="conv-name-row">
-            <span class="conv-name">${otherName || "Unknown"}</span>
+            <span class="conv-name">${renderPartnerNameHtml(partner, 14)}</span>
             <span class="conv-time">${time}</span>
           </div>
+          ${locationLine}
           <div class="conv-bottom">
             <span class="conv-preview">${isMine ? "You: " : ""}${escapeHtml(preview)}</span>
             ${unread > 0 ? `<span class="conv-unread">${unread}</span>` : ""}
@@ -167,54 +313,211 @@ function renderConvList(conversations, unreadMap = {}) {
 }
 
 async function resolvePartner(otherUid) {
+  const key = String(otherUid);
+  const fromDir = shopperByUid.get(key);
+  if (fromDir) return { ...fromDir };
+
   const known = allConversations.find(m => {
     const pid = m._partner?.uid || (m.sender_id === currentUser.uid ? m.receiver_id : m.sender_id);
-    return String(pid) === String(otherUid);
+    return String(pid) === key;
   });
-  if (known?._partner?.name) return known._partner;
-
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("with") === otherUid && params.get("name")) {
-    return { uid: otherUid, name: decodeURIComponent(params.get("name")), role: "shopper" };
+  if (known?._partner) {
+    const enriched = getEnrichedPartner(key, known._partner);
+    if (enriched.name) return enriched;
   }
 
-  const { data } = await supabase
-    .from("public_shoppers").select("uid, name").eq("uid", otherUid).maybeSingle();
-  if (data?.name) return { uid: otherUid, name: data.name, role: "shopper" };
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("with") === key && params.get("name")) {
+    return getEnrichedPartner(key, {
+      uid: key,
+      name: decodeURIComponent(params.get("name")),
+      role: "shopper",
+    });
+  }
 
-  const { data: user } = await supabase.from("users").select("uid, name, role").eq("uid", otherUid).maybeSingle();
-  if (user) return { uid: otherUid, name: user.name, role: user.role };
+  const { data } = await supabase.from("public_shoppers").select("*").eq("uid", key).maybeSingle();
+  if (data) {
+    const p = normalizeShopperPartner(data);
+    shopperByUid.set(key, p);
+    return p;
+  }
 
-  return { uid: otherUid, name: "User", role: "shopper" };
+  const { data: user } = await supabase
+    .from("users")
+    .select("uid, name, role, avatar_url")
+    .eq("uid", key)
+    .maybeSingle();
+  if (user) {
+    return {
+      uid: key,
+      name: user.name,
+      role: user.role,
+      avatar_url: user.avatar_url || null,
+      verified: false,
+    };
+  }
+
+  return { uid: key, name: "User", role: "user" };
 }
 
 window.openConversation = async function (otherUid) {
+  if (!currentUser?.uid || !otherUid) return;
+
   activeConversationId = getConvId(currentUser.uid, otherUid);
   activePartner        = await resolvePartner(otherUid);
   setConversationPartner(activeConversationId, activePartner, currentUser.uid);
 
-  document.getElementById("chatEmptyState").style.display = "none";
-  document.getElementById("chatHeader").style.display     = "flex";
-  document.getElementById("chatMessages").style.display   = "flex";
-  document.getElementById("chatInputRow").style.display   = "flex";
-
-  document.getElementById("chatHeaderAvatar").textContent = (activePartner.name || "?")[0].toUpperCase();
-  document.getElementById("chatHeaderName").textContent   = activePartner.name || "Shopper";
-  document.getElementById("chatHeaderSub").textContent    = activePartner.role || "shopper";
+  setThreadVisible(true);
+  renderChatHeader(activePartner);
+  setActiveChatPartner(activePartner.uid);
 
   const sidebar = document.getElementById("convSidebar");
-  if (window.innerWidth <= 640 && sidebar) sidebar.classList.add("hidden");
+  if (window.innerWidth <= 900 && sidebar) sidebar.classList.add("is-hidden");
 
   threadMessageIds = new Set();
   await loadMessages();
   await markAsRead();
   await loadConversations();
+  document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
 };
 
 async function loadMessages() {
   if (!activePartner?.uid) return;
   const msgs = await getMessagesForPartner(currentUser.uid, activePartner.uid);
   renderMessages(msgs);
+}
+
+function renderMessageBody(content) {
+  if (!content) return { type: "text", html: "" };
+  if (content.startsWith("[img]")) {
+    const url = content.slice(5);
+    return {
+      type: "image",
+      html: `<img src="${escapeHtml(url)}" class="msg-media" alt="Shared image" loading="lazy" onclick="window.open('${escapeHtml(url)}','_blank')">`,
+    };
+  }
+  if (content.startsWith("[audio]")) {
+    const url = content.slice(7);
+    const bars = Array.from({ length: 14 }, () => "<span></span>").join("");
+    return {
+      type: "audio",
+      html: `
+        <div class="msg-voice">
+          <button type="button" class="msg-voice__btn" aria-label="Play voice note">
+            <i class="fas fa-play msg-voice__icon-play" aria-hidden="true"></i>
+            <i class="fas fa-pause msg-voice__icon-pause" aria-hidden="true"></i>
+          </button>
+          <div class="msg-voice__body">
+            <div class="msg-voice__wave" aria-hidden="true">${bars}</div>
+            <span class="msg-voice__label">Voice note</span>
+          </div>
+          <span class="msg-voice__dur">—</span>
+          <audio class="msg-voice__audio" preload="metadata" src="${escapeHtml(url)}"></audio>
+        </div>`,
+    };
+  }
+  return { type: "text", html: `<p class="msg-text">${escapeHtml(content)}</p>` };
+}
+
+function buildMessageRowHtml(m, myUid) {
+  if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return "";
+
+  const isMine = String(m.sender_id) === String(myUid);
+  const time = formatTime(m.created_at);
+  const read = isMine
+    ? m.is_read
+      ? '<span class="msg-meta__read" aria-label="Read">✓✓</span>'
+      : '<span class="msg-meta__read" aria-label="Sent">✓</span>'
+    : "";
+  const { html: bodyHtml, type } = renderMessageBody(m.content);
+  const bubbleClass = isMine ? "bubble-mine" : "bubble-theirs";
+  const modClass =
+    type === "audio" ? " msg-bubble--voice" : type === "image" ? " msg-bubble--image" : "";
+  const rowMod = type === "audio" ? " msg-row--voice" : "";
+  const avatar = !isMine
+    ? `<div class="msg-avatar" aria-hidden="true">${(m.sender_name || "?")[0].toUpperCase()}</div>`
+    : "";
+  const idAttr = m.id ? ` data-msg-id="${m.id}"` : "";
+
+  return `
+    <div class="msg-row ${isMine ? "mine" : "theirs"}${rowMod}"${idAttr}>
+      ${avatar}
+      <div class="msg-stack">
+        <div class="msg-bubble ${bubbleClass}${modClass}">
+          ${bodyHtml}
+        </div>
+        <div class="msg-meta">
+          <span class="msg-meta__time">${time}</span>${read}
+        </div>
+      </div>
+    </div>`;
+}
+
+function formatDateDivider(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatVoiceDuration(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "—";
+  const s = Math.floor(seconds);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+function bindVoiceDuration(audio) {
+  const wrap = audio.closest(".msg-voice");
+  const durEl = wrap?.querySelector(".msg-voice__dur");
+  if (!durEl || !Number.isFinite(audio.duration)) return;
+  durEl.textContent = formatVoiceDuration(audio.duration);
+}
+
+let activeVoiceAudio = null;
+
+function setupVoicePlayers() {
+  const container = document.getElementById("chatMessages");
+  if (!container || container.dataset.voiceBound === "1") return;
+  container.dataset.voiceBound = "1";
+
+  container.addEventListener("click", e => {
+    const btn = e.target.closest(".msg-voice__btn");
+    if (!btn) return;
+    const wrap = btn.closest(".msg-voice");
+    const audio = wrap?.querySelector(".msg-voice__audio");
+    if (!audio) return;
+
+    if (activeVoiceAudio && activeVoiceAudio !== audio) {
+      activeVoiceAudio.pause();
+      activeVoiceAudio.currentTime = 0;
+      activeVoiceAudio.closest(".msg-voice")?.classList.remove("is-playing");
+    }
+
+    if (audio.paused) {
+      audio.play().catch(() => {});
+      wrap.classList.add("is-playing");
+      activeVoiceAudio = audio;
+    } else {
+      audio.pause();
+      wrap.classList.remove("is-playing");
+      activeVoiceAudio = null;
+    }
+  });
+
+  container.addEventListener("loadedmetadata", e => {
+    if (e.target.matches?.(".msg-voice__audio")) bindVoiceDuration(e.target);
+  });
+
+  container.addEventListener("ended", e => {
+    if (!e.target.matches?.(".msg-voice__audio")) return;
+    e.target.closest(".msg-voice")?.classList.remove("is-playing");
+    if (activeVoiceAudio === e.target) activeVoiceAudio = null;
+  });
 }
 
 function renderMessages(msgs) {
@@ -224,31 +527,24 @@ function renderMessages(msgs) {
   threadMessageIds = new Set((msgs || []).map(m => m.id).filter(Boolean));
 
   if (msgs.length === 0) {
-    container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin:auto;padding:40px">No messages yet.<br>Say hello! 👋</div>`;
+    container.innerHTML = `<p class="chat-messages__empty">No messages yet.<br>Say hello!</p>`;
     return;
   }
 
   let lastDate = null;
   container.innerHTML = msgs.map(m => {
-    if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return "";
-
-    const isMine  = String(m.sender_id) === String(currentUser.uid);
-    const time    = formatTime(m.created_at);
-    const read    = isMine ? (m.is_read ? " ✓✓" : " ✓") : "";
-    const msgDate = new Date(m.created_at).toLocaleDateString();
+    const msgDate = new Date(m.created_at).toDateString();
     let dateDivider = "";
-    if (msgDate !== lastDate) { lastDate = msgDate; dateDivider = `<div class="msg-date-divider">${msgDate}</div>`; }
-
-    return `
-      ${dateDivider}
-      <div class="msg-row ${isMine ? "mine" : "theirs"}">
-        ${!isMine ? `<div class="msg-avatar">${(m.sender_name || "?")[0].toUpperCase()}</div>` : ""}
-        <div class="msg-bubble ${isMine ? "bubble-mine" : "bubble-theirs"}">
-          <div class="msg-content">${renderMessageContent(m.content)}</div>
-          <div class="msg-time">${time}${read}</div>
-        </div>
-      </div>`;
+    if (msgDate !== lastDate) {
+      lastDate = msgDate;
+      dateDivider = `<div class="msg-date-divider">${formatDateDivider(m.created_at)}</div>`;
+    }
+    return dateDivider + buildMessageRowHtml(m, currentUser.uid);
   }).join("");
+
+  container.querySelectorAll(".msg-voice__audio").forEach(a => {
+    if (a.readyState >= 1) bindVoiceDuration(a);
+  });
 
   container.scrollTop = container.scrollHeight;
 }
@@ -258,58 +554,44 @@ function appendMessageToThread(m) {
   if (m.content === "[videocall]incoming" || m.content === "[voicecall]incoming") return;
 
   const container = document.getElementById("chatMessages");
-  if (!container || container.style.display === "none") return;
+  if (!container || !isThreadOpen()) return;
 
   threadMessageIds.add(m.id);
 
-  const empty = container.querySelector("div[style*='padding:40px']");
+  const empty = container.querySelector(".chat-messages__empty");
   if (empty) empty.remove();
 
-  const isMine = String(m.sender_id) === String(currentUser.uid);
-  const time   = formatTime(m.created_at);
-  const read   = isMine ? (m.is_read ? " ✓✓" : " ✓") : "";
-  const row    = document.createElement("div");
-  row.className = `msg-row ${isMine ? "mine" : "theirs"}`;
-  row.dataset.msgId = m.id;
-  row.innerHTML = `
-    ${!isMine ? `<div class="msg-avatar">${(m.sender_name || "?")[0].toUpperCase()}</div>` : ""}
-    <div class="msg-bubble ${isMine ? "bubble-mine" : "bubble-theirs"}">
-      <div class="msg-content">${renderMessageContent(m.content)}</div>
-      <div class="msg-time">${time}${read}</div>
-    </div>`;
-  container.appendChild(row);
-  container.scrollTop = container.scrollHeight;
-}
+  const wrap = document.createElement("div");
+  wrap.innerHTML = buildMessageRowHtml(m, currentUser.uid);
+  const el = wrap.firstElementChild;
+  if (!el) return;
+  if (m.id) el.dataset.msgId = m.id;
+  container.appendChild(el);
 
-function renderMessageContent(content) {
-  if (!content) return "";
-  if (content.startsWith("[img]")) {
-    const url = content.slice(5);
-    return `<img src="${escapeHtml(url)}" style="max-width:220px;max-height:220px;border-radius:10px;cursor:pointer;display:block" onclick="window.open('${escapeHtml(url)}','_blank')" loading="lazy">`;
-  }
-  if (content.startsWith("[audio]")) {
-    const url = content.slice(7);
-    return `<audio controls style="max-width:200px;height:36px"><source src="${escapeHtml(url)}"></audio>`;
-  }
-  return escapeHtml(content);
+  const audio = el.querySelector(".msg-voice__audio");
+  if (audio?.readyState >= 1) bindVoiceDuration(audio);
+
+  container.scrollTop = container.scrollHeight;
 }
 
 function appendOptimisticMessage(content) {
   const container = document.getElementById("chatMessages");
   if (!container) return;
 
-  const empty = container.querySelector("div[style*='padding:40px']");
+  const empty = container.querySelector(".chat-messages__empty");
   if (empty) empty.remove();
 
-  const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const row  = document.createElement("div");
-  row.className = "msg-row mine";
-  row.innerHTML = `
-    <div class="msg-bubble bubble-mine">
-      <div class="msg-content">${renderMessageContent(content)}</div>
-      <div class="msg-time">${time} ✓</div>
-    </div>`;
-  container.appendChild(row);
+  const fake = {
+    sender_id: currentUser.uid,
+    content,
+    created_at: new Date().toISOString(),
+    is_read: false,
+  };
+  const wrap = document.createElement("div");
+  wrap.innerHTML = buildMessageRowHtml(fake, currentUser.uid);
+  const el = wrap.firstElementChild;
+  if (!el) return;
+  container.appendChild(el);
   container.scrollTop = container.scrollHeight;
 }
 
@@ -382,7 +664,10 @@ window.toggleVoiceRecord = async function () {
     mediaRecorder?.stop();
     isRecording = false;
     const btn = document.getElementById("voiceBtn");
-    if (btn) { btn.style.background = ""; btn.style.color = ""; btn.title = "Record voice note"; }
+      if (btn) {
+        btn.classList.remove("is-recording");
+        btn.title = "Voice note";
+      }
   } else {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -397,7 +682,10 @@ window.toggleVoiceRecord = async function () {
       mediaRecorder.start();
       isRecording = true;
       const btn = document.getElementById("voiceBtn");
-      if (btn) { btn.style.background = "#e74c3c"; btn.style.color = "#fff"; btn.title = "Click to stop recording"; }
+      if (btn) {
+        btn.classList.add("is-recording");
+        btn.title = "Stop recording";
+      }
     } catch {
       alert("Microphone access denied.");
     }
@@ -538,7 +826,7 @@ async function handleIncomingCall({ sender_id, sender_name, callType }) {
   }
 
   if (!activePartner || String(activePartner.uid) !== String(sender_id)) {
-    activePartner = { uid: sender_id, name: sender_name || "User", role: "user" };
+    activePartner = getEnrichedPartner(sender_id, { uid: sender_id, name: sender_name || "User", role: "user" });
     activeConversationId = getConvId(currentUser.uid, sender_id);
     setConversationPartner(activeConversationId, activePartner, currentUser.uid);
   }
@@ -573,7 +861,8 @@ function filterConversations(query) {
 }
 
 window.showConvList = function () {
-  document.getElementById("convSidebar")?.classList.remove("hidden");
+  document.getElementById("convSidebar")?.classList.remove("is-hidden");
+  setActiveChatPartner(null);
 };
 
 function formatTime(ts) {
@@ -588,6 +877,7 @@ function escapeHtml(text) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  setupVoicePlayers();
   init();
 
   document.body.addEventListener("click", () => unlockSounds(), { once: true });
@@ -600,5 +890,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("convSearch")?.addEventListener("input", e => {
     filterConversations(e.target.value.trim());
+  });
+
+  document.getElementById("convList")?.addEventListener("click", e => {
+    const item = e.target.closest(".conv-item[data-partner-id]");
+    if (!item) return;
+    openConversation(item.dataset.partnerId);
+  });
+
+  document.getElementById("convList")?.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const item = e.target.closest(".conv-item[data-partner-id]");
+    if (!item) return;
+    e.preventDefault();
+    openConversation(item.dataset.partnerId);
   });
 });

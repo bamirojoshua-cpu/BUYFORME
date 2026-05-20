@@ -2,6 +2,13 @@
 
 @import url("verified-badge.css");
 
+.buyer-app,
+.buyer-app *,
+.buyer-app *::before,
+.buyer-app *::after {
+  box-sizing: border-box;
+}
+
 :root {
   --green: #1a9e6e;
   --green-dark: #127a54;
@@ -25,6 +32,7 @@
   --surface: #ffffff;
   --surface-2: #f8fbf9;
   --sidebar-w: 268px;
+  --sidebar-w-collapsed: 76px;
   --radius: 16px;
   --radius-lg: 22px;
   --radius-sm: 12px;
@@ -300,12 +308,12 @@
   font-size: 1.4rem;
 }
 
-/* ── Toast ── */
+/* ── Toast (hidden until a message is shown) ── */
 .buyer-toast {
   position: fixed;
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   left: 50%;
-  transform: translateX(-50%) translateY(120%);
+  transform: translateX(-50%) translateY(12px);
   background: var(--green-deep);
   color: #fff;
   padding: 12px 22px;
@@ -314,13 +322,27 @@
   font-weight: 600;
   z-index: 5000;
   box-shadow: var(--shadow-lg);
-  transition: transform 0.35s var(--ease);
   max-width: min(92vw, 420px);
   text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.3s var(--ease),
+    transform 0.35s var(--ease),
+    visibility 0.3s;
 }
 
 .buyer-toast.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transform: translateX(-50%) translateY(0);
+}
+
+.buyer-toast:not(.show) {
+  padding: 0;
+  box-shadow: none;
 }
 
 .buyer-app--chat .buyer-toast {

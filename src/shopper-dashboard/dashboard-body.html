@@ -3,28 +3,29 @@
         <!-- SIDEBAR -->
         <div class="sidebar">
             <div class="sidebar-brand">
-                <a href="index.html" class="brand-link"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
+                <a href="index.html" class="brand-link" data-tooltip="Home" aria-label="Home"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
+                <button type="button" class="sidebar-collapse-btn" id="shopperSidebarCollapse"
+                    aria-label="Collapse sidebar" aria-expanded="true" data-tooltip="Collapse sidebar">
+                    <i class="fas fa-angles-left" aria-hidden="true"></i>
+                </button>
             </div>
             <div class="sidebar-profile">
                 <div class="avatar-large" id="sidebarAvatar">A</div>
                 <h3 id="sidebarName" class="sidebar-name-row">Shopper</h3>
             </div>
             <ul class="sidebar-menu">
-                <li><a class="active" href="#" data-tab="overview-section" data-nav-title="Dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
-                <li><a href="#" data-tab="requests-section" data-nav-title="Requests"><i class="fas fa-inbox"></i> Requests <span class="badge" id="reqBadge" style="display:none"></span></a></li>
-                <li><a href="#" data-tab="orders-section" data-nav-title="Orders"><i class="fas fa-shopping-bag"></i> My Orders</a></li>
-                <li><a href="#" data-tab="messages-section" data-nav-title="Messages"><i class="fas fa-comment"></i> Messages <span class="badge" id="msgBadge" style="display:none"></span></a></li>
-                <li><a href="#" data-tab="earnings-section" data-nav-title="Earnings"><i class="fas fa-wallet"></i> Earnings</a></li>
-                <li><a href="#" data-tab="settings-section" data-nav-title="Settings"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a class="active" href="#" data-tab="overview-section" data-nav-title="Dashboard" data-tooltip="Dashboard"><i class="fas fa-home"></i><span class="nav-label">Dashboard</span></a></li>
+                <li><a href="#" data-tab="requests-section" data-nav-title="Requests" data-tooltip="Requests"><i class="fas fa-inbox"></i><span class="nav-label">Requests</span><span class="badge" id="reqBadge" style="display:none"></span></a></li>
+                <li><a href="#" data-tab="orders-section" data-nav-title="Orders" data-tooltip="My Orders"><i class="fas fa-shopping-bag"></i><span class="nav-label">My Orders</span></a></li>
+                <li><a href="#" data-tab="messages-section" data-nav-title="Messages" data-tooltip="Messages"><i class="fas fa-comment"></i><span class="nav-label">Messages</span><span class="badge" id="msgBadge" style="display:none"></span></a></li>
+                <li><a href="#" data-tab="earnings-section" data-nav-title="Earnings" data-tooltip="Earnings"><i class="fas fa-wallet"></i><span class="nav-label">Earnings</span></a></li>
+                <li><a href="#" data-tab="settings-section" data-nav-title="Settings" data-tooltip="Settings"><i class="fas fa-cog"></i><span class="nav-label">Settings</span></a></li>
             </ul>
             <div class="sidebar-logout">
-                <button class="btn-logout" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Log Out</button>
+                <button type="button" class="btn-logout" onclick="handleLogout()" data-tooltip="Log out">
+                    <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span class="logout-label">Log Out</span>
+                </button>
             </div>
-        </div>
-
-        <div class="mobile-dash-bar">
-            <button type="button" class="menu-btn" data-nav-toggle=".sidebar" aria-label="Open menu"><i class="fas fa-bars" aria-hidden="true"></i></button>
-            <span id="mobileDashTitle">Dashboard</span>
         </div>
 
         <!-- MAIN -->

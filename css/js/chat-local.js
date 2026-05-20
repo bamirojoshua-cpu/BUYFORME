@@ -75,6 +75,10 @@ export function setConversationPartner(convId, partner, myUserId) {
     uid: String(partner.uid),
     name: partner.name || "User",
     role: partner.role || "user",
+    avatar_url: partner.avatar_url || null,
+    location: partner.location || "",
+    rating: partner.rating ?? null,
+    verified: Boolean(partner.verified),
   };
 }
 

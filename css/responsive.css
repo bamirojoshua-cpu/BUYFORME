@@ -220,12 +220,8 @@ table {
     box-sizing: border-box;
   }
 
-  .dashboard-grid .mobile-dash-bar {
-    grid-row: 1 !important;
-  }
-
   .dashboard-grid .dashboard-main {
-    grid-row: 2 !important;
+    grid-row: 1 !important;
   }
 
   .dashboard-grid .sidebar,
@@ -363,18 +359,9 @@ table {
     max-width: 100%;
   }
 
+  /* Redundant with bottom nav + section headings — hide on phone/tablet */
   .mobile-dash-bar {
-    display: flex !important;
-    justify-content: center;
-  }
-
-  .mobile-dash-bar .menu-btn {
     display: none !important;
-  }
-
-  .mobile-dash-bar span {
-    flex: 1;
-    text-align: center;
   }
 
   /* Admin pill: icon-only to fit more links */
