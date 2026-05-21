@@ -45,7 +45,7 @@
             overflow-x: hidden;
         }
 
-        /* ── NAVBAR (floating pill on scroll) ── */
+        /* NAVBAR (floating pill on scroll) */
         .navbar--landing {
             position: fixed;
             top: 0;
@@ -152,7 +152,7 @@
             gap: 12px;
         }
 
-        /* Landing buttons — pill shape + hover lift */
+        /* Landing buttons: pill shape + hover lift */
         .btn-ghost,
         .btn-solid,
         .btn-hero-primary,
@@ -235,7 +235,7 @@
             box-shadow: 0 10px 28px rgba(26, 158, 110, 0.35);
         }
 
-        /* ── HERO ── */
+        /* HERO */
         .hero-wrap {
             padding: 96px max(20px, env(safe-area-inset-right)) 32px max(20px, env(safe-area-inset-left));
             max-width: 1320px;
@@ -484,7 +484,7 @@
             font-weight: 600;
         }
 
-        /* ── HERO RIGHT ── */
+        /* HERO RIGHT */
         .hero-right {
             display: flex;
             justify-content: center;
@@ -680,7 +680,7 @@
             font-size: 0.85rem;
         }
 
-        /* ── LANDING PAGE BLOCKS (rounded, inset like hero) ── */
+        /* LANDING PAGE BLOCKS (rounded, inset like hero) */
         .landing-main {
             max-width: 1320px;
             margin: 0 auto;
@@ -698,7 +698,7 @@
                 0 0 0 1px rgba(0, 0, 0, 0.04);
         }
 
-        /* ── STATS BAR ── */
+        /* STATS BAR */
         .stats-bar {
             background: var(--green-dark);
             color: white;
@@ -731,7 +731,7 @@
             letter-spacing: 0.5px;
         }
 
-        /* ── SECTIONS ── */
+        /* SECTIONS */
         .section {
             padding: 100px 48px;
             background: var(--white);
@@ -774,7 +774,7 @@
             margin-bottom: 64px;
         }
 
-        /* ── HOW IT WORKS ── */
+        /* HOW IT WORKS */
         .steps-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -838,7 +838,7 @@
             line-height: 1.6;
         }
 
-        /* ── WHY BUYFORME ── */
+        /* WHY BUYFORME */
         .why-section {
             background: var(--text);
             color: white;
@@ -976,7 +976,7 @@
             transition: color 0.25s ease;
         }
 
-        /* ── LOCATIONS ── */
+        /* LOCATIONS */
         .locations-section {
             padding: 100px 48px;
             background: var(--cream-dark);
@@ -1035,7 +1035,7 @@
             display: inline-block;
         }
 
-        /* ── TESTIMONIALS ── */
+        /* TESTIMONIALS */
         .testimonials-section {
             padding: 100px 48px;
             background: var(--white);
@@ -1105,7 +1105,7 @@
             color: var(--text-muted);
         }
 
-        /* ── FOR SHOPPERS ── */
+        /* FOR SHOPPERS */
         .shoppers-section {
             background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
             padding: 100px 48px;
@@ -1197,7 +1197,7 @@
             box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
         }
 
-        /* ── CTA ── */
+        /* CTA */
         .cta-section {
             padding: 120px 48px;
             text-align: center;
@@ -1272,7 +1272,7 @@
             box-shadow: 0 8px 22px rgba(12, 26, 20, 0.1);
         }
 
-        /* ── FOOTER ── */
+        /* FOOTER */
         .footer {
             background: var(--text);
             color: rgba(255, 255, 255, 0.5);
@@ -1343,7 +1343,7 @@
             color: rgba(255, 255, 255, 0.35);
         }
 
-        /* ── ANIMATIONS ── */
+        /* ANIMATIONS */
         @keyframes fadeUp {
             from {
                 opacity: 0;
@@ -1367,7 +1367,7 @@
             transform: translateY(0);
         }
 
-        /* ── RESPONSIVE ── */
+        /* RESPONSIVE */
         @media (max-width: 1024px) {
             .steps-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -1511,8 +1511,6 @@
 </head>
 
 <body>
-
-    <!-- NAVBAR -->
     <header class="navbar navbar--landing" id="navbar">
         <div class="navbar-inner">
             <a href="index.html" class="brand-link nav-logo"><img src="images/logo.png" alt="BuyForMe" class="brand-logo"></a>
@@ -1529,8 +1527,6 @@
             <a href="auth.html" class="btn-solid nav-mobile-cta">Get Started</a>
         </div>
     </header>
-
-    <!-- HERO -->
     <div class="hero-wrap">
     <section class="hero" id="hero">
         <div class="hero-bg" aria-hidden="true"></div>
@@ -1605,8 +1601,6 @@
     </div>
 
     <main class="landing-main">
-
-    <!-- STATS BAR -->
     <div class="stats-bar landing-block">
         <div class="stat-item">
             <span class="num">12K+</span>
@@ -1625,12 +1619,10 @@
             <span class="lbl">Satisfaction Rate</span>
         </div>
     </div>
-
-    <!-- HOW IT WORKS -->
     <section class="section landing-block" id="how-it-works">
         <div class="section-label">How It Works</div>
         <h2 class="section-title reveal">Five steps to shop<br>anything from anywhere.</h2>
-        <p class="section-sub reveal">From finding a shopper to receiving your package  the whole process is simple,
+        <p class="section-sub reveal">From finding a shopper to receiving your package, the whole process is simple,
             transparent and protected.</p>
         <div class="steps-grid">
             <div class="step-item reveal">
@@ -1641,7 +1633,7 @@
             <div class="step-item reveal">
                 <div class="step-number">02</div>
                 <h3>Send a Request</h3>
-                <p>Describe exactly what you want  brand, size, colour, quantity.</p>
+                <p>Describe exactly what you want: brand, size, colour, quantity.</p>
             </div>
             <div class="step-item reveal">
                 <div class="step-number">03</div>
@@ -1660,12 +1652,10 @@
             </div>
         </div>
     </section>
-
-    <!-- WHY BUYFORME -->
     <section class="why-section landing-block">
         <div class="section-label">Why BuyForMe</div>
         <h2 class="section-title reveal">Built for African buyers.<br>Trusted by thousands.</h2>
-        <p class="section-sub reveal">Every feature was designed with one goal  making cross-border shopping safe,
+        <p class="section-sub reveal">Every feature was designed with one goal: making cross-border shopping safe,
             simple and reliable for Africa.</p>
         <div class="why-grid">
             <div class="why-card reveal">
@@ -1677,7 +1667,7 @@
             <div class="why-card reveal">
                 <div class="why-icon"><i class="fas fa-video"></i></div>
                 <h3>Live Market Verification</h3>
-                <p>Your shopper sends real photos and videos before purchasing. See exactly what you're getting  no
+                <p>Your shopper sends real photos and videos before purchasing. See exactly what you're getting, with no
                     surprises.</p>
             </div>
             <div class="why-card reveal">
@@ -1689,7 +1679,7 @@
             <div class="why-card reveal">
                 <div class="why-icon"><i class="fas fa-comments"></i></div>
                 <h3>Direct Chat</h3>
-                <p>Communicate directly with your shopper. Send voice notes, images and documents  all in one place.
+                <p>Communicate directly with your shopper. Send voice notes, images and documents, all in one place.
                 </p>
             </div>
             <div class="why-card reveal">
@@ -1705,12 +1695,10 @@
             </div>
         </div>
     </section>
-
-    <!-- LOCATIONS -->
     <section class="locations-section landing-block" id="locations">
         <div class="section-label">Shopping Destinations</div>
         <h2 class="section-title reveal">Shoppers everywhere<br>you want to buy from.</h2>
-        <p class="section-sub reveal">Our verified shoppers are stationed in the world's best markets  ready to buy on
+        <p class="section-sub reveal">Our verified shoppers are stationed in the world's best markets, ready to buy on
             your behalf.</p>
         <div class="locations-grid">
             <div class="location-card reveal">
@@ -1740,12 +1728,10 @@
             </div>
         </div>
     </section>
-
-    <!-- TESTIMONIALS -->
     <section class="testimonials-section landing-block" id="testimonials">
         <div class="section-label">Real Reviews</div>
         <h2 class="section-title reveal">African buyers.<br>Real experiences.</h2>
-        <p class="section-sub reveal">Don't take our word for it  here's what buyers across Africa say about BuyForMe.
+        <p class="section-sub reveal">Don't take our word for it. Here's what buyers across Africa say about BuyForMe.
         </p>
         <div class="testimonials-grid">
             <div class="testimonial-card reveal">
@@ -1789,14 +1775,12 @@
             </div>
         </div>
     </section>
-
-    <!-- FOR SHOPPERS -->
     <section class="shoppers-section landing-block" id="for-shoppers">
         <div>
             <div class="section-label">For Shoppers</div>
             <h2 class="section-title">Turn your location<br>into income.</h2>
             <p>Living in Turkey, China, the UK or the US? You're sitting on a goldmine. African buyers need trustworthy
-                people on the ground  and BuyForMe connects you directly to them.</p>
+                people on the ground, and BuyForMe connects you directly to them.</p>
             <a href="auth.html" class="btn-white">
                 <i class="fas fa-user-plus"></i> Apply as a Shopper
             </a>
@@ -1805,7 +1789,7 @@
             <div class="earn-card">
                 <div class="earn-icon"><i class="fas fa-wallet"></i></div>
                 <div>
-                    <h4>Earn 10–15% Per Order</h4>
+                    <h4>Earn 10 to 15% Per Order</h4>
                     <p>Set your own service fee. Top shoppers earn $2,000+ a month.</p>
                 </div>
             </div>
@@ -1832,8 +1816,6 @@
             </div>
         </div>
     </section>
-
-    <!-- CTA -->
     <section class="cta-section landing-block">
         <div class="section-label" style="justify-content:center;display:flex">Get Started Today</div>
         <h2 class="section-title reveal">The world's best markets.<br><em
@@ -1845,8 +1827,6 @@
             <a href="auth.html" class="btn-cta-secondary">Earn as a Shopper →</a>
         </div>
     </section>
-
-    <!-- FOOTER -->
     <footer class="footer landing-block">
         <div class="footer-top">
             <div class="footer-brand">

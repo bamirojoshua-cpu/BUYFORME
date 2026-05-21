@@ -75,7 +75,7 @@
             background: radial-gradient(circle, rgba(18, 122, 84, 0.12) 0%, transparent 70%);
         }
 
-        /* ── PAGE ── */
+        /* PAGE */
         .auth-page {
             position: relative;
             z-index: 1;
@@ -105,7 +105,7 @@
                 0 0 0 1px rgba(26, 158, 110, 0.08);
         }
 
-        /* ── BRAND — above card, large & prominent ── */
+        /* BRAND: above card, large & prominent */
         .auth-brand {
             display: flex;
             flex-direction: column;
@@ -170,7 +170,7 @@
             line-height: 1.5;
         }
 
-        /* ── TABS ── */
+        /* TABS */
         .tab-group {
             display: flex;
             background: var(--bg);
@@ -209,7 +209,7 @@
             box-shadow: 0 2px 10px rgba(12, 26, 20, 0.08);
         }
 
-        /* ── ROLE SELECTOR ── */
+        /* ROLE SELECTOR */
         .role-section {
             display: none;
             margin-bottom: 16px;
@@ -284,7 +284,7 @@
             color: var(--text-muted);
         }
 
-        /* ── NAME SECTION ── */
+        /* NAME SECTION */
         .name-section {
             display: none;
             margin-bottom: 0;
@@ -294,7 +294,7 @@
             display: block;
         }
 
-        /* ── FORM GROUPS ── */
+        /* FORM GROUPS */
         .form-group {
             margin-bottom: 16px;
         }
@@ -335,7 +335,7 @@
             box-shadow: 0 0 0 3px rgba(26, 158, 110, 0.15);
         }
 
-        /* ── ERROR ── */
+        /* ERROR */
         .error-msg {
             font-size: 0.82rem;
             color: var(--red);
@@ -351,7 +351,7 @@
             display: block;
         }
 
-        /* ── SUBMIT ── */
+        /* SUBMIT */
         .btn-auth {
             width: 100%;
             padding: 14px;
@@ -385,7 +385,7 @@
             cursor: not-allowed;
         }
 
-        /* ── FOOTER ── */
+        /* FOOTER */
         .auth-footer {
             text-align: center;
             margin-top: 20px;
@@ -457,17 +457,11 @@
 
             <h1 id="authTitle">Welcome back</h1>
             <p class="auth-subtitle" id="authSubtitle">Log in to your BuyForMe account</p>
-
-            <!-- TABS -->
             <div class="tab-group">
                 <div class="tab active" id="loginTab">Login</div>
                 <div class="tab" id="signupTab">Sign Up</div>
             </div>
-
-            <!-- ERROR MESSAGE -->
             <div class="error-msg" id="errorMsg"></div>
-
-            <!-- ROLE SELECTOR — signup only -->
             <div class="role-section" id="roleSection">
                 <span class="role-label">I want to join as a:</span>
                 <div class="role-selector">
@@ -483,36 +477,24 @@
                     </div>
                 </div>
             </div>
-
-            <!-- FORM -->
             <form id="authForm">
-
-                <!-- NAME — signup only -->
                 <div class="name-section" id="nameSection">
                     <div class="form-group">
                         <label>Full Name</label>
                         <input type="text" id="fullName" placeholder="e.g. Aisha Musa">
                     </div>
                 </div>
-
-                <!-- EMAIL -->
                 <div class="form-group">
                     <label>Email Address</label>
                     <input type="email" id="email" placeholder="you@email.com" required>
                 </div>
-
-                <!-- PASSWORD -->
                 <div class="form-group">
                     <label>Password</label>
                     <input type="password" id="password" placeholder="Min. 6 characters" required>
                 </div>
-
-                <!-- SUBMIT -->
                 <button type="submit" class="btn-auth" id="authBtn">Login</button>
 
             </form>
-
-            <!-- FOOTER -->
             <p class="auth-footer" id="authFooter">
                 Don't have an account? <a href="#" id="switchToSignup">Sign up free</a>
             </p>

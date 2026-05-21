@@ -2,686 +2,685 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <title>Track Your Order | BuyForMe</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="css/brand.css">
-    <link rel="stylesheet" href="css/responsive.css">
-    <link rel="icon" href="images/logo.png" type="image/png">
-
-    <style>
-        :root {
-            --green: #1a9e6e;
-            --green-lite: #e8f7f2;
-            --blue: #2563eb;
-            --amber: #d97706;
-            --red: #dc2626;
-            --bg: #f0f4f3;
-            --card: #ffffff;
-            --text: #1a1a2e;
-            --muted: #6b7280;
-            --border: #e5e7eb;
-            --step-done: #1a9e6e;
-            --step-idle: #d1d5db;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
-
-        .navbar {
-            background: #fff;
-            border-bottom: 1px solid var(--border);
-            padding: 0 24px;
-            height: 64px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 1.35rem;
-            color: var(--green);
-            letter-spacing: -0.5px;
-        }
-
-        .back-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            text-decoration: none;
-            color: var(--muted);
-            font-size: 0.9rem;
-            font-weight: 500;
-            border: 1px solid var(--border);
-            padding: 7px 14px;
-            border-radius: 8px;
-            transition: all 0.2s;
-        }
-
-        .back-btn:hover {
-            color: var(--green);
-            border-color: var(--green);
-        }
-
-        .page {
-            max-width: 660px;
-            margin: 0 auto;
-            padding: 36px 20px 60px;
-        }
-
-        .state-box {
-            background: var(--card);
-            border-radius: 18px;
-            padding: 60px 30px;
-            text-align: center;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-        }
-
-        .state-box .icon {
-            font-size: 2.5rem;
-            margin-bottom: 14px;
-        }
-
-        .state-box p {
-            color: var(--muted);
-            font-size: 1rem;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--green);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .tracking-card {
-            background: var(--card);
-            border-radius: 20px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.07);
-            overflow: hidden;
-        }
-
-        .card-accent {
-            height: 6px;
-            background: linear-gradient(90deg, var(--green), #059669, #2563eb);
-        }
-
-        .card-inner {
-            padding: 32px;
-        }
-
-        .track-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 28px;
-        }
-
-        .track-header h2 {
-            font-family: 'Sora', sans-serif;
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--text);
-        }
-
-        .order-ref {
-            font-size: 0.8rem;
-            color: var(--muted);
-            margin-top: 4px;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            text-transform: capitalize;
-            white-space: nowrap;
-        }
-
-        .status-badge::before {
-            content: '';
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: currentColor;
-            opacity: 0.7;
-        }
-
-        .badge-pending {
-            background: #fef3c7;
-            color: #b45309;
-        }
-
-        .badge-accepted {
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-
-        .badge-payment {
-            background: #fce7f3;
-            color: #be185d;
-        }
-
-        .badge-paid {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .badge-purchased {
-            background: #ede9fe;
-            color: #5b21b6;
-        }
-
-        .badge-delivering {
-            background: #fed7aa;
-            color: #9a3412;
-        }
-
-        .badge-delivered {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .order-summary {
-            background: var(--bg);
-            border-radius: 14px;
-            padding: 20px;
-            margin-bottom: 32px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-        }
-
-        .summary-item label {
-            display: block;
-            font-size: 0.72rem;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 4px;
-        }
-
-        .summary-item span {
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: var(--text);
-        }
-
-        .summary-item.full {
-            grid-column: 1 / -1;
-        }
-
-        .progress-section {
-            margin-bottom: 12px;
-        }
-
-        .progress-section h3 {
-            font-family: 'Sora', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 28px;
-        }
-
-        .steps-track {
-            position: relative;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        .steps-track::before {
-            content: '';
-            position: absolute;
-            top: 19px;
-            left: 19px;
-            right: 19px;
-            height: 3px;
-            background: var(--step-idle);
-            border-radius: 4px;
-            z-index: 0;
-        }
-
-        .progress-fill-line {
-            position: absolute;
-            top: 19px;
-            left: 19px;
-            height: 3px;
-            background: linear-gradient(90deg, var(--green), #059669);
-            border-radius: 4px;
-            z-index: 1;
-            transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 0%;
-        }
-
-        .step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            position: relative;
-            z-index: 2;
-            width: 20%;
-        }
-
-        .step-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #fff;
-            border: 2.5px solid var(--step-idle);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9rem;
-            color: var(--step-idle);
-            transition: all 0.4s ease;
-        }
-
-        .step-label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--muted);
-            text-align: center;
-            line-height: 1.3;
-            transition: color 0.3s;
-        }
-
-        .step.done .step-icon {
-            background: var(--step-done);
-            border-color: var(--step-done);
-            color: #fff;
-            box-shadow: 0 0 0 5px rgba(26, 158, 110, 0.15);
-        }
-
-        .step.done .step-label {
-            color: var(--step-done);
-        }
-
-        .step.current .step-icon {
-            background: var(--step-done);
-            border-color: var(--step-done);
-            color: #fff;
-            animation: pulse-ring 1.8s ease-out infinite;
-        }
-
-        .step.current .step-label {
-            color: var(--step-done);
-            font-weight: 700;
-        }
-
-        @keyframes pulse-ring {
-            0% {
-                box-shadow: 0 0 0 0 rgba(26, 158, 110, 0.5);
-            }
-
-            70% {
-                box-shadow: 0 0 0 10px rgba(26, 158, 110, 0);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(26, 158, 110, 0);
-            }
-        }
-
-        .payment-banner {
-            background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%);
-            border-radius: 14px;
-            padding: 22px 24px;
-            margin-top: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .payment-banner .pb-text h4 {
-            font-family: 'Sora', sans-serif;
-            color: #fff;
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .payment-banner .pb-text p {
-            color: rgba(255, 255, 255, 0.72);
-            font-size: 0.82rem;
-        }
-
-        .pay-btn {
-            background: #fff;
-            color: #1d4ed8;
-            border: none;
-            padding: 11px 22px;
-            border-radius: 10px;
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 0.88rem;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: transform 0.15s, box-shadow 0.15s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .pay-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .pay-btn:active {
-            transform: translateY(0);
-        }
-
-        .timeline {
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid var(--border);
-        }
-
-        .timeline h3 {
-            font-family: 'Sora', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 18px;
-        }
-
-        .tl-item {
-            display: flex;
-            gap: 14px;
-            align-items: flex-start;
-            margin-bottom: 16px;
-            animation: fadeSlideIn 0.4s ease both;
-        }
-
-        @keyframes fadeSlideIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .tl-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--green);
-            margin-top: 5px;
-            flex-shrink: 0;
-        }
-
-        .tl-dot.idle {
-            background: var(--step-idle);
-        }
-
-        .tl-content p {
-            font-size: 0.88rem;
-            font-weight: 500;
-            color: var(--text);
-        }
-
-        .tl-content span {
-            font-size: 0.75rem;
-            color: var(--muted);
-        }
-
-        .shopper-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px 20px;
-            background: var(--green-lite);
-            border-radius: 12px;
-            margin-top: 24px;
-        }
-
-        .shopper-av {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--green);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-
-        .shopper-av img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 50%;
-        }
-
-        .shopper-info p {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--text);
-        }
-
-        .shopper-info span {
-            font-size: 0.75rem;
-            color: var(--muted);
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(80px);
-            background: #1a1a2e;
-            color: #fff;
-            padding: 12px 22px;
-            border-radius: 10px;
-            font-size: 0.88rem;
-            font-weight: 500;
-            z-index: 9999;
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            opacity: 0;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-
-        .toast.success {
-            background: var(--green);
-        }
-
-        .toast.error {
-            background: var(--red);
-        }
-
-        @media (max-width: 500px) {
-            .card-inner {
-                padding: 22px 18px;
-            }
-
-            .order-summary {
-                grid-template-columns: 1fr;
-            }
-
-            .summary-item.full {
-                grid-column: 1;
-            }
-
-            .step-label {
-                font-size: 0.62rem;
-            }
-
-            .track-header {
-                flex-direction: column;
-                gap: 12px;
-            }
-
-            .payment-banner {
-                flex-direction: column;
-            }
-        }
-    </style>
+ <meta charset="UTF-8">
+ <title>Track Your Order | BuyForMe</title>
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap"
+ rel="stylesheet">
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ <link rel="stylesheet" href="css/brand.css">
+ <link rel="stylesheet" href="css/responsive.css">
+ <link rel="icon" href="images/logo.png" type="image/png">
+
+ <style>
+ :root {
+ --green: #1a9e6e;
+ --green-lite: #e8f7f2;
+ --blue: #2563eb;
+ --amber: #d97706;
+ --red: #dc2626;
+ --bg: #f0f4f3;
+ --card: #ffffff;
+ --text: #1a1a2e;
+ --muted: #6b7280;
+ --border: #e5e7eb;
+ --step-done: #1a9e6e;
+ --step-idle: #d1d5db;
+ }
+
+ * {
+ box-sizing: border-box;
+ margin: 0;
+ padding: 0;
+ }
+
+ body {
+ font-family: 'DM Sans', sans-serif;
+ background: var(--bg);
+ color: var(--text);
+ min-height: 100vh;
+ }
+
+ .navbar {
+ background: #fff;
+ border-bottom: 1px solid var(--border);
+ padding: 0 24px;
+ height: 64px;
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ position: sticky;
+ top: 0;
+ z-index: 100;
+ }
+
+ .logo {
+ font-family: 'Sora', sans-serif;
+ font-weight: 700;
+ font-size: 1.35rem;
+ color: var(--green);
+ letter-spacing: -0.5px;
+ }
+
+ .back-btn {
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ text-decoration: none;
+ color: var(--muted);
+ font-size: 0.9rem;
+ font-weight: 500;
+ border: 1px solid var(--border);
+ padding: 7px 14px;
+ border-radius: 8px;
+ transition: all 0.2s;
+ }
+
+ .back-btn:hover {
+ color: var(--green);
+ border-color: var(--green);
+ }
+
+ .page {
+ max-width: 660px;
+ margin: 0 auto;
+ padding: 36px 20px 60px;
+ }
+
+ .state-box {
+ background: var(--card);
+ border-radius: 18px;
+ padding: 60px 30px;
+ text-align: center;
+ box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+ }
+
+ .state-box .icon {
+ font-size: 2.5rem;
+ margin-bottom: 14px;
+ }
+
+ .state-box p {
+ color: var(--muted);
+ font-size: 1rem;
+ }
+
+ .spinner {
+ width: 40px;
+ height: 40px;
+ border: 3px solid var(--border);
+ border-top-color: var(--green);
+ border-radius: 50%;
+ animation: spin 0.8s linear infinite;
+ margin: 0 auto 16px;
+ }
+
+ @keyframes spin {
+ to {
+ transform: rotate(360deg);
+ }
+ }
+
+ .tracking-card {
+ background: var(--card);
+ border-radius: 20px;
+ box-shadow: 0 4px 30px rgba(0, 0, 0, 0.07);
+ overflow: hidden;
+ }
+
+ .card-accent {
+ height: 6px;
+ background: linear-gradient(90deg, var(--green), #059669, #2563eb);
+ }
+
+ .card-inner {
+ padding: 32px;
+ }
+
+ .track-header {
+ display: flex;
+ justify-content: space-between;
+ align-items: flex-start;
+ margin-bottom: 28px;
+ }
+
+ .track-header h2 {
+ font-family: 'Sora', sans-serif;
+ font-size: 1.4rem;
+ font-weight: 700;
+ color: var(--text);
+ }
+
+ .order-ref {
+ font-size: 0.8rem;
+ color: var(--muted);
+ margin-top: 4px;
+ }
+
+ .status-badge {
+ display: inline-flex;
+ align-items: center;
+ gap: 6px;
+ padding: 6px 14px;
+ border-radius: 20px;
+ font-size: 0.78rem;
+ font-weight: 600;
+ text-transform: capitalize;
+ white-space: nowrap;
+ }
+
+ .status-badge::before {
+ content: '';
+ width: 7px;
+ height: 7px;
+ border-radius: 50%;
+ background: currentColor;
+ opacity: 0.7;
+ }
+
+ .badge-pending {
+ background: #fef3c7;
+ color: #b45309;
+ }
+
+ .badge-accepted {
+ background: #dbeafe;
+ color: #1d4ed8;
+ }
+
+ .badge-payment {
+ background: #fce7f3;
+ color: #be185d;
+ }
+
+ .badge-paid {
+ background: #d1fae5;
+ color: #065f46;
+ }
+
+ .badge-purchased {
+ background: #ede9fe;
+ color: #5b21b6;
+ }
+
+ .badge-delivering {
+ background: #fed7aa;
+ color: #9a3412;
+ }
+
+ .badge-delivered {
+ background: #d1fae5;
+ color: #065f46;
+ }
+
+ .order-summary {
+ background: var(--bg);
+ border-radius: 14px;
+ padding: 20px;
+ margin-bottom: 32px;
+ display: grid;
+ grid-template-columns: 1fr 1fr;
+ gap: 14px;
+ }
+
+ .summary-item label {
+ display: block;
+ font-size: 0.72rem;
+ font-weight: 600;
+ color: var(--muted);
+ text-transform: uppercase;
+ letter-spacing: 0.05em;
+ margin-bottom: 4px;
+ }
+
+ .summary-item span {
+ font-size: 0.95rem;
+ font-weight: 500;
+ color: var(--text);
+ }
+
+ .summary-item.full {
+ grid-column: 1 / -1;
+ }
+
+ .progress-section {
+ margin-bottom: 12px;
+ }
+
+ .progress-section h3 {
+ font-family: 'Sora', sans-serif;
+ font-size: 0.85rem;
+ font-weight: 600;
+ color: var(--muted);
+ text-transform: uppercase;
+ letter-spacing: 0.06em;
+ margin-bottom: 28px;
+ }
+
+ .steps-track {
+ position: relative;
+ display: flex;
+ justify-content: space-between;
+ align-items: flex-start;
+ }
+
+ .steps-track::before {
+ content: '';
+ position: absolute;
+ top: 19px;
+ left: 19px;
+ right: 19px;
+ height: 3px;
+ background: var(--step-idle);
+ border-radius: 4px;
+ z-index: 0;
+ }
+
+ .progress-fill-line {
+ position: absolute;
+ top: 19px;
+ left: 19px;
+ height: 3px;
+ background: linear-gradient(90deg, var(--green), #059669);
+ border-radius: 4px;
+ z-index: 1;
+ transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+ width: 0%;
+ }
+
+ .step {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ gap: 10px;
+ position: relative;
+ z-index: 2;
+ width: 20%;
+ }
+
+ .step-icon {
+ width: 40px;
+ height: 40px;
+ border-radius: 50%;
+ background: #fff;
+ border: 2.5px solid var(--step-idle);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-size: 0.9rem;
+ color: var(--step-idle);
+ transition: all 0.4s ease;
+ }
+
+ .step-label {
+ font-size: 0.7rem;
+ font-weight: 600;
+ color: var(--muted);
+ text-align: center;
+ line-height: 1.3;
+ transition: color 0.3s;
+ }
+
+ .step.done .step-icon {
+ background: var(--step-done);
+ border-color: var(--step-done);
+ color: #fff;
+ box-shadow: 0 0 0 5px rgba(26, 158, 110, 0.15);
+ }
+
+ .step.done .step-label {
+ color: var(--step-done);
+ }
+
+ .step.current .step-icon {
+ background: var(--step-done);
+ border-color: var(--step-done);
+ color: #fff;
+ animation: pulse-ring 1.8s ease-out infinite;
+ }
+
+ .step.current .step-label {
+ color: var(--step-done);
+ font-weight: 700;
+ }
+
+ @keyframes pulse-ring {
+ 0% {
+ box-shadow: 0 0 0 0 rgba(26, 158, 110, 0.5);
+ }
+
+ 70% {
+ box-shadow: 0 0 0 10px rgba(26, 158, 110, 0);
+ }
+
+ 100% {
+ box-shadow: 0 0 0 0 rgba(26, 158, 110, 0);
+ }
+ }
+
+ .payment-banner {
+ background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%);
+ border-radius: 14px;
+ padding: 22px 24px;
+ margin-top: 28px;
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 16px;
+ flex-wrap: wrap;
+ }
+
+ .payment-banner .pb-text h4 {
+ font-family: 'Sora', sans-serif;
+ color: #fff;
+ font-size: 1rem;
+ font-weight: 600;
+ margin-bottom: 4px;
+ }
+
+ .payment-banner .pb-text p {
+ color: rgba(255, 255, 255, 0.72);
+ font-size: 0.82rem;
+ }
+
+ .pay-btn {
+ background: #fff;
+ color: #1d4ed8;
+ border: none;
+ padding: 11px 22px;
+ border-radius: 10px;
+ font-family: 'Sora', sans-serif;
+ font-weight: 700;
+ font-size: 0.88rem;
+ cursor: pointer;
+ white-space: nowrap;
+ transition: transform 0.15s, box-shadow 0.15s;
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ }
+
+ .pay-btn:hover {
+ transform: translateY(-1px);
+ box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+ }
+
+ .pay-btn:active {
+ transform: translateY(0);
+ }
+
+ .timeline {
+ margin-top: 32px;
+ padding-top: 24px;
+ border-top: 1px solid var(--border);
+ }
+
+ .timeline h3 {
+ font-family: 'Sora', sans-serif;
+ font-size: 0.85rem;
+ font-weight: 600;
+ color: var(--muted);
+ text-transform: uppercase;
+ letter-spacing: 0.06em;
+ margin-bottom: 18px;
+ }
+
+ .tl-item {
+ display: flex;
+ gap: 14px;
+ align-items: flex-start;
+ margin-bottom: 16px;
+ animation: fadeSlideIn 0.4s ease both;
+ }
+
+ @keyframes fadeSlideIn {
+ from {
+ opacity: 0;
+ transform: translateY(8px);
+ }
+
+ to {
+ opacity: 1;
+ transform: translateY(0);
+ }
+ }
+
+ .tl-dot {
+ width: 10px;
+ height: 10px;
+ border-radius: 50%;
+ background: var(--green);
+ margin-top: 5px;
+ flex-shrink: 0;
+ }
+
+ .tl-dot.idle {
+ background: var(--step-idle);
+ }
+
+ .tl-content p {
+ font-size: 0.88rem;
+ font-weight: 500;
+ color: var(--text);
+ }
+
+ .tl-content span {
+ font-size: 0.75rem;
+ color: var(--muted);
+ }
+
+ .shopper-row {
+ display: flex;
+ align-items: center;
+ gap: 12px;
+ padding: 16px 20px;
+ background: var(--green-lite);
+ border-radius: 12px;
+ margin-top: 24px;
+ }
+
+ .shopper-av {
+ width: 40px;
+ height: 40px;
+ border-radius: 50%;
+ background: var(--green);
+ color: #fff;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-family: 'Sora', sans-serif;
+ font-weight: 700;
+ font-size: 1rem;
+ flex-shrink: 0;
+ }
+
+ .shopper-av img {
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+ border-radius: 50%;
+ }
+
+ .shopper-info p {
+ font-size: 0.88rem;
+ font-weight: 600;
+ color: var(--text);
+ }
+
+ .shopper-info span {
+ font-size: 0.75rem;
+ color: var(--muted);
+ }
+
+ .toast {
+ position: fixed;
+ bottom: 24px;
+ left: 50%;
+ transform: translateX(-50%) translateY(80px);
+ background: #1a1a2e;
+ color: #fff;
+ padding: 12px 22px;
+ border-radius: 10px;
+ font-size: 0.88rem;
+ font-weight: 500;
+ z-index: 9999;
+ transition: transform 0.3s ease, opacity 0.3s ease;
+ opacity: 0;
+ pointer-events: none;
+ white-space: nowrap;
+ }
+
+ .toast.show {
+ transform: translateX(-50%) translateY(0);
+ opacity: 1;
+ }
+
+ .toast.success {
+ background: var(--green);
+ }
+
+ .toast.error {
+ background: var(--red);
+ }
+
+ @media (max-width: 500px) {
+ .card-inner {
+ padding: 22px 18px;
+ }
+
+ .order-summary {
+ grid-template-columns: 1fr;
+ }
+
+ .summary-item.full {
+ grid-column: 1;
+ }
+
+ .step-label {
+ font-size: 0.62rem;
+ }
+
+ .track-header {
+ flex-direction: column;
+ gap: 12px;
+ }
+
+ .payment-banner {
+ flex-direction: column;
+ }
+ }
+ </style>
 </head>
 
 <body>
 
-    <header class="navbar">
-        <a href="index.html" class="brand-link logo"><img src="images/logo.png" alt="BuyForMe" class="brand-logo"></a>
-        <a href="my-orders.html" class="back-btn">
-            <i class="fas fa-arrow-left"></i> My Orders
-        </a>
-    </header>
+ <header class="navbar">
+ <a href="index.html" class="brand-link logo"><img src="images/logo.png" alt="BuyForMe" class="brand-logo"></a>
+ <a href="my-orders.html" class="back-btn">
+ <i class="fas fa-arrow-left"></i> My Orders
+ </a>
+ </header>
 
-    <main class="page">
+ <main class="page">
 
-        <div class="state-box" id="loadingState">
-            <div class="spinner"></div>
-            <p>Loading your order…</p>
-        </div>
+ <div class="state-box" id="loadingState">
+ <div class="spinner"></div>
+ <p>Loading your order…</p>
+ </div>
 
-        <div class="state-box" id="errorState" style="display:none">
-            <div class="icon">⚠️</div>
-            <p id="errorMsg">Something went wrong. Please try again.</p>
-        </div>
+ <div class="state-box" id="errorState" style="display:none">
+ <div class="icon">⚠️</div>
+ <p id="errorMsg">Something went wrong. Please try again.</p>
+ </div>
 
-        <div class="tracking-card" id="trackingCard" style="display:none">
-            <div class="card-accent"></div>
-            <div class="card-inner">
+ <div class="tracking-card" id="trackingCard" style="display:none">
+ <div class="card-accent"></div>
+ <div class="card-inner">
 
-                <div class="track-header">
-                    <div>
-                        <h2>Order Tracking</h2>
-                        <div class="order-ref" id="orderRef">—</div>
-                    </div>
-                    <div class="status-badge" id="statusBadge">—</div>
-                </div>
+ <div class="track-header">
+ <div>
+ <h2>Order Tracking</h2>
+ <div class="order-ref" id="orderRef">N/A</div>
+ </div>
+ <div class="status-badge" id="statusBadge">N/A</div>
+ </div>
 
-                <div class="order-summary">
-                    <div class="summary-item">
-                        <label>Product</label>
-                        <span id="sumProduct">—</span>
-                    </div>
-                    <div class="summary-item">
-                        <label>Budget</label>
-                        <span id="sumBudget">—</span>
-                    </div>
-                    <div class="summary-item">
-                        <label>Destination</label>
-                        <span id="sumAddress">—</span>
-                    </div>
-                    <div class="summary-item">
-                        <label>Placed On</label>
-                        <span id="sumDate">—</span>
-                    </div>
-                    <div class="summary-item full" id="sumNotesWrap" style="display:none">
-                        <label>Notes</label>
-                        <span id="sumNotes">—</span>
-                    </div>
-                </div>
+ <div class="order-summary">
+ <div class="summary-item">
+ <label>Product</label>
+ <span id="sumProduct">N/A</span>
+ </div>
+ <div class="summary-item">
+ <label>Budget</label>
+ <span id="sumBudget">N/A</span>
+ </div>
+ <div class="summary-item">
+ <label>Destination</label>
+ <span id="sumAddress">N/A</span>
+ </div>
+ <div class="summary-item">
+ <label>Placed On</label>
+ <span id="sumDate">N/A</span>
+ </div>
+ <div class="summary-item full" id="sumNotesWrap" style="display:none">
+ <label>Notes</label>
+ <span id="sumNotes">N/A</span>
+ </div>
+ </div>
 
-                <div class="progress-section">
-                    <h3>Shipment Progress</h3>
-                    <div class="steps-track">
-                        <div class="progress-fill-line" id="progressLine"></div>
-                        <div class="step" id="step1">
-                            <div class="step-icon"><i class="fas fa-file-alt"></i></div>
-                            <div class="step-label">Sent</div>
-                        </div>
-                        <div class="step" id="step2">
-                            <div class="step-icon"><i class="fas fa-check-circle"></i></div>
-                            <div class="step-label">Accepted</div>
-                        </div>
-                        <div class="step" id="step3">
-                            <div class="step-icon"><i class="fas fa-credit-card"></i></div>
-                            <div class="step-label">Paid</div>
-                        </div>
-                        <div class="step" id="step4">
-                            <div class="step-icon"><i class="fas fa-shopping-bag"></i></div>
-                            <div class="step-label">Bought</div>
-                        </div>
-                        <div class="step" id="step5">
-                            <div class="step-icon"><i class="fas fa-truck"></i></div>
-                            <div class="step-label">Shipping</div>
-                        </div>
-                        <div class="step" id="step6">
-                            <div class="step-icon"><i class="fas fa-home"></i></div>
-                            <div class="step-label">Arrived</div>
-                        </div>
-                    </div>
-                </div>
+ <div class="progress-section">
+ <h3>Shipment Progress</h3>
+ <div class="steps-track">
+ <div class="progress-fill-line" id="progressLine"></div>
+ <div class="step" id="step1">
+ <div class="step-icon"><i class="fas fa-file-alt"></i></div>
+ <div class="step-label">Sent</div>
+ </div>
+ <div class="step" id="step2">
+ <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+ <div class="step-label">Accepted</div>
+ </div>
+ <div class="step" id="step3">
+ <div class="step-icon"><i class="fas fa-credit-card"></i></div>
+ <div class="step-label">Paid</div>
+ </div>
+ <div class="step" id="step4">
+ <div class="step-icon"><i class="fas fa-shopping-bag"></i></div>
+ <div class="step-label">Bought</div>
+ </div>
+ <div class="step" id="step5">
+ <div class="step-icon"><i class="fas fa-truck"></i></div>
+ <div class="step-label">Shipping</div>
+ </div>
+ <div class="step" id="step6">
+ <div class="step-icon"><i class="fas fa-home"></i></div>
+ <div class="step-label">Arrived</div>
+ </div>
+ </div>
+ </div>
 
-                <div class="shopper-row" id="shopperRow" style="display:none">
-                    <div class="shopper-av" id="shopperAv">?</div>
-                    <div class="shopper-info">
-                        <p id="shopperName">—</p>
-                        <span>Your Shopper</span>
-                    </div>
-                </div>
+ <div class="shopper-row" id="shopperRow" style="display:none">
+ <div class="shopper-av" id="shopperAv">?</div>
+ <div class="shopper-info">
+ <p id="shopperName">N/A</p>
+ <span>Your Shopper</span>
+ </div>
+ </div>
 
-                <div class="timeline">
-                    <h3>Activity Log</h3>
-                    <div id="timelineList"></div>
-                </div>
+ <div class="timeline">
+ <h3>Activity Log</h3>
+ <div id="timelineList"></div>
+ </div>
 
-            </div>
-        </div>
+ </div>
+ </div>
 
-    </main>
+ </main>
 
-    <div class="toast" id="toast"></div>
+ <div class="toast" id="toast"></div>
 
-    <!-- All logic lives in tracking.js -->
-    <script type="module" src="css/js/tracking.js"></script>
+ <script type="module" src="css/js/tracking.js"></script>
 
 </body>
 

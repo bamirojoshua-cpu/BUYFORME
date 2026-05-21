@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Send Request — BuyForMe</title>
+    <title>Send Request | BuyForMe</title>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="css/buyer-theme.css">
@@ -25,7 +25,7 @@
 
         <header class="buyer-page-head buyer-animate-in">
             <h1>Send purchase request</h1>
-            <p>Three quick steps — your shopper confirms before any payment.</p>
+            <p>Three quick steps: your shopper confirms before any payment.</p>
         </header>
 
         <nav class="request-wizard-steps" id="wizardSteps" aria-label="Request steps">
@@ -57,7 +57,6 @@
                 <div class="request-error" id="errorMsg" role="alert"></div>
 
                 <div id="formState">
-                    <!-- Step 1: Product -->
                     <section class="wizard-panel active buyer-card" data-panel="1" aria-labelledby="step1-title">
                         <h2 class="form-card__title" id="step1-title">
                             <i class="fas fa-box" aria-hidden="true"></i> What do you want?
@@ -93,16 +92,14 @@
                         <div class="form-group">
                             <label for="notes">Details for your shopper</label>
                             <textarea id="notes" class="buyer-textarea" rows="4" placeholder="Size, colour, model, links, alternatives…"></textarea>
-                            <p class="field-hint"><span id="notesCount">0 / 500</span> — more detail helps them get it right.</p>
+                            <p class="field-hint"><span id="notesCount">0 / 500</span>: more detail helps them get it right.</p>
                         </div>
                     </section>
-
-                    <!-- Step 2: Delivery -->
                     <section class="wizard-panel buyer-card" data-panel="2" hidden aria-labelledby="step2-title">
                         <h2 class="form-card__title" id="step2-title">
                             <i class="fas fa-truck" aria-hidden="true"></i> Where should it go?
                         </h2>
-                        <p class="form-card__sub">We pre-fill from your account when possible — edit if needed.</p>
+                        <p class="form-card__sub">We pre-fill from your account when possible: edit if needed.</p>
                         <div class="form-group">
                             <label for="address">Full delivery address <span class="req">*</span></label>
                             <input type="text" id="address" class="buyer-input" placeholder="Street, city, state">
@@ -129,8 +126,6 @@
                             </select>
                         </div>
                     </section>
-
-                    <!-- Step 3: Budget & review -->
                     <section class="wizard-panel buyer-card" data-panel="3" hidden aria-labelledby="step3-title">
                         <h2 class="form-card__title" id="step3-title">
                             <i class="fas fa-wallet" aria-hidden="true"></i> Budget &amp; review
@@ -148,25 +143,25 @@
                                 </select>
                                 <input type="number" id="budget" class="buyer-input" placeholder="0.00" min="1" step="0.01">
                             </div>
-                            <p class="field-hint">Product cost only — fees are calculated below.</p>
+                            <p class="field-hint">Product cost only: fees are calculated below.</p>
                         </div>
 
                         <div class="price-breakdown" id="priceBreakdown">
                             <div class="price-row">
                                 <span>Product budget</span>
-                                <span id="breakdownBudget">—</span>
+                                <span id="breakdownBudget"></span>
                             </div>
                             <div class="price-row">
                                 <span>Shopper fee <span id="breakdownFeePercent"></span></span>
-                                <span id="breakdownShopperFee">—</span>
+                                <span id="breakdownShopperFee"></span>
                             </div>
                             <div class="price-row">
                                 <span>BuyForMe platform <span class="fee-badge">5%</span></span>
-                                <span id="breakdownPlatformFee">—</span>
+                                <span id="breakdownPlatformFee"></span>
                             </div>
                             <div class="price-row price-row--total">
                                 <span>Estimated total</span>
-                                <span id="breakdownTotal">—</span>
+                                <span id="breakdownTotal"></span>
                             </div>
                         </div>
 
@@ -204,18 +199,18 @@
 
             <aside class="request-aside" id="requestAside">
                 <div class="shopper-preview buyer-card">
-                    <div class="shopper-avatar" id="previewAvatar">—</div>
+                    <div class="shopper-avatar" id="previewAvatar"></div>
                     <div class="shopper-preview__meta">
                         <h3 id="previewName">Loading…</h3>
-                        <p id="previewLocation">—</p>
-                        <p class="shopper-preview__fee"><span id="previewFee">—</span> service fee</p>
+                        <p id="previewLocation"></p>
+                        <p class="shopper-preview__fee"><span id="previewFee"></span> service fee</p>
                     </div>
                 </div>
 
                 <div class="request-summary-card buyer-card">
                     <h3 class="request-summary-card__title"><i class="fas fa-list-check" aria-hidden="true"></i> Your request</h3>
                     <ul class="request-summary-list" id="requestSummaryList">
-                        <li class="request-summary-empty">Fill in the form — your summary updates here.</li>
+                        <li class="request-summary-empty">Fill in the form: your summary updates here.</li>
                     </ul>
                 </div>
 
@@ -223,30 +218,30 @@
                     <h3 class="price-breakdown__title">Cost estimate</h3>
                     <div class="price-row">
                         <span>Product</span>
-                        <span id="breakdownBudgetAside">—</span>
+                        <span id="breakdownBudgetAside"></span>
                     </div>
                     <div class="price-row">
                         <span>Shopper <span id="breakdownFeePercentAside"></span></span>
-                        <span id="breakdownShopperFeeAside">—</span>
+                        <span id="breakdownShopperFeeAside"></span>
                     </div>
                     <div class="price-row">
                         <span>Platform <span class="fee-badge">5%</span></span>
-                        <span id="breakdownPlatformFeeAside">—</span>
+                        <span id="breakdownPlatformFeeAside"></span>
                     </div>
                     <div class="price-row price-row--total">
                         <span>Total</span>
-                        <span id="breakdownTotalAside">—</span>
+                        <span id="breakdownTotalAside"></span>
                     </div>
                 </div>
 
                 <div class="request-how buyer-card">
                     <h3 class="request-how__title">What happens next</h3>
                     <ol class="request-how__list">
-                        <li><strong>Sent</strong> — Shopper gets your request</li>
-                        <li><strong>Accept</strong> — They confirm they can buy it</li>
-                        <li><strong>Pay</strong> — You pay securely via BuyForMe</li>
-                        <li><strong>Shop</strong> — Photos/video before purchase</li>
-                        <li><strong>Deliver</strong> — Item ships to your address</li>
+                        <li><strong>Sent</strong>: Shopper gets your request</li>
+                        <li><strong>Accept</strong>: They confirm they can buy it</li>
+                        <li><strong>Pay</strong>: You pay securely via BuyForMe</li>
+                        <li><strong>Shop</strong>: Photos/video before purchase</li>
+                        <li><strong>Deliver</strong>: Item ships to your address</li>
                     </ol>
                 </div>
             </aside>

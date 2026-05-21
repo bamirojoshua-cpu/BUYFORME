@@ -2,420 +2,408 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BuyForMe | Verify Your Identity</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="css/brand.css">
-    <link rel="stylesheet" href="css/responsive.css">
-    <link rel="icon" href="images/logo.png" type="image/png">
-    <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>BuyForMe | Verify Your Identity</title>
+ <link
+ href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&display=swap"
+ rel="stylesheet">
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ <link rel="stylesheet" href="css/brand.css">
+ <link rel="stylesheet" href="css/responsive.css">
+ <link rel="icon" href="images/logo.png" type="image/png">
+ <style>
+ *,
+ *::before,
+ *::after {
+ box-sizing: border-box;
+ margin: 0;
+ padding: 0;
+ }
 
-        :root {
-            --green: #1a9e6e;
-            --green-dark: #127a54;
-            --green-light: #e6f7f1;
-            --amber: #f59e0b;
-            --amber-light: #fef3c7;
-            --red: #ef4444;
-            --text: #0f1c18;
-            --text-muted: #5a7268;
-            --border: #dde8e4;
-            --bg: #f4f8f6;
-            --white: #ffffff;
-            --radius: 14px;
-        }
+ :root {
+ --green: #1a9e6e;
+ --green-dark: #127a54;
+ --green-light: #e6f7f1;
+ --amber: #f59e0b;
+ --amber-light: #fef3c7;
+ --red: #ef4444;
+ --text: #0f1c18;
+ --text-muted: #5a7268;
+ --border: #dde8e4;
+ --bg: #f4f8f6;
+ --white: #ffffff;
+ --radius: 14px;
+ }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
+ body {
+ font-family: 'Inter', sans-serif;
+ background: var(--bg);
+ color: var(--text);
+ min-height: 100vh;
+ }
 
-        /* ── NAVBAR ── */
-        .navbar {
-            background: var(--white);
-            border-bottom: 1px solid var(--border);
-            padding: 0 32px;
-            height: 62px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+ /* NAVBAR */
+ .navbar {
+ background: var(--white);
+ border-bottom: 1px solid var(--border);
+ padding: 0 32px;
+ height: 62px;
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ }
 
-        .logo {
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: var(--green);
-            text-decoration: none;
-        }
+ .logo {
+ font-family: 'Sora', sans-serif;
+ font-weight: 700;
+ font-size: 1.2rem;
+ color: var(--green);
+ text-decoration: none;
+ }
 
-        .logout-btn {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            background: none;
-            border: 1px solid var(--border);
-            padding: 6px 14px;
-            border-radius: 7px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.15s;
-        }
+ .logout-btn {
+ font-size: 0.82rem;
+ color: var(--text-muted);
+ background: none;
+ border: 1px solid var(--border);
+ padding: 6px 14px;
+ border-radius: 7px;
+ cursor: pointer;
+ text-decoration: none;
+ transition: all 0.15s;
+ }
 
-        .logout-btn:hover {
-            border-color: var(--red);
-            color: var(--red);
-        }
+ .logout-btn:hover {
+ border-color: var(--red);
+ color: var(--red);
+ }
 
-        /* ── PAGE ── */
-        .page {
-            max-width: 620px;
-            margin: 0 auto;
-            padding: 48px 24px 60px;
-        }
+ /* PAGE */
+ .page {
+ max-width: 620px;
+ margin: 0 auto;
+ padding: 48px 24px 60px;
+ }
 
-        /* ── STEPS ── */
-        .steps {
-            display: flex;
-            align-items: center;
-            margin-bottom: 40px;
-        }
+ /* STEPS */
+ .steps {
+ display: flex;
+ align-items: center;
+ margin-bottom: 40px;
+ }
 
-        .step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            flex: 1;
-        }
+ .step {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ gap: 6px;
+ flex: 1;
+ }
 
-        .step-circle {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--border);
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Sora', sans-serif;
-        }
+ .step-circle {
+ width: 32px;
+ height: 32px;
+ border-radius: 50%;
+ background: var(--border);
+ color: var(--text-muted);
+ font-size: 0.8rem;
+ font-weight: 700;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-family: 'Sora', sans-serif;
+ }
 
-        .step.done .step-circle {
-            background: var(--green-light);
-            color: var(--green-dark);
-        }
+ .step.done .step-circle {
+ background: var(--green-light);
+ color: var(--green-dark);
+ }
 
-        .step.active .step-circle {
-            background: var(--green);
-            color: white;
-        }
+ .step.active .step-circle {
+ background: var(--green);
+ color: white;
+ }
 
-        .step-label {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            font-weight: 500;
-            text-align: center;
-        }
+ .step-label {
+ font-size: 0.72rem;
+ color: var(--text-muted);
+ font-weight: 500;
+ text-align: center;
+ }
 
-        .step.active .step-label {
-            color: var(--green-dark);
-        }
+ .step.active .step-label {
+ color: var(--green-dark);
+ }
 
-        .step-line {
-            flex: 1;
-            height: 1.5px;
-            background: var(--border);
-            margin-bottom: 22px;
-        }
+ .step-line {
+ flex: 1;
+ height: 1.5px;
+ background: var(--border);
+ margin-bottom: 22px;
+ }
 
-        .step-line.done {
-            background: var(--green);
-        }
+ .step-line.done {
+ background: var(--green);
+ }
 
-        /* ── HEADER ── */
-        .verify-header {
-            text-align: center;
-            margin-bottom: 32px;
-        }
+ /* HEADER */
+ .verify-header {
+ text-align: center;
+ margin-bottom: 32px;
+ }
 
-        .shield-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: var(--green-light);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.6rem;
-            color: var(--green);
-            margin: 0 auto 16px;
-        }
+ .shield-icon {
+ width: 64px;
+ height: 64px;
+ border-radius: 50%;
+ background: var(--green-light);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-size: 1.6rem;
+ color: var(--green);
+ margin: 0 auto 16px;
+ }
 
-        .verify-header h1 {
-            font-family: 'Sora', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
+ .verify-header h1 {
+ font-family: 'Sora', sans-serif;
+ font-size: 1.5rem;
+ font-weight: 700;
+ margin-bottom: 8px;
+ }
 
-        .verify-header p {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            line-height: 1.7;
-            max-width: 480px;
-            margin: 0 auto;
-        }
+ .verify-header p {
+ font-size: 0.9rem;
+ color: var(--text-muted);
+ line-height: 1.7;
+ max-width: 480px;
+ margin: 0 auto;
+ }
 
-        /* ── NOTICE ── */
-        .notice-box {
-            background: var(--amber-light);
-            border: 1px solid #fcd34d;
-            border-radius: 10px;
-            padding: 14px 18px;
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-            margin-bottom: 24px;
-            font-size: 0.85rem;
-            color: #92400e;
-            line-height: 1.6;
-        }
+ /* NOTICE */
+ .notice-box {
+ background: var(--amber-light);
+ border: 1px solid #fcd34d;
+ border-radius: 10px;
+ padding: 14px 18px;
+ display: flex;
+ gap: 12px;
+ align-items: flex-start;
+ margin-bottom: 24px;
+ font-size: 0.85rem;
+ color: #92400e;
+ line-height: 1.6;
+ }
 
-        .notice-box i {
-            margin-top: 2px;
-            flex-shrink: 0;
-        }
+ .notice-box i {
+ margin-top: 2px;
+ flex-shrink: 0;
+ }
 
-        /* ── UPLOAD CARDS ── */
-        .upload-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
+ /* UPLOAD CARDS */
+ .upload-list {
+ display: flex;
+ flex-direction: column;
+ gap: 12px;
+ margin-bottom: 24px;
+ }
 
-        .upload-card {
-            background: var(--white);
-            border: 1.5px dashed var(--border);
-            border-radius: var(--radius);
-            padding: 18px 20px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            cursor: pointer;
-            transition: all 0.15s;
-            text-decoration: none;
-            color: inherit;
-        }
+ .upload-card {
+ background: var(--white);
+ border: 1.5px dashed var(--border);
+ border-radius: var(--radius);
+ padding: 18px 20px;
+ display: flex;
+ align-items: center;
+ gap: 16px;
+ cursor: pointer;
+ transition: all 0.15s;
+ text-decoration: none;
+ color: inherit;
+ }
 
-        .upload-card:hover {
-            border-color: var(--green);
-            background: var(--green-light);
-        }
+ .upload-card:hover {
+ border-color: var(--green);
+ background: var(--green-light);
+ }
 
-        .upload-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            background: var(--bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            color: var(--text-muted);
-            flex-shrink: 0;
-        }
+ .upload-icon {
+ width: 44px;
+ height: 44px;
+ border-radius: 10px;
+ background: var(--bg);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-size: 1.1rem;
+ color: var(--text-muted);
+ flex-shrink: 0;
+ }
 
-        .upload-info {
-            flex: 1;
-        }
+ .upload-info {
+ flex: 1;
+ }
 
-        .upload-title {
-            font-family: 'Sora', sans-serif;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 3px;
-        }
+ .upload-title {
+ font-family: 'Sora', sans-serif;
+ font-size: 0.9rem;
+ font-weight: 600;
+ margin-bottom: 3px;
+ }
 
-        .upload-sub {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-        }
+ .upload-sub {
+ font-size: 0.78rem;
+ color: var(--text-muted);
+ }
 
-        .upload-required {
-            color: var(--red);
-            font-weight: 600;
-        }
+ .upload-required {
+ color: var(--red);
+ font-weight: 600;
+ }
 
-        .upload-action {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+ .upload-action {
+ font-size: 0.78rem;
+ color: var(--text-muted);
+ white-space: nowrap;
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ }
 
-        /* ── SUBMIT ── */
-        .btn-submit {
-            width: 100%;
-            padding: 14px;
-            background: var(--green);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Sora', sans-serif;
-            transition: background 0.15s;
-            margin-bottom: 16px;
-        }
+ /* SUBMIT */
+ .btn-submit {
+ width: 100%;
+ padding: 14px;
+ background: var(--green);
+ color: white;
+ border: none;
+ border-radius: 10px;
+ font-size: 0.95rem;
+ font-weight: 600;
+ cursor: pointer;
+ font-family: 'Sora', sans-serif;
+ transition: background 0.15s;
+ margin-bottom: 16px;
+ }
 
-        .btn-submit:hover {
-            background: var(--green-dark);
-        }
+ .btn-submit:hover {
+ background: var(--green-dark);
+ }
 
-        /* ── SECURITY NOTE ── */
-        .security-note {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-align: center;
-        }
+ /* SECURITY NOTE */
+ .security-note {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ gap: 8px;
+ font-size: 0.8rem;
+ color: var(--text-muted);
+ text-align: center;
+ }
 
-        .security-note i {
-            color: var(--green);
-        }
+ .security-note i {
+ color: var(--green);
+ }
 
-        /* ── RESPONSIVE ── */
-        @media (max-width: 600px) {
-            .page {
-                padding: 28px 16px 40px;
-            }
+ /* RESPONSIVE */
+ @media (max-width: 600px) {
+ .page {
+ padding: 28px 16px 40px;
+ }
 
-            .navbar {
-                padding: 0 16px;
-            }
+ .navbar {
+ padding: 0 16px;
+ }
 
-            .step-label {
-                font-size: 0.65rem;
-            }
-        }
-    </style>
+ .step-label {
+ font-size: 0.65rem;
+ }
+ }
+ </style>
 </head>
 
 <body>
+ <nav class="navbar">
+ <a href="index.html" class="brand-link logo"><img src="images/logo.png" alt="BuyForMe" class="brand-logo"></a>
+ <a href="auth.html" class="logout-btn">Log Out</a>
+ </nav>
 
-    <!-- NAVBAR -->
-    <nav class="navbar">
-        <a href="index.html" class="brand-link logo"><img src="images/logo.png" alt="BuyForMe" class="brand-logo"></a>
-        <a href="auth.html" class="logout-btn">Log Out</a>
-    </nav>
+ <div class="page">
+ <div class="steps">
+ <div class="step done">
+ <div class="step-circle">✓</div>
+ <div class="step-label">Sign Up</div>
+ </div>
+ <div class="step-line done"></div>
+ <div class="step active">
+ <div class="step-circle">2</div>
+ <div class="step-label">Verify ID</div>
+ </div>
+ <div class="step-line"></div>
+ <div class="step">
+ <div class="step-circle">3</div>
+ <div class="step-label">Get Listed</div>
+ </div>
+ </div>
+ <div class="verify-header">
+ <div class="shield-icon"><i class="fas fa-user-shield"></i></div>
+ <h1>Verify Your Identity</h1>
+ <p>To keep BuyForMe safe for African buyers, all shoppers must verify their identity and residency before
+ going live on the marketplace.</p>
+ </div>
+ <div class="notice-box">
+ <i class="fas fa-info-circle"></i>
+ <span>Verification usually takes <strong>24 to 48 hours</strong>. You'll receive an email once approved. You
+ won't appear on the marketplace until verified.</span>
+ </div>
+ <div class="upload-list">
 
-    <div class="page">
+ <label class="upload-card">
+ <div class="upload-icon"><i class="fas fa-passport"></i></div>
+ <div class="upload-info">
+ <div class="upload-title">Passport Bio-Data Page <span class="upload-required">*</span></div>
+ <div class="upload-sub">Clear photo or scan of your passport</div>
+ </div>
+ <div class="upload-action">
+ <i class="fas fa-upload"></i> Upload
+ </div>
+ <input type="file" accept="image/*,.pdf" hidden>
+ </label>
 
-        <!-- STEPS -->
-        <div class="steps">
-            <div class="step done">
-                <div class="step-circle">✓</div>
-                <div class="step-label">Sign Up</div>
-            </div>
-            <div class="step-line done"></div>
-            <div class="step active">
-                <div class="step-circle">2</div>
-                <div class="step-label">Verify ID</div>
-            </div>
-            <div class="step-line"></div>
-            <div class="step">
-                <div class="step-circle">3</div>
-                <div class="step-label">Get Listed</div>
-            </div>
-        </div>
+ <label class="upload-card">
+ <div class="upload-icon"><i class="fas fa-file-signature"></i></div>
+ <div class="upload-info">
+ <div class="upload-title"> ID <span class="upload-required">*</span></div>
+ <div class="upload-sub">Show Gov issue ID </div>
+ </div>
+ <div class="upload-action">
+ <i class="fas fa-upload"></i> Upload
+ </div>
+ <input type="file" accept="image/*,.pdf" hidden>
+ </label>
 
-        <!-- HEADER -->
-        <div class="verify-header">
-            <div class="shield-icon"><i class="fas fa-user-shield"></i></div>
-            <h1>Verify Your Identity</h1>
-            <p>To keep BuyForMe safe for African buyers, all shoppers must verify their identity and residency before
-                going live on the marketplace.</p>
-        </div>
+ <label class="upload-card">
+ <div class="upload-icon"><i class="fas fa-id-card"></i></div>
+ <div class="upload-info">
+ <div class="upload-title">Residence Permit / Local ID <span class="upload-required">*</span></div>
+ <div class="upload-sub">Front and back if available</div>
+ </div>
+ <div class="upload-action">
+ <i class="fas fa-upload"></i> Upload
+ </div>
+ <input type="file" accept="image/*,.pdf" hidden>
+ </label>
 
-        <!-- NOTICE -->
-        <div class="notice-box">
-            <i class="fas fa-info-circle"></i>
-            <span>Verification usually takes <strong>24–48 hours</strong>. You'll receive an email once approved. You
-                won't appear on the marketplace until verified.</span>
-        </div>
+ </div>
+ <button class="btn-submit">Submit Documents for Review</button>
 
-        <!-- UPLOAD CARDS -->
-        <div class="upload-list">
+ <p class="security-note">
+ <i class="fas fa-lock"></i>
+ All documents are encrypted and safe
+ </p>
 
-            <label class="upload-card">
-                <div class="upload-icon"><i class="fas fa-passport"></i></div>
-                <div class="upload-info">
-                    <div class="upload-title">Passport Bio-Data Page <span class="upload-required">*</span></div>
-                    <div class="upload-sub">Clear photo or scan of your passport</div>
-                </div>
-                <div class="upload-action">
-                    <i class="fas fa-upload"></i> Upload
-                </div>
-                <input type="file" accept="image/*,.pdf" hidden>
-            </label>
-
-            <label class="upload-card">
-                <div class="upload-icon"><i class="fas fa-file-signature"></i></div>
-                <div class="upload-info">
-                    <div class="upload-title"> ID <span class="upload-required">*</span></div>
-                    <div class="upload-sub">Show Gov issue ID </div>
-                </div>
-                <div class="upload-action">
-                    <i class="fas fa-upload"></i> Upload
-                </div>
-                <input type="file" accept="image/*,.pdf" hidden>
-            </label>
-
-            <label class="upload-card">
-                <div class="upload-icon"><i class="fas fa-id-card"></i></div>
-                <div class="upload-info">
-                    <div class="upload-title">Residence Permit / Local ID <span class="upload-required">*</span></div>
-                    <div class="upload-sub">Front and back if available</div>
-                </div>
-                <div class="upload-action">
-                    <i class="fas fa-upload"></i> Upload
-                </div>
-                <input type="file" accept="image/*,.pdf" hidden>
-            </label>
-
-        </div>
-
-        <!-- SUBMIT -->
-        <button class="btn-submit">Submit Documents for Review</button>
-
-        <p class="security-note">
-            <i class="fas fa-lock"></i>
-            All documents are encrypted and safe
-        </p>
-
-    </div>
+ </div>
 <script type="module" src="css/js/verify.js"></script>
 </body>
 
