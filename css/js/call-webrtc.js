@@ -18,6 +18,15 @@ const ICE_SERVERS = {
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun.cloudflare.com:3478" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -55,13 +64,34 @@ export class WebRTCCall {
     this.cameraEnabled = true;
     this.speakerOn = true;
     this._facingMode = "user";
+    this._videoDeviceIds = [];
+    this._videoDeviceIndex = 0;
+    this._offerSent = false;
     this._connectedSoundPlayed = false;
     this._callStartTime = null;
     this._timerInterval = null;
+    this._offerReadyTimeout = null;
+  }
+
+  _offerOptions() {
+    return {
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: this.isVideo,
+    };
   }
 
   async start() {
     this._buildOverlay();
+
+    if (!this.channelReady) {
+      try {
+        await this._connectSignaling();
+      } catch (e) {
+        alert(e.message || "Could not connect call signaling.");
+        this.end(false);
+        return;
+      }
+    }
 
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -74,28 +104,56 @@ export class WebRTCCall {
       return;
     }
 
-    this._attachLocalPreview();
+    if (this.isVideo) await this._cacheVideoDevices();
 
-    if (!this.channelReady) await this._connectSignaling();
+    this._attachLocalPreview();
     this._createPeer();
 
+    this.pc.onicecandidate = e => {
+      if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
+    };
+
     if (this.isCaller) {
-      this.pc.onicecandidate = e => {
-        if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
-      };
-      await new Promise(r => setTimeout(r, 1200));
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
-      await this._sendSignal({ type: "offer", sdp: offer });
-      this._startRingingTimeout();
+      this._offerSent = false;
+      this._offerReadyTimeout = setTimeout(() => this._sendOfferIfCaller(), 500);
     } else {
-      this.pc.onicecandidate = e => {
-        if (e.candidate) this._sendSignal({ type: "ice", candidate: e.candidate.toJSON() });
-      };
       await this._drainQueue();
     }
 
     await this._unlockAudioPlayback();
+  }
+
+  async _sendOfferIfCaller() {
+    if (!this.isCaller || this._offerSent || !this.pc || this.ended) return;
+    this._offerSent = true;
+    clearTimeout(this._offerReadyTimeout);
+    this._offerReadyTimeout = null;
+
+    try {
+      const offer = await this.pc.createOffer(this._offerOptions());
+      await this.pc.setLocalDescription(offer);
+      await this._sendSignal({ type: "offer", sdp: offer });
+      this._startRingingTimeout();
+    } catch (e) {
+      console.error("createOffer:", e);
+      this._setStatus("Could not start call");
+    }
+  }
+
+  async _cacheVideoDevices() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      this._videoDeviceIds = devices
+        .filter(d => d.kind === "videoinput" && d.deviceId)
+        .map(d => d.deviceId);
+      const currentId = this.localStream?.getVideoTracks?.()[0]?.getSettings?.()?.deviceId;
+      if (currentId) {
+        const idx = this._videoDeviceIds.indexOf(currentId);
+        if (idx >= 0) this._videoDeviceIndex = idx;
+      }
+    } catch {
+      this._videoDeviceIds = [];
+    }
   }
 
   _attachLocalPreview() {
@@ -269,21 +327,30 @@ export class WebRTCCall {
   }
 
   async prepareIncoming() {
-    if (this.channelReady) return;
+    if (!this.channelReady) {
+      try {
+        await this._connectSignaling();
+      } catch (e) {
+        console.warn("Call signaling pre-connect:", e.message);
+        return;
+      }
+    }
     try {
-      await this._connectSignaling();
-    } catch (e) {
-      console.warn("Call signaling pre-connect:", e.message);
+      await this._sendSignal({ type: "ready" });
+    } catch {
+      /* callee will still connect when user accepts */
     }
   }
 
   async _handleSignal(payload) {
     if (!this.pc || this.ended) return;
 
-    if (payload.type === "offer" && !this.isCaller) {
+    if (payload.type === "ready" && this.isCaller) {
+      await this._sendOfferIfCaller();
+    } else if (payload.type === "offer" && !this.isCaller) {
       await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
       await this._flushIceQueue();
-      const answer = await this.pc.createAnswer();
+      const answer = await this.pc.createAnswer(this._offerOptions());
       await this.pc.setLocalDescription(answer);
       await this._sendSignal({ type: "answer", sdp: answer });
     } else if (payload.type === "answer" && this.isCaller) {
@@ -371,28 +438,101 @@ export class WebRTCCall {
     if (pip) pip.style.opacity = this.cameraEnabled ? "1" : "0.35";
   }
 
+  async _applyVideoTrack(newTrack) {
+    if (!newTrack || !this.localStream) return false;
+    const oldTrack = this.localStream.getVideoTracks()[0];
+    if (oldTrack?.id === newTrack.id) return true;
+
+    const sender = this.pc?.getSenders?.().find(s => s.track?.kind === "video");
+    if (sender) {
+      await sender.replaceTrack(newTrack);
+    } else if (this.pc) {
+      this.pc.addTrack(newTrack, this.localStream);
+    }
+
+    if (oldTrack) {
+      this.localStream.removeTrack(oldTrack);
+      oldTrack.stop();
+    }
+    if (!this.localStream.getVideoTracks().includes(newTrack)) {
+      this.localStream.addTrack(newTrack);
+    }
+
+    const localVid = document.getElementById("bfmLocalVideo");
+    if (localVid) {
+      localVid.srcObject = this.localStream;
+      await localVid.play().catch(() => {});
+    }
+    return true;
+  }
+
+  async _getFlippedVideoStream() {
+    if (this._videoDeviceIds.length >= 2) {
+      this._videoDeviceIndex = (this._videoDeviceIndex + 1) % this._videoDeviceIds.length;
+      const deviceId = this._videoDeviceIds[this._videoDeviceIndex];
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+      } catch {
+        /* try ideal deviceId without exact */
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { deviceId, width: { ideal: 640 }, height: { ideal: 480 } },
+          });
+        } catch {
+          /* fall through to facingMode */
+        }
+      }
+    }
+
+    this._facingMode = this._facingMode === "user" ? "environment" : "user";
+    const modes = [
+      { facingMode: { exact: this._facingMode } },
+      { facingMode: this._facingMode },
+    ];
+    for (const video of modes) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { ...video, width: { ideal: 640 }, height: { ideal: 480 } },
+        });
+      } catch {
+        /* next */
+      }
+    }
+    return null;
+  }
+
   async flipCamera() {
     if (!this.isVideo || !this.localStream) return;
-    this._facingMode = this._facingMode === "user" ? "environment" : "user";
+
+    const oldTrack = this.localStream.getVideoTracks()[0];
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: this._facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
-      });
-      const newTrack = newStream.getVideoTracks()[0];
-      const oldTrack = this.localStream.getVideoTracks()[0];
-      if (!newTrack || !oldTrack) return;
-      this.localStream.removeTrack(oldTrack);
-      this.localStream.addTrack(newTrack);
-      oldTrack.stop();
-      const sender = this.pc?.getSenders?.().find(s => s.track?.kind === "video");
-      if (sender) await sender.replaceTrack(newTrack);
-      const localVid = document.getElementById("bfmLocalVideo");
-      if (localVid) {
-        localVid.srcObject = this.localStream;
-        localVid.play().catch(() => {});
+      const newStream = await this._getFlippedVideoStream();
+      const newTrack = newStream?.getVideoTracks?.()[0];
+      if (!newTrack) throw new Error("No camera track");
+
+      const ok = await this._applyVideoTrack(newTrack);
+      if (ok) {
+        newStream.getTracks().forEach(t => {
+          if (t !== newTrack) t.stop();
+        });
+        return;
       }
-    } catch { /* keep current camera */ }
+    } catch (e) {
+      console.warn("flipCamera:", e);
+    }
+
+    if (oldTrack) {
+      this.localStream.addTrack(oldTrack);
+    }
   }
 
   async toggleSpeaker() {
@@ -529,6 +669,7 @@ export class WebRTCCall {
     if (this.ended) return;
     this.ended = true;
     clearTimeout(this._ringTimer);
+    clearTimeout(this._offerReadyTimeout);
     clearInterval(this._timerInterval);
     this._timerInterval = null;
     this._callStartTime = null;

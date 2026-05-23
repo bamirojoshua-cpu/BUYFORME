@@ -11,6 +11,9 @@ export const INBOX_EVENT_CALL = "call_invite";
 const partnerCache = {};
 let messagesChannelRef = null;
 let inboxChannelRef = null;
+/** Reused publish channels — avoids ~1–3s subscribe delay per call/message broadcast */
+const inboxPublishChannels = new Map();
+const inboxPublishReady = new Set();
 
 export function getConvId(uid1, uid2) {
   return [String(uid1), String(uid2)].sort().join("_");
@@ -357,45 +360,55 @@ export function unsubscribeInbox(supabaseClient) {
     supabaseClient.removeChannel(inboxChannelRef);
     inboxChannelRef = null;
   }
+  inboxPublishChannels.forEach(ch => supabaseClient.removeChannel(ch));
+  inboxPublishChannels.clear();
+  inboxPublishReady.clear();
 }
 
-/** Broadcast on the same channel the receiver listens to: chat_inbox_{userId} */
-export async function broadcastToUser(supabaseClient, receiverId, event, payload) {
+async function ensureInboxPublishChannel(supabaseClient, receiverId) {
   const targetId = String(receiverId);
   const channelName = `chat_inbox_${targetId}`;
 
-  const ch = supabaseClient.channel(channelName, {
-    config: { broadcast: { ack: false } },
-  });
+  if (inboxPublishReady.has(channelName)) {
+    return inboxPublishChannels.get(channelName);
+  }
+
+  let ch = inboxPublishChannels.get(channelName);
+  if (!ch) {
+    ch = supabaseClient.channel(channelName, {
+      config: { broadcast: { ack: false } },
+    });
+    inboxPublishChannels.set(channelName, ch);
+  }
+
+  if (ch.state === "joined") {
+    inboxPublishReady.add(channelName);
+    return ch;
+  }
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      supabaseClient.removeChannel(ch);
-      reject(new Error("Could not reach the other user — are they online with chat open?"));
-    }, 10000);
+      reject(new Error("Could not reach the other user — are they online?"));
+    }, 8000);
 
     ch.subscribe(status => {
       if (status === "SUBSCRIBED") {
-        ch.send({ type: "broadcast", event, payload })
-          .then(() => {
-            clearTimeout(timeout);
-            setTimeout(() => {
-              supabaseClient.removeChannel(ch);
-              resolve();
-            }, 150);
-          })
-          .catch(err => {
-            clearTimeout(timeout);
-            supabaseClient.removeChannel(ch);
-            reject(err);
-          });
+        clearTimeout(timeout);
+        inboxPublishReady.add(channelName);
+        resolve(ch);
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         clearTimeout(timeout);
-        supabaseClient.removeChannel(ch);
+        inboxPublishReady.delete(channelName);
         reject(new Error("Realtime connection failed. Check Supabase Realtime is enabled."));
       }
     });
   });
+}
+
+/** Broadcast on the same channel the receiver listens to: chat_inbox_{userId} */
+export async function broadcastToUser(supabaseClient, receiverId, event, payload) {
+  const ch = await ensureInboxPublishChannel(supabaseClient, receiverId);
+  await ch.send({ type: "broadcast", event, payload });
 }
 
 export async function sendCallInvite(supabaseClient, payload) {
@@ -416,13 +429,7 @@ export async function sendCallInvite(supabaseClient, payload) {
   let broadcastOk = false;
   let dbOk = false;
 
-  try {
-    await broadcastToUser(supabaseClient, receiverId, INBOX_EVENT_CALL, invite);
-    broadcastOk = true;
-  } catch (e) {
-    console.warn("Call invite broadcast:", e.message);
-  }
-
+  // DB insert first — postgres_changes often delivers faster than a cold broadcast channel
   try {
     const { error } = await supabaseClient.from("messages").insert({
       conversation_id: invite.conversation_id,
@@ -437,6 +444,13 @@ export async function sendCallInvite(supabaseClient, payload) {
     if (!error) dbOk = true;
   } catch (e) {
     console.warn("Call invite db ping:", e);
+  }
+
+  try {
+    await broadcastToUser(supabaseClient, receiverId, INBOX_EVENT_CALL, invite);
+    broadcastOk = true;
+  } catch (e) {
+    console.warn("Call invite broadcast:", e.message);
   }
 
   if (!broadcastOk && !dbOk) {

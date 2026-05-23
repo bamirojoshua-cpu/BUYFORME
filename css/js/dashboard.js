@@ -64,6 +64,7 @@ let shopperAudioChunks   = [];
 let shopperIsRecording   = false;
 
 let shopperActiveCall = null;
+let shopperIncomingCallKey = null;
 let shopperThreadIds  = new Set();
 let shopperRefreshTimer = null;
 
@@ -1398,12 +1399,14 @@ window.endShopperCall = function (playEndTone = true) {
   stopAllCallSounds();
   shopperActiveCall?.end(playEndTone);
   shopperActiveCall = null;
+  shopperIncomingCallKey = null;
   clearIncomingCallPrep();
   hideIncomingCallScreen();
 };
 
 async function startShopperCall(callType) {
   window.endShopperCall(false);
+  playOutgoingRingback();
   try {
     await sendCallInvite(supabase, {
       sender_id: getShopperChatUserId(),
@@ -1414,8 +1417,6 @@ async function startShopperCall(callType) {
       callType,
       conversation_id: activeChatConvId,
     });
-    playOutgoingRingback();
-    await new Promise(r => setTimeout(r, 400));
     shopperActiveCall = await startOutgoingCall({
       supabase,
       myUserId: getShopperChatUserId(),
@@ -1458,16 +1459,18 @@ async function handleShopperIncomingCall(payload) {
   const callType = payload.callType === "voice" ? "voice" : "video";
   const isVideo = callType === "video";
   const senderId = String(payload.sender_id);
+  const key = `${senderId}:${callType}`;
+
+  if (shopperIncomingCallKey === key) return;
+  if (document.getElementById("bfmCallOverlay") || document.getElementById("bfmIncomingCall")) return;
+
+  shopperIncomingCallKey = key;
 
   if (!activeChatPartner || String(activeChatPartner.uid) !== senderId) {
     activeChatPartner = { uid: senderId, name: payload.sender_name || "User", role: "buyer" };
     activeChatConvId = getConvId(myId, senderId);
     setConversationPartner(activeChatConvId, activeChatPartner, myId);
   }
-
-  showToast(`Incoming ${isVideo ? "video" : "voice"} call from ${payload.sender_name || "Buyer"}`);
-
-  await prepareIncomingCallSignaling(supabase, myId, senderId, callType);
 
   playIncomingCallRing();
 
@@ -1476,6 +1479,10 @@ async function handleShopperIncomingCall(payload) {
     callType,
     onAccept: () => (isVideo ? acceptShopperVideoCall() : acceptShopperVoiceCall()),
     onDecline: () => rejectShopperCall(),
+  });
+
+  prepareIncomingCallSignaling(supabase, myId, senderId, callType).catch(e => {
+    console.warn("Call pre-connect:", e?.message || e);
   });
 }
 

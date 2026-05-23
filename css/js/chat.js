@@ -45,6 +45,7 @@ let activePartner        = null;
 let allConversations     = [];
 let activeCall           = null;
 let pendingIncomingCallType = "video";
+let incomingCallKey = null;
 
 let mediaRecorder = null;
 let audioChunks   = [];
@@ -732,6 +733,7 @@ window.startVoiceCall = async function () {
 
 async function startCall(callType) {
   endActiveCall(false);
+  playOutgoingRingback();
   try {
     await sendCallInvite(supabase, {
       sender_id:   currentUser.uid,
@@ -742,8 +744,6 @@ async function startCall(callType) {
       callType,
       conversation_id: activeConversationId,
     });
-    playOutgoingRingback();
-    await new Promise(r => setTimeout(r, 400));
     activeCall = await startOutgoingCall({
       supabase,
       myUserId: currentUser.uid,
@@ -808,30 +808,27 @@ function endActiveCall(playEndTone = true) {
   stopAllCallSounds();
   activeCall?.end(playEndTone);
   activeCall = null;
+  incomingCallKey = null;
   clearIncomingCallPrep();
   hideIncomingCallScreen();
 }
 
 async function handleIncomingCall({ sender_id, sender_name, callType }) {
-  const type = callType || "video";
-  pendingIncomingCallType = type;
+  const type = callType === "voice" ? "voice" : "video";
   const isVideo = type === "video";
+  const key = `${sender_id}:${type}`;
 
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    try {
-      new Notification(`Incoming ${isVideo ? "video" : "voice"} call`, {
-        body: `${sender_name || "Someone"} is calling you`,
-      });
-    } catch {}
-  }
+  if (incomingCallKey === key) return;
+  if (document.getElementById("bfmCallOverlay") || document.getElementById("bfmIncomingCall")) return;
+
+  incomingCallKey = key;
+  pendingIncomingCallType = type;
 
   if (!activePartner || String(activePartner.uid) !== String(sender_id)) {
     activePartner = getEnrichedPartner(sender_id, { uid: sender_id, name: sender_name || "User", role: "user" });
     activeConversationId = getConvId(currentUser.uid, sender_id);
     setConversationPartner(activeConversationId, activePartner, currentUser.uid);
   }
-
-  await prepareIncomingCallSignaling(supabase, currentUser.uid, sender_id, type);
 
   playIncomingCallRing();
 
@@ -841,6 +838,18 @@ async function handleIncomingCall({ sender_id, sender_name, callType }) {
     onAccept: () => (isVideo ? acceptVideoCall() : acceptVoiceCall()),
     onDecline: () => rejectCall(),
   });
+
+  prepareIncomingCallSignaling(supabase, currentUser.uid, sender_id, type).catch(e => {
+    console.warn("Call pre-connect:", e?.message || e);
+  });
+
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try {
+      new Notification(`Incoming ${isVideo ? "video" : "voice"} call`, {
+        body: `${sender_name || "Someone"} is calling you`,
+      });
+    } catch {}
+  }
 }
 
 async function markAsRead() {
