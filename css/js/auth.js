@@ -7,6 +7,11 @@
 
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
+import {
+  clearAuthSession,
+  shouldSkipAutoLoginRedirect,
+  finishLoggedOutAuthUrl,
+} from "./auth-session.js";
 
 
 /* ─────────────────────────────────────────────
@@ -43,19 +48,13 @@ async function fetchUserProfile(uid) {
 async function redirectIfAlreadyLoggedIn() {
   const params = new URLSearchParams(window.location.search);
   if (params.get("logged_out") === "1") {
-    try {
-      await supabase.auth.signOut({ scope: "global" });
-      Object.keys(localStorage).forEach(key => {
-        if (key === "bfm-auth" || key.startsWith("bfm-auth")) {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch {
-      /* ignore */
-    }
-    if (window.history.replaceState) {
-      window.history.replaceState({}, "", "auth.html");
-    }
+    await clearAuthSession(supabase);
+    finishLoggedOutAuthUrl();
+    return;
+  }
+
+  if (shouldSkipAutoLoginRedirect()) {
+    await clearAuthSession(supabase);
     return;
   }
 

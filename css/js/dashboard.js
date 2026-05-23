@@ -9,6 +9,8 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { getShopperDashboardHref } from "./app-paths.js";
+import { clearAuthSession } from "./auth-session.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
 import {
   getConvId,
@@ -78,6 +80,14 @@ function getShopperChatUserId() {
   return String(currentProfile?.uid || currentUser?.id || "");
 }
 
+function wireShopperBrandLink() {
+  const link = document.querySelector(".sidebar-brand .brand-link");
+  if (!link) return;
+  link.href = getShopperDashboardHref();
+  link.setAttribute("aria-label", "Shopper dashboard");
+  link.dataset.tooltip = "Dashboard";
+}
+
 /* ─── INIT ─── */
 export async function bootstrapShopperDashboard() {
   document.body.addEventListener("click", () => unlockSounds(), { once: true });
@@ -94,6 +104,7 @@ export async function bootstrapShopperDashboard() {
 
   currentProfile = profile;
 
+  wireShopperBrandLink();
   renderSidebarProfile();
   await renderRequests();
   await renderOrders();
@@ -1572,22 +1583,6 @@ window.handleLogout = async function () {
     console.warn("unsubscribeInbox:", e);
   }
 
-  try {
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-    if (error) console.warn("signOut:", error.message);
-  } catch (e) {
-    console.warn("signOut:", e);
-  }
-
-  try {
-    Object.keys(localStorage).forEach((key) => {
-      if (key === "bfm-auth" || key.startsWith("bfm-auth")) {
-        localStorage.removeItem(key);
-      }
-    });
-  } catch {
-    /* ignore */
-  }
-
+  await clearAuthSession(supabase);
   window.location.replace("auth.html?logged_out=1");
 };

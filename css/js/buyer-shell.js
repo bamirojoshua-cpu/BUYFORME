@@ -1,7 +1,8 @@
 /* Buyer app shell — sidebar, bottom nav, auth, badges */
 
 import { supabase } from "./supabase.js";
-import { getShopperDashboardHref } from "./app-paths.js";
+import { getBuyerDashboardHref, getShopperDashboardHref } from "./app-paths.js";
+import { clearAuthSession } from "./auth-session.js";
 import { initBuyerNotifications, refreshBuyerBadges, stopBuyerNotifications } from "./buyer-notifications.js";
 
 const NAV_ITEMS = [
@@ -27,26 +28,10 @@ export async function performBuyerLogout() {
     console.warn("stopBuyerNotifications:", e);
   }
 
-  try {
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-    if (error) console.warn("signOut:", error.message);
-  } catch (e) {
-    console.warn("signOut:", e);
-  }
-
   shellUser = null;
   delete document.body.dataset.shellInit;
 
-  try {
-    Object.keys(localStorage).forEach(key => {
-      if (key === "bfm-auth" || key.startsWith("bfm-auth")) {
-        localStorage.removeItem(key);
-      }
-    });
-  } catch {
-    /* ignore */
-  }
-
+  await clearAuthSession(supabase);
   window.location.replace("auth.html?logged_out=1");
 }
 
@@ -137,7 +122,7 @@ function injectShell(activeKey, title) {
     <div class="buyer-sidebar-overlay" id="buyerSidebarOverlay"></div>
     <aside class="buyer-sidebar" id="buyerSidebar" aria-label="Buyer navigation">
       <div class="buyer-sidebar__brand">
-        <a href="index.html" class="brand-link" data-tooltip="Home" aria-label="Home"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
+        <a href="${getBuyerDashboardHref()}" class="brand-link" data-tooltip="Discover" aria-label="Buyer dashboard"><img src="images/logo.png" alt="BuyForMe" class="brand-logo brand-logo--sm"></a>
         <div class="buyer-sidebar__brand-actions">
         <button type="button" class="buyer-notif-bell" id="buyerNotifBell" aria-label="Notifications">
           <i class="fas fa-bell" aria-hidden="true"></i>

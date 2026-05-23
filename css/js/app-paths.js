@@ -5,6 +5,11 @@ export function isLocalDevHost() {
   return host === "localhost" || host === "127.0.0.1";
 }
 
+/** Buyer home (Discover) after sign-in. */
+export function getBuyerDashboardHref() {
+  return "buyers.html";
+}
+
 /** Shopper dashboard page that works in the current environment. */
 export function getShopperDashboardHref() {
   if (isLocalDevHost()) {

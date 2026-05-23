@@ -3,6 +3,8 @@
 .buyer-app-body {
   --sidebar-float-gap: 14px;
   --sidebar-float-radius: 24px;
+  /* Space reserved for floating bottom nav (matches .buyer-main padding-bottom on mobile) */
+  --buyer-bottom-nav-clear: calc(96px + env(safe-area-inset-bottom, 0px));
   font-family: "Inter", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -605,9 +607,11 @@ body.buyer-sidebar-collapsed .buyer-sidebar__logout {
   .buyer-sidebar {
     left: var(--sidebar-float-gap);
     top: var(--sidebar-float-gap);
-    bottom: var(--sidebar-float-gap);
+    bottom: var(--buyer-bottom-nav-clear);
     width: min(var(--sidebar-w), calc(100vw - var(--sidebar-float-gap) * 2));
-    max-height: calc(100dvh - var(--sidebar-float-gap) * 2);
+    max-height: calc(
+      100dvh - var(--sidebar-float-gap) - var(--buyer-bottom-nav-clear)
+    );
     border-radius: var(--sidebar-float-radius);
     transform: translateX(calc(-100% - var(--sidebar-float-gap) * 2));
     box-shadow:
@@ -617,6 +621,7 @@ body.buyer-sidebar-collapsed .buyer-sidebar__logout {
 
   .buyer-sidebar.open {
     transform: translateX(0);
+    z-index: 410;
   }
 
   .buyer-mobile-bar {
@@ -629,7 +634,7 @@ body.buyer-sidebar-collapsed .buyer-sidebar__logout {
 
   .buyer-main {
     margin-left: 0;
-    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--buyer-bottom-nav-clear);
   }
 
   .buyer-app--chat .buyer-main {

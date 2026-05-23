@@ -37,6 +37,8 @@ let activeFilter = "All";
 let searchTerm = "";
 let sortBy = "rating";
 
+const FEATURED_SHOPPER_LIMIT = 5;
+
 function escapeHtml(text) {
   return String(text ?? "")
     .replace(/&/g, "&amp;")
@@ -146,7 +148,7 @@ function renderFeatured() {
   const grid = document.getElementById("featuredGrid");
   if (!section || !grid || allShoppers.length === 0) return;
 
-  const top = sortShoppers([...allShoppers]).slice(0, 8);
+  const top = sortShoppers([...allShoppers]).slice(0, FEATURED_SHOPPER_LIMIT);
   section.hidden = false;
   grid.innerHTML = top
     .map((s) => {
