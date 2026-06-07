@@ -112,17 +112,24 @@ body.buyer-sidebar-collapsed .buyer-sidebar {
   margin: 0 auto 10px;
   background: linear-gradient(135deg, var(--green), var(--green-dark));
   color: #fff;
-  font-family: "Sora", sans-serif;
+  font-family: var(--bfm-font-accent);
   font-weight: 700;
   font-size: 1.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 14px var(--green-glow);
+  overflow: hidden;
+}
+
+.buyer-sidebar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .buyer-sidebar__name {
-  font-family: "Sora", sans-serif;
+  font-family: var(--bfm-font-accent);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -280,6 +287,27 @@ body.buyer-sidebar-collapsed .buyer-sidebar [data-tooltip]:focus-visible::after 
   padding: 12px 20px 0;
   border-top: 1px solid var(--border);
   margin-top: auto;
+}
+
+.buyer-sidebar__locale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.bfm-locale-select {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
 .buyer-sidebar__logout {

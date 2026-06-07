@@ -5,8 +5,10 @@ import { requireBuyerSession, fetchPublicShopper } from "./buyer-session.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
 import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { flagEmoji, countryCodeFromLocation } from "./country-flag.js";
+import { buildRequestRow, insertRequest, computeFees, PLATFORM_FEE_PERCENT } from "./api/request-builder.js";
+import { addToWishlist } from "./api/wishlist.js";
+import { addToCart } from "./api/cart.js";
 
-const PLATFORM_FEE_PERCENT = 5;
 const TOTAL_STEPS = 3;
 const DRAFT_PREFIX = "bfm-request-draft-";
 
@@ -182,17 +184,15 @@ function goBack() {
   if (wizardStep > 1) setWizardStep(wizardStep - 1);
 }
 
-function computeFees() {
+function computeFormFees() {
   const budget = parseFloat(getFormValues().budget) || 0;
   const currency = getFormValues().currency;
-  const shopperFee = budget * (shopperFeePercent / 100);
-  const platformFee = budget * (PLATFORM_FEE_PERCENT / 100);
-  const total = budget + shopperFee + platformFee;
+  const { shopperFee, platformFee, total } = computeFees(budget, shopperFeePercent);
   return { budget, currency, shopperFee, platformFee, total };
 }
 
 export function updateFeeEstimate() {
-  const { budget, currency, shopperFee, platformFee, total } = computeFees();
+  const { budget, currency, shopperFee, platformFee, total } = computeFormFees();
   const show = budget > 0;
 
   document.querySelectorAll(".price-breakdown").forEach((box) => {
@@ -284,7 +284,7 @@ function renderReviewSummary() {
   const el = $("reviewSummary");
   if (!el) return;
   const v = getFormValues();
-  const { currency, total } = computeFees();
+  const { currency, total } = computeFormFees();
 
   el.innerHTML = `
     <dl class="review-dl">
@@ -322,8 +322,6 @@ async function handleSubmit() {
   }
 
   const v = getFormValues();
-  const { shopperFee, platformFee, total } = computeFees();
-  const budget = parseFloat(v.budget);
 
   const next = $("wizardNext");
   const sticky = $("stickyNextBtn");
@@ -334,30 +332,15 @@ async function handleSubmit() {
     }
   });
 
-  const { error } = await supabase.from("requests").insert({
-    buyer_id: currentUser.uid,
-    buyer_name: currentUser.name,
-    shopper_id: currentShopper.uid,
-    shopper_name: currentShopper.name,
-    shopper_location: currentShopper.location || "",
-    product_name: v.productName,
-    store_name: v.storeName,
-    quantity: parseInt(v.quantity, 10),
-    category: v.category,
-    notes: v.notes,
-    budget,
-    shopper_fee: shopperFee,
-    platform_fee: platformFee,
-    total_amount: total,
-    currency: v.currency,
-    address: v.address,
-    country: v.country,
-    phone: v.phone,
-    timeline: v.timeline,
-    status: "pending",
-  });
-
-  if (error) {
+  try {
+    const row = buildRequestRow({
+      buyer: currentUser,
+      shopper: currentShopper,
+      item: v,
+      shopperFeePercent,
+    });
+    await insertRequest(row);
+  } catch (error) {
     console.error("Request error:", error);
     showError("Failed to send request. Please try again.");
     [next, sticky].forEach((b) => {
@@ -386,11 +369,81 @@ async function handleSubmit() {
   }
 }
 
+async function saveCurrentToWishlist() {
+  const v = getFormValues();
+  if (!v.productName) {
+    showBuyerToast("Enter a product name first");
+    return;
+  }
+  try {
+    await addToWishlist(currentUser.uid, {
+      shopper_id: currentShopper.uid,
+      product_name: v.productName,
+      store_name: v.storeName,
+      quantity: parseInt(v.quantity, 10) || 1,
+      category: v.category,
+      notes: v.notes,
+      budget: v.budget ? parseFloat(v.budget) : null,
+      currency: v.currency,
+    });
+    showBuyerToast("Saved to wishlist");
+    document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
+  } catch (e) {
+    console.error(e);
+    showBuyerToast("Could not save — run supabase-phase3.sql");
+  }
+}
+
+async function addCurrentToCart() {
+  const v = getFormValues();
+  if (!v.productName) {
+    showBuyerToast("Enter a product name first");
+    return;
+  }
+  try {
+    await addToCart(currentUser.uid, {
+      shopper_id: currentShopper.uid,
+      shopper_name: currentShopper.name,
+      product_name: v.productName,
+      store_name: v.storeName,
+      quantity: parseInt(v.quantity, 10) || 1,
+      category: v.category,
+      notes: v.notes,
+      budget: v.budget ? parseFloat(v.budget) : null,
+      currency: v.currency,
+      address: v.address,
+      country: v.country,
+      phone: v.phone,
+      timeline: v.timeline,
+    });
+    showBuyerToast("Added to cart");
+    document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
+  } catch (e) {
+    console.error(e);
+    showBuyerToast("Could not add to cart");
+  }
+}
+
 function prefillBuyerDelivery(profile) {
   if (!profile) return;
-  const address = [profile.address, profile.city].filter(Boolean).join(", ");
-  if (address && !$("address").value) $("address").value = address;
-  if (profile.country && !$("country").value) $("country").value = profile.country;
+
+  let address = profile.address || "";
+  let city = profile.city || "";
+  let country = profile.country || "";
+
+  const saved = profile.saved_addresses;
+  if (Array.isArray(saved) && saved.length) {
+    const def = saved.find((a) => a.is_default) || saved[0];
+    if (def) {
+      address = def.address || address;
+      city = def.city || city;
+      country = def.country || country;
+    }
+  }
+
+  const line = [address, city].filter(Boolean).join(", ");
+  if (line && !$("address").value) $("address").value = line;
+  if (country && !$("country").value) $("country").value = country;
   if (profile.phone && !$("phone").value) $("phone").value = profile.phone;
 }
 
@@ -481,6 +534,9 @@ async function init() {
       el.addEventListener("input", onChange);
       el.addEventListener("change", onChange);
     });
+
+    $("saveWishlistBtn")?.addEventListener("click", saveCurrentToWishlist);
+    $("addCartBtn")?.addEventListener("click", addCurrentToCart);
 
     $("notes")?.setAttribute("maxlength", "500");
     updateNotesCount();

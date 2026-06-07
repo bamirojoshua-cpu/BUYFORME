@@ -4,12 +4,16 @@ import { supabase } from "./supabase.js";
 import { getBuyerDashboardHref, getShopperDashboardHref } from "./app-paths.js";
 import { clearAuthSession } from "./auth-session.js";
 import { initBuyerNotifications, refreshBuyerBadges, stopBuyerNotifications } from "./buyer-notifications.js";
+import { wishlistCount } from "./api/wishlist.js";
+import { cartCount } from "./api/cart.js";
+import { initI18n, t, setLocale, getLocale } from "./i18n/index.js";
 
 const NAV_ITEMS = [
-  { key: "discover", href: "buyers.html", icon: "fa-compass", label: "Discover" },
-  { key: "orders", href: "my-orders.html", icon: "fa-bag-shopping", label: "Orders", badge: "ordersBadge" },
-  { key: "messages", href: "chat.html", icon: "fa-message", label: "Messages", badge: "messagesBadge" },
-  { key: "account", href: "buyers.html?settings=1", icon: "fa-user", label: "Account" },
+  { key: "discover", href: "buyers.html", icon: "fa-compass", i18nKey: "nav.discover" },
+  { key: "wishlist", href: "wishlist.html", icon: "fa-heart", i18nKey: "nav.wishlist", badge: "wishlistBadge" },
+  { key: "cart", href: "cart.html", icon: "fa-cart-shopping", i18nKey: "nav.cart", badge: "cartBadge" },
+  { key: "orders", href: "my-orders.html", icon: "fa-bag-shopping", i18nKey: "nav.orders", badge: "ordersBadge" },
+  { key: "messages", href: "chat.html", icon: "fa-message", i18nKey: "nav.messages", badge: "messagesBadge" },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "buyforme-buyer-sidebar-collapsed";
@@ -95,14 +99,15 @@ async function ensureBuyerAuth() {
 
 function buildNavLinks(activeKey) {
   return NAV_ITEMS.map((item) => {
+    const label = t(item.i18nKey);
     const active = item.key === activeKey ? "active" : "";
     const badge = item.badge
       ? `<span class="nav-badge" id="shell-${item.badge}"></span>`
       : "";
     return `<li><a href="${item.href}" class="${active}" data-nav="${item.key}"
-      aria-label="${escapeHtml(item.label)}" data-tooltip="${escapeHtml(item.label)}">
+      aria-label="${escapeHtml(label)}" data-tooltip="${escapeHtml(label)}">
       <i class="fas ${item.icon}" aria-hidden="true"></i>
-      <span class="nav-label">${item.label}</span>${badge}
+      <span class="nav-label" data-i18n="${item.i18nKey}">${escapeHtml(label)}</span>${badge}
     </a></li>`;
   }).join("");
 }
@@ -112,6 +117,9 @@ function injectShell(activeKey, title) {
 
   const initial = (shellUser?.name || "B")[0].toUpperCase();
   const firstName = (shellUser?.name || "Buyer").split(" ")[0];
+  const avatarHtml = shellUser?.avatar_url
+    ? `<img src="${escapeHtml(shellUser.avatar_url)}" alt="">`
+    : initial;
 
   const grid = document.createElement("div");
   grid.id = "buyer-app-grid";
@@ -135,12 +143,23 @@ function injectShell(activeKey, title) {
         </div>
       </div>
       <div class="buyer-sidebar__user">
-        <div class="buyer-sidebar__avatar" id="shellAvatar">${initial}</div>
+        <div class="buyer-sidebar__avatar" id="shellAvatar">${avatarHtml}</div>
         <p class="buyer-sidebar__name">${escapeHtml(firstName)}</p>
         <p class="buyer-sidebar__role">Buyer account</p>
       </div>
       <ul class="buyer-nav">${buildNavLinks(activeKey)}</ul>
       <div class="buyer-sidebar__foot">
+        <label class="buyer-sidebar__locale" for="bfmLocaleSelect" data-tooltip="Language">
+          <i class="fas fa-globe" aria-hidden="true"></i>
+          <select id="bfmLocaleSelect" class="bfm-locale-select" aria-label="Language">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+          </select>
+        </label>
+        <a href="buyers.html?settings=1" class="buyer-sidebar__settings" data-tooltip="Account settings">
+          <i class="fas fa-gear" aria-hidden="true"></i>
+          <span class="logout-label">Settings</span>
+        </a>
         <button type="button" class="buyer-sidebar__logout" id="shellLogout" aria-label="Log out" data-tooltip="Log out">
           <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
           <span class="logout-label">Log out</span>
@@ -166,12 +185,13 @@ function injectShell(activeKey, title) {
   bottomNav.className = "buyer-bottom-nav";
   bottomNav.setAttribute("aria-label", "Mobile navigation");
   bottomNav.innerHTML = NAV_ITEMS.map((item) => {
+    const label = t(item.i18nKey);
     const active = item.key === activeKey ? "active" : "";
     const badge = item.badge ? `<span class="nav-badge" id="bottom-${item.badge}"></span>` : "";
-    return `<a href="${item.href}" class="${active}" aria-label="${escapeHtml(item.label)}"
-      data-tooltip="${escapeHtml(item.label)}">
+    return `<a href="${item.href}" class="${active}" aria-label="${escapeHtml(label)}"
+      data-tooltip="${escapeHtml(label)}">
       <i class="fas ${item.icon}" aria-hidden="true"></i>
-      <span class="bottom-nav-label">${item.label}</span>${badge}
+      <span class="bottom-nav-label" data-i18n="${item.i18nKey}">${escapeHtml(label)}</span>${badge}
     </a>`;
   }).join("");
 
@@ -209,6 +229,12 @@ function injectShell(activeKey, title) {
 
   applyStoredSidebarState();
   setupSidebarCollapse();
+
+  const localeSelect = document.getElementById("bfmLocaleSelect");
+  if (localeSelect) {
+    localeSelect.value = getLocale();
+    localeSelect.addEventListener("change", () => setLocale(localeSelect.value));
+  }
 }
 
 function isDesktopSidebar() {
@@ -295,7 +321,11 @@ function escapeHtml(text) {
 async function updateNavBadges() {
   if (!shellUser?.uid) return;
 
-  const counts = await refreshBuyerBadges();
+  const [counts, wCount, cCount] = await Promise.all([
+    refreshBuyerBadges(),
+    wishlistCount(shellUser.uid).catch(() => 0),
+    cartCount(shellUser.uid).catch(() => 0),
+  ]);
 
   const setBadge = (id, n) => {
     document.querySelectorAll(`#shell-${id}, #bottom-${id}`).forEach((el) => {
@@ -311,6 +341,8 @@ async function updateNavBadges() {
 
   setBadge("ordersBadge", counts.orders);
   setBadge("messagesBadge", counts.messages);
+  setBadge("wishlistBadge", wCount);
+  setBadge("cartBadge", cCount);
 }
 
 /**
@@ -318,6 +350,8 @@ async function updateNavBadges() {
  * @param {{ title?: string, narrow?: boolean, chat?: boolean, skipAuth?: boolean, user?: object }} options
  */
 export async function initBuyerShell(activeTab, options = {}) {
+  initI18n();
+
   if (options.user) shellUser = options.user;
 
   if (document.body.dataset.shellInit === "1") {
@@ -325,7 +359,7 @@ export async function initBuyerShell(activeTab, options = {}) {
     setupSidebarCollapse();
     applyStoredSidebarState();
     if (shellUser?.uid) {
-      initBuyerNotifications(shellUser, { toast: showBuyerToast });
+      await initBuyerNotifications(shellUser, { toast: showBuyerToast });
     }
     return shellUser;
   }
@@ -345,6 +379,8 @@ export async function initBuyerShell(activeTab, options = {}) {
     discover: "Discover",
     orders: "My Orders",
     messages: "Messages",
+    wishlist: "Wishlist",
+    cart: "Cart",
     account: "Account",
     profile: "Shopper Profile",
     request: "Send Request",
@@ -365,7 +401,7 @@ export async function initBuyerShell(activeTab, options = {}) {
 
   await updateNavBadges();
   if (shellUser?.uid) {
-    initBuyerNotifications(shellUser, { toast: showBuyerToast });
+    await initBuyerNotifications(shellUser, { toast: showBuyerToast });
   }
 
   document.addEventListener("bfm-buyer-badges", () => {
@@ -377,4 +413,22 @@ export async function initBuyerShell(activeTab, options = {}) {
 
 export function getShellUser() {
   return shellUser;
+}
+
+/** Refresh sidebar avatar and name after profile update. */
+export function updateShellUserDisplay(user) {
+  if (user) shellUser = { ...shellUser, ...user };
+  const initial = (shellUser?.name || "B")[0].toUpperCase();
+  const av = document.getElementById("shellAvatar");
+  if (av) {
+    if (shellUser?.avatar_url) {
+      av.innerHTML = `<img src="${escapeHtml(shellUser.avatar_url)}" alt="">`;
+    } else {
+      av.textContent = initial;
+    }
+  }
+  const nameEl = document.querySelector(".buyer-sidebar__name");
+  if (nameEl && shellUser?.name) {
+    nameEl.textContent = shellUser.name.split(" ")[0];
+  }
 }

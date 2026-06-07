@@ -1,0 +1,213 @@
+/* BuyForMe Design System — Components */
+
+/* ── Buttons ── */
+.bfm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  font-family: var(--bfm-font-ui);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: var(--bfm-radius-pill);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background var(--bfm-dur) var(--bfm-ease),
+    border-color var(--bfm-dur) var(--bfm-ease),
+    box-shadow var(--bfm-dur) var(--bfm-ease),
+    transform var(--bfm-dur-fast) var(--bfm-ease);
+}
+
+.bfm-btn:active {
+  transform: scale(0.98);
+}
+
+.bfm-btn--primary {
+  background: var(--bfm-green);
+  color: var(--bfm-white);
+  box-shadow: 0 4px 14px var(--bfm-green-glow);
+}
+
+.bfm-btn--primary:hover {
+  background: var(--bfm-green-dark);
+}
+
+.bfm-btn--secondary {
+  background: var(--bfm-surface);
+  color: var(--bfm-text);
+  border-color: var(--bfm-border-strong);
+}
+
+.bfm-btn--secondary:hover {
+  background: var(--bfm-surface-2);
+  box-shadow: var(--bfm-shadow-sm);
+}
+
+.bfm-btn--ghost {
+  background: transparent;
+  color: var(--bfm-text-muted);
+}
+
+.bfm-btn--ghost:hover {
+  background: var(--bfm-green-light);
+  color: var(--bfm-green-dark);
+}
+
+.bfm-btn--amber {
+  background: var(--bfm-amber);
+  color: var(--bfm-white);
+}
+
+.bfm-btn--sm {
+  padding: 8px 14px;
+  font-size: 0.8125rem;
+}
+
+/* ── Cards ── */
+.bfm-card {
+  background: var(--bfm-surface);
+  border: 1px solid var(--bfm-border);
+  border-radius: var(--bfm-radius-lg);
+  box-shadow: var(--bfm-shadow-md);
+  overflow: hidden;
+  transition: box-shadow var(--bfm-dur) var(--bfm-ease), transform var(--bfm-dur) var(--bfm-ease);
+}
+
+.bfm-card:hover {
+  box-shadow: var(--bfm-shadow-lg);
+}
+
+.bfm-card__body {
+  padding: 24px;
+}
+
+.bfm-card__accent {
+  height: 4px;
+  background: linear-gradient(90deg, var(--bfm-green), var(--bfm-gold));
+}
+
+/* ── Badges ── */
+.bfm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  font-family: var(--bfm-font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--bfm-radius-pill);
+  letter-spacing: 0.02em;
+}
+
+.bfm-badge--pending    { background: #f3f4f6; color: #6b7280; }
+.bfm-badge--accepted   { background: var(--bfm-blue-light); color: var(--bfm-blue); }
+.bfm-badge--payment    { background: var(--bfm-amber-light); color: var(--bfm-amber); }
+.bfm-badge--paid       { background: var(--bfm-green-light); color: var(--bfm-green-dark); }
+.bfm-badge--purchased  { background: #ede9fe; color: #7c3aed; }
+.bfm-badge--delivering { background: #e0f2fe; color: #0284c7; }
+.bfm-badge--delivered  { background: var(--bfm-green-light); color: var(--bfm-green-deep); }
+
+/* ── Inputs ── */
+.bfm-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-family: var(--bfm-font-ui);
+  font-size: 0.9375rem;
+  color: var(--bfm-text);
+  background: var(--bfm-surface);
+  border: 1px solid var(--bfm-border-strong);
+  border-radius: var(--bfm-radius-sm);
+  transition: border-color var(--bfm-dur-fast), box-shadow var(--bfm-dur-fast);
+}
+
+.bfm-input:focus {
+  outline: none;
+  border-color: var(--bfm-green);
+  box-shadow: 0 0 0 3px var(--bfm-green-glow);
+}
+
+.bfm-input--error {
+  border-color: var(--bfm-red);
+}
+
+.bfm-field-error {
+  font-size: 0.8125rem;
+  color: var(--bfm-red);
+  margin-top: 6px;
+}
+
+/* ── Toast ── */
+.bfm-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  padding: 14px 22px;
+  background: var(--bfm-charcoal-soft);
+  color: var(--bfm-text-inverse);
+  font-family: var(--bfm-font-ui);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--bfm-radius-pill);
+  box-shadow: var(--bfm-shadow-lg);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--bfm-dur) var(--bfm-ease), opacity var(--bfm-dur) var(--bfm-ease);
+}
+
+.bfm-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.bfm-toast--success { background: var(--bfm-green-dark); }
+.bfm-toast--error   { background: var(--bfm-red); }
+.bfm-toast--info    { background: var(--bfm-charcoal-soft); }
+
+/* ── Skeleton ── */
+.bfm-skeleton {
+  background: linear-gradient(90deg, var(--bfm-surface-2) 25%, var(--bfm-cream-dark) 50%, var(--bfm-surface-2) 75%);
+  background-size: 200% 100%;
+  animation: bfmShimmer 1.4s ease infinite;
+  border-radius: var(--bfm-radius-xs);
+}
+
+@keyframes bfmShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Animations ── */
+@keyframes bfmFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bfmSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bfmSpin {
+  to { transform: rotate(360deg); }
+}
+
+.bfm-animate-in {
+  animation: bfmFadeIn var(--bfm-dur) var(--bfm-ease) backwards;
+}
+
+.bfm-animate-up {
+  animation: bfmSlideUp var(--bfm-dur) var(--bfm-ease) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bfm-animate-in,
+  .bfm-animate-up,
+  .bfm-skeleton {
+    animation: none;
+  }
+}

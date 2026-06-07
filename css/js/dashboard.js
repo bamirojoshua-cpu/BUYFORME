@@ -46,6 +46,13 @@ import {
   stopAllCallSounds,
 } from "./app-sounds.js";
 import { showIncomingCallScreen, hideIncomingCallScreen } from "./call-ui.js";
+import {
+  initNotificationCenter,
+  pushNotification,
+  renderNotificationList,
+  clearNotificationCenter,
+  updateNotificationDot,
+} from "./notification-center.js";
 
 /* ─── STATE ─── */
 let currentUser    = null;
@@ -544,6 +551,7 @@ function buildRequestCard(r) {
       <div class="request-action">
         <div class="service-fee">${r.currency||"$"}${r.budget}</div>
         <div class="fee-label">Budget</div>
+        <button class="btn btn-secondary" onclick="sendQuote('${r.id}',${JSON.stringify(r.product_name)},${r.budget},${JSON.stringify(r.currency || "USD")})">Send quote</button>
         <button class="btn btn-primary" onclick="acceptRequest('${r.id}','${r.product_name}')">Accept</button>
         <button class="btn btn-danger"  onclick="declineRequest('${r.id}','${r.product_name}')">Decline</button>
       </div>
@@ -568,10 +576,47 @@ window.declineRequest = async function (id, name) {
   await renderRequests();
 };
 
+window.sendQuote = async function (id, name, currentBudget, currency) {
+  const amountStr = prompt(`Quote price for "${name}" (${currency}):`, String(currentBudget || ""));
+  if (amountStr === null) return;
+  const budget = parseFloat(amountStr);
+  if (!Number.isFinite(budget) || budget <= 0) {
+    showToast("Enter a valid amount.", "error");
+    return;
+  }
+  const quoteNotes = prompt("Notes for the buyer (optional):") || "";
+
+  const { data: order } = await supabase.from("requests").select("*").eq("id", id).maybeSingle();
+  if (!order) { showToast("Order not found.", "error"); return; }
+
+  const feeRatio = order.budget > 0 ? (order.shopper_fee || 0) / order.budget : 0.1;
+  const platformRatio = order.budget > 0 ? (order.platform_fee || 0) / order.budget : 0.05;
+  const shopperFee = Math.round(budget * feeRatio * 100) / 100;
+  const platformFee = Math.round(budget * platformRatio * 100) / 100;
+  const total = Math.round((budget + shopperFee + platformFee) * 100) / 100;
+
+  const { error } = await supabase.from("requests").update({
+    status: "quoted",
+    budget,
+    shopper_fee: shopperFee,
+    platform_fee: platformFee,
+    total_amount: total,
+    quote_notes: quoteNotes,
+    quoted_at: new Date().toISOString(),
+    request_type: "quote",
+  }).eq("id", id);
+
+  if (error) { showToast("Failed to send quote.", "error"); return; }
+  addNotification(`Quote sent for ${name}`, { type: "order" });
+  showToast(`Quote sent: ${currency}${budget}`);
+  invalidateTabRefresh("requests-section", "overview-section");
+  await renderRequests();
+};
+
 /* ─── ORDERS ─── */
 async function getOrders() {
   const { data, error } = await supabase.from("requests").select("*")
-    .eq("shopper_id", currentUser.id).neq("status","pending").neq("status","cancelled")
+    .eq("shopper_id", currentUser.id).neq("status","pending").neq("status","cancelled").neq("status","quoted")
     .order("created_at",{ascending:false});
   if (error) return [];
   return data || [];
@@ -603,6 +648,13 @@ async function renderOrders() {
     else if (isLocked)  action = `<button class="btn btn-secondary" disabled><i class="fas fa-lock" style="margin-right:6px"></i>Waiting for Payment</button>`;
     else                action = `<button class="btn btn-primary" onclick="cycleOrderStatus('${o.id}','${o.status}')">Update Status</button>`;
 
+    const shipLine = (o.status === "delivering" || o.status === "delivered") && (o.tracking_number || o.carrier)
+      ? `<div class="request-meta" style="margin-top:8px">
+           <span><i class="fas fa-truck"></i> ${o.carrier || "Carrier"} · ${o.tracking_number || "—"}</span>
+           ${o.estimated_delivery ? `<span><i class="fas fa-calendar"></i> ETA ${new Date(o.estimated_delivery).toLocaleDateString()}</span>` : ""}
+         </div>`
+      : "";
+
     return `
       <div class="request-item">
         <div>
@@ -613,6 +665,7 @@ async function renderOrders() {
             <span><i class="fas fa-dollar-sign"></i> ${o.currency||"$"}${o.budget} budget</span>
           </div>
           <div style="margin-top:8px">${getStatusBadge(o.status)}</div>
+          ${shipLine}
         </div>
         <div class="request-action">${action}</div>
       </div>`;
@@ -624,7 +677,24 @@ window.cycleOrderStatus = async function (id, current) {
   if (idx === -1) { showToast("Cannot update this order.", "error"); return; }
   if (idx === SHOPPER_STATUSES.length-1) { showToast("Already completed.", "error"); return; }
   const next = SHOPPER_STATUSES[idx+1];
-  const { error } = await supabase.from("requests").update({status:next}).eq("id",id);
+
+  let patch = { status: next };
+  if (next === "delivering") {
+    const carrier = prompt("Carrier name (e.g. DHL, FedEx):");
+    if (carrier === null) return;
+    const tracking = prompt("Tracking number:");
+    if (tracking === null) return;
+    const etaStr = prompt("Estimated delivery (YYYY-MM-DD) — optional:");
+    patch = {
+      status: next,
+      carrier: carrier.trim() || null,
+      tracking_number: tracking.trim() || null,
+      shipped_at: new Date().toISOString(),
+      estimated_delivery: etaStr ? new Date(etaStr).toISOString() : null,
+    };
+  }
+
+  const { error } = await supabase.from("requests").update(patch).eq("id", id);
   if (error) { showToast("Failed to update.", "error"); return; }
   showToast(`Updated to: ${next}`);
   invalidateTabRefresh("orders-section", "earnings-section", "overview-section");
@@ -1503,16 +1573,21 @@ window.filterShopperConversations = function (query) {
   renderShopperConvItems(filtered);
 };
 
-/* ─── NOTIFICATIONS ─── */
-function getNotifications() {
-  try { return JSON.parse(localStorage.getItem("bfm_notifications")) || []; }
-  catch { return []; }
+/* ─── NOTIFICATIONS (server-backed via notification-center) ─── */
+async function initShopperNotifications() {
+  const uid = currentUser?.id || currentProfile?.uid;
+  if (!uid) return;
+
+  await initNotificationCenter({
+    userId: uid,
+    legacyStorageKey: "bfm_notifications",
+    listId: "notifDrawerList",
+    dotSelectors: ["#notifDot"],
+  });
 }
 
-function addNotification(msg) {
-  const n = getNotifications();
-  n.unshift({ message: msg, time: Date.now() });
-  localStorage.setItem("bfm_notifications", JSON.stringify(n.slice(0, 50)));
+function addNotification(msg, meta = {}) {
+  pushNotification(msg, { type: meta.type || "info", title: meta.title, link: meta.link });
   updateNotifDot();
   if (document.getElementById("notifDrawer")?.classList.contains("is-open")) {
     renderNotificationsList();
@@ -1520,42 +1595,20 @@ function addNotification(msg) {
 }
 
 function updateNotifDot() {
-  const dot = document.getElementById("notifDot");
-  if (dot) dot.className = getNotifications().length > 0 ? "notif-dot show" : "notif-dot";
+  updateNotificationDot();
 }
 
 function renderNotificationsList() {
-  const list = document.getElementById("notifDrawerList");
-  if (!list) return;
-  const items = getNotifications();
-
-  if (items.length === 0) {
-    list.innerHTML = `
-      <div class="notif-empty">
-        <div class="notif-empty-icon">${faIcon("fa-bell-slash")}</div>
-        <p>You're all caught up</p>
-        <span>New activity will show up here</span>
-      </div>`;
-    return;
-  }
-
-  list.innerHTML = items.map(item => `
-    <article class="notif-item">
-      <div class="notif-item-icon">${faIcon("fa-bell")}</div>
-      <div class="notif-item-body">
-        <p>${escapeHtml(item.message)}</p>
-        <time>${formatTime(item.time)}</time>
-      </div>
-    </article>`).join("");
+  renderNotificationList("notifDrawerList");
 }
 
 function initNotificationsPanel() {
+  initShopperNotifications().catch(console.error);
+
   document.getElementById("notifDrawerBackdrop")?.addEventListener("click", closeNotifications);
   document.getElementById("notifDrawerClose")?.addEventListener("click", closeNotifications);
-  document.getElementById("notifClearBtn")?.addEventListener("click", () => {
-    localStorage.removeItem("bfm_notifications");
-    updateNotifDot();
-    renderNotificationsList();
+  document.getElementById("notifClearBtn")?.addEventListener("click", async () => {
+    await clearNotificationCenter();
     showToast("Notifications cleared.");
   });
   document.addEventListener("keydown", e => {

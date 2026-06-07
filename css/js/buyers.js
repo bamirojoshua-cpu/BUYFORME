@@ -5,7 +5,9 @@
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
-import { initBuyerShell, showBuyerToast, performBuyerLogout } from "./buyer-shell.js";
+import { initBuyerShell, showBuyerToast, performBuyerLogout, updateShellUserDisplay } from "./buyer-shell.js";
+import { createTicket, fetchMyTickets } from "./api/tickets.js";
+import { isEmail, required, validate as runValidators } from "./validators/forms.js";
 
 let currentUser = { id: "", name: "Buyer", email: "", role: "buyer" };
 let allShoppers = [];
@@ -67,6 +69,7 @@ function showGridLoading() {
 function mapProfile(profile) {
   currentUser = {
     id: profile.uid,
+    uid: profile.uid,
     name: profile.name || "Buyer",
     email: profile.email || "",
     role: profile.role || "buyer",
@@ -75,7 +78,62 @@ function mapProfile(profile) {
     country: profile.country || "",
     currency: profile.currency || "",
     payment: profile.payment || "",
+    avatar_url: profile.avatar_url || "",
+    notifications: profile.notifications !== false,
+    saved_addresses: parseSavedAddresses(profile.saved_addresses),
   };
+}
+
+function parseSavedAddresses(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function defaultAddressFromProfile() {
+  if (!currentUser.address && !currentUser.city && !currentUser.country) return null;
+  return {
+    id: "primary",
+    label: "Primary",
+    address: currentUser.address || "",
+    city: currentUser.city || "",
+    country: currentUser.country || "",
+    is_default: true,
+  };
+}
+
+function getAddressBook() {
+  const book = [...(currentUser.saved_addresses || [])];
+  if (book.length === 0) {
+    const legacy = defaultAddressFromProfile();
+    if (legacy) book.push(legacy);
+  }
+  return book;
+}
+
+async function persistAddressBook(addresses) {
+  currentUser.saved_addresses = addresses;
+  const primary = addresses.find((a) => a.is_default) || addresses[0];
+  const payload = {
+    saved_addresses: addresses,
+    address: primary?.address || "",
+    city: primary?.city || "",
+    country: primary?.country || "",
+  };
+  const { error } = await supabase.from("users").update(payload).eq("uid", currentUser.id);
+  if (error) throw error;
+  if (primary) {
+    currentUser.address = primary.address || "";
+    currentUser.city = primary.city || "";
+    currentUser.country = primary.country || "";
+  }
 }
 
 async function initAuth() {
@@ -177,11 +235,18 @@ function renderFeatured() {
 function updateNavUser() {
   const initial = (currentUser.name || "B")[0].toUpperCase();
   const shellAvatar = document.getElementById("shellAvatar");
-  if (shellAvatar) shellAvatar.textContent = initial;
+  if (shellAvatar) {
+    if (currentUser.avatar_url) {
+      shellAvatar.innerHTML = `<img src="${escapeHtml(currentUser.avatar_url)}" alt="">`;
+    } else {
+      shellAvatar.textContent = initial;
+    }
+  }
   const welcomeMsg = document.getElementById("welcomeMsg");
   if (welcomeMsg) {
     welcomeMsg.textContent = `Welcome back, ${currentUser.name.split(" ")[0]}`;
   }
+  updateShellUserDisplay(currentUser);
 }
 
 function prefillProfile() {
@@ -403,11 +468,24 @@ window.switchTab = function (tab) {
 
   if (tab === "profile") {
     const notifOn = currentUser.notifications !== false;
+    const avInner = currentUser.avatar_url
+      ? `<img src="${escapeHtml(currentUser.avatar_url)}" alt="">`
+      : (currentUser.name || "B")[0].toUpperCase();
     form.innerHTML = `
+      <div class="profile-avatar-upload">
+        <div class="profile-avatar-preview" id="profileAvatarPreview">${avInner}</div>
+        <div>
+          <label class="bfm-btn bfm-btn--secondary bfm-btn--sm" for="profileAvatarInput">
+            <i class="fas fa-camera"></i> Change photo
+          </label>
+          <input type="file" id="profileAvatarInput" accept="image/jpeg,image/png,image/webp" hidden>
+          <p class="settings-hint">JPG, PNG or WebP. Max 2 MB.</p>
+        </div>
+      </div>
       <label for="settingName">Full name</label>
-      <input type="text" id="settingName" value="${escapeHtml(currentUser.name)}" placeholder="Your name" autocomplete="name">
+      <input type="text" id="settingName" class="bfm-input" value="${escapeHtml(currentUser.name)}" placeholder="Your name" autocomplete="name">
       <label for="settingEmail">Email</label>
-      <input type="email" id="settingEmail" value="${escapeHtml(currentUser.email)}" placeholder="you@email.com" autocomplete="email">
+      <input type="email" id="settingEmail" class="bfm-input" value="${escapeHtml(currentUser.email)}" placeholder="you@email.com" autocomplete="email">
       <div class="settings-toggle-row toggle-row">
         <span>Push &amp; in-app notifications</span>
         <button type="button" class="toggle-track ${notifOn ? "on" : ""}" id="buyerNotifToggle" aria-pressed="${notifOn}">
@@ -421,16 +499,36 @@ window.switchTab = function (tab) {
       this.classList.toggle("on");
       this.setAttribute("aria-pressed", this.classList.contains("on"));
     });
+    document.getElementById("profileAvatarInput")?.addEventListener("change", handleAvatarSelect);
   } else if (tab === "shipping") {
     form.innerHTML = `
-      <label for="settingAddress">Street address</label>
-      <input type="text" id="settingAddress" value="${escapeHtml(currentUser.address)}" placeholder="e.g. 12 Accra Road">
-      <label for="settingCity">City</label>
-      <input type="text" id="settingCity" value="${escapeHtml(currentUser.city)}" placeholder="e.g. Lagos">
-      <label for="settingCountry">Country</label>
-      <input type="text" id="settingCountry" value="${escapeHtml(currentUser.country)}" placeholder="e.g. Nigeria">
-      <button type="button" class="btn-save" onclick="saveShipping()"><i class="fas fa-check"></i> Save address</button>
+      <p class="settings-hint" style="margin-bottom:14px">Save delivery addresses for faster checkout on future orders.</p>
+      <div class="address-book" id="addressBookList"></div>
+      <div class="address-book-form buyer-card" id="addressBookForm">
+        <h3 class="address-book-form__title">Add address</h3>
+        <label for="addrLabel">Label</label>
+        <input type="text" id="addrLabel" class="bfm-input" placeholder="e.g. Home, Office">
+        <label for="addrStreet">Street address</label>
+        <input type="text" id="addrStreet" class="bfm-input" placeholder="e.g. 12 Accra Road">
+        <label for="addrCity">City</label>
+        <input type="text" id="addrCity" class="bfm-input" placeholder="e.g. Lagos">
+        <label for="addrCountry">Country</label>
+        <input type="text" id="addrCountry" class="bfm-input" placeholder="e.g. Nigeria">
+        <button type="button" class="btn-save" onclick="addAddress()"><i class="fas fa-plus"></i> Add address</button>
+      </div>
       <p class="settings-msg" id="shippingMsg" role="status"></p>`;
+    renderAddressBook();
+  } else if (tab === "support") {
+    form.innerHTML = `
+      <p class="settings-hint">Open a ticket — our team typically responds within 24 hours.</p>
+      <label for="ticketSubject">Subject</label>
+      <input type="text" id="ticketSubject" class="bfm-input" placeholder="Brief summary">
+      <label for="ticketBody">Message</label>
+      <textarea id="ticketBody" class="bfm-input" rows="4" placeholder="Describe your issue…"></textarea>
+      <button type="button" class="btn-save" onclick="submitSupportTicket()"><i class="fas fa-paper-plane"></i> Submit ticket</button>
+      <div id="ticketList" class="ticket-list" style="margin-top:20px"></div>
+      <p class="settings-msg" id="supportMsg" role="status"></p>`;
+    loadMyTickets();
   } else if (tab === "payments") {
     form.innerHTML = `
       <label for="settingCurrency">Preferred currency</label>
@@ -447,10 +545,10 @@ window.saveProfile = async function () {
   const email = document.getElementById("settingEmail")?.value.trim();
   const msg = document.getElementById("profileMsg");
 
-  if (!name || !email) {
-    setSettingsMsg(msg, "Please fill in all fields.", "error");
-    return;
-  }
+  const nameErr = runValidators(name, [required]);
+  if (nameErr) { setSettingsMsg(msg, "Please enter your name.", "error"); return; }
+  const emailErr = runValidators(email, [required, isEmail]);
+  if (emailErr) { setSettingsMsg(msg, emailErr, "error"); return; }
 
   setSettingsMsg(msg, "Saving…", null);
 
@@ -478,30 +576,183 @@ window.saveProfile = async function () {
   showBuyerToast("Profile saved");
 };
 
-window.saveShipping = async function () {
-  const address = document.getElementById("settingAddress")?.value.trim();
-  const city = document.getElementById("settingCity")?.value.trim();
-  const country = document.getElementById("settingCountry")?.value.trim();
-  const msg = document.getElementById("shippingMsg");
+async function handleAvatarSelect(e) {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
 
-  setSettingsMsg(msg, "Saving…", null);
-
-  const { error } = await supabase
-    .from("users")
-    .update({ address, city, country })
-    .eq("uid", currentUser.id);
-
-  if (error) {
-    setSettingsMsg(msg, "Failed to save. Please try again.", "error");
+  if (file.size > 2 * 1024 * 1024) {
+    showBuyerToast("Image must be under 2 MB");
     return;
   }
 
-  currentUser.address = address;
-  currentUser.city = city;
-  currentUser.country = country;
-  setSettingsMsg(msg, "Address saved successfully.", "success");
-  showBuyerToast("Address saved");
+  const preview = document.getElementById("profileAvatarPreview");
+  const msg = document.getElementById("profileMsg");
+  setSettingsMsg(msg, "Uploading photo…", null);
+
+  try {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${currentUser.id}/avatar.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (upErr) throw upErr;
+
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
+
+    const { error } = await supabase.from("users").update({ avatar_url: avatarUrl }).eq("uid", currentUser.id);
+    if (error) throw error;
+
+    currentUser.avatar_url = avatarUrl;
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="">`;
+    updateNavUser();
+    setSettingsMsg(msg, "Photo updated.", "success");
+    showBuyerToast("Profile photo saved");
+  } catch (err) {
+    console.error("Avatar upload:", err);
+    setSettingsMsg(msg, "Could not upload photo. Try again.", "error");
+  }
+}
+
+function renderAddressBook() {
+  const list = document.getElementById("addressBookList");
+  if (!list) return;
+  const addresses = getAddressBook();
+
+  if (addresses.length === 0) {
+    list.innerHTML = `<p class="address-book-empty">No saved addresses yet. Add one below.</p>`;
+    return;
+  }
+
+  list.innerHTML = addresses
+    .map(
+      (a) => `
+    <article class="address-card${a.is_default ? " address-card--default" : ""}">
+      <div class="address-card__head">
+        <strong>${escapeHtml(a.label || "Address")}</strong>
+        ${a.is_default ? '<span class="address-card__badge">Default</span>' : ""}
+      </div>
+      <p>${escapeHtml(a.address)}</p>
+      <p class="address-card__meta">${escapeHtml([a.city, a.country].filter(Boolean).join(", "))}</p>
+      <div class="address-card__actions">
+        ${!a.is_default ? `<button type="button" class="btn-pill btn-pill--secondary btn-pill--sm" onclick="setDefaultAddress('${escapeHtml(a.id)}')">Set default</button>` : ""}
+        <button type="button" class="btn-pill btn-pill--ghost btn-pill--sm" onclick="removeAddress('${escapeHtml(a.id)}')">Remove</button>
+      </div>
+    </article>`
+    )
+    .join("");
+}
+
+window.addAddress = async function () {
+  const label = document.getElementById("addrLabel")?.value.trim() || "Address";
+  const address = document.getElementById("addrStreet")?.value.trim();
+  const city = document.getElementById("addrCity")?.value.trim();
+  const country = document.getElementById("addrCountry")?.value.trim();
+  const msg = document.getElementById("shippingMsg");
+
+  if (!address || !country) {
+    setSettingsMsg(msg, "Street address and country are required.", "error");
+    return;
+  }
+
+  setSettingsMsg(msg, "Saving…", null);
+  const book = getAddressBook();
+  const entry = {
+    id: crypto.randomUUID?.() || `addr-${Date.now()}`,
+    label,
+    address,
+    city,
+    country,
+    is_default: book.length === 0,
+  };
+  book.push(entry);
+
+  try {
+    await persistAddressBook(book);
+    renderAddressBook();
+    document.getElementById("addrLabel").value = "";
+    document.getElementById("addrStreet").value = "";
+    document.getElementById("addrCity").value = "";
+    document.getElementById("addrCountry").value = "";
+    setSettingsMsg(msg, "Address saved.", "success");
+    showBuyerToast("Address added");
+  } catch {
+    setSettingsMsg(msg, "Failed to save address.", "error");
+  }
 };
+
+window.setDefaultAddress = async function (id) {
+  const msg = document.getElementById("shippingMsg");
+  const book = getAddressBook().map((a) => ({ ...a, is_default: a.id === id }));
+  try {
+    await persistAddressBook(book);
+    renderAddressBook();
+    setSettingsMsg(msg, "Default address updated.", "success");
+  } catch {
+    setSettingsMsg(msg, "Could not update default.", "error");
+  }
+};
+
+window.removeAddress = async function (id) {
+  const msg = document.getElementById("shippingMsg");
+  let book = getAddressBook().filter((a) => a.id !== id);
+  if (book.length && !book.some((a) => a.is_default)) {
+    book[0].is_default = true;
+  }
+  try {
+    await persistAddressBook(book);
+    renderAddressBook();
+    setSettingsMsg(msg, "Address removed.", "success");
+  } catch {
+    setSettingsMsg(msg, "Could not remove address.", "error");
+  }
+};
+
+window.submitSupportTicket = async function () {
+  const subject = document.getElementById("ticketSubject")?.value.trim();
+  const body = document.getElementById("ticketBody")?.value.trim();
+  const msg = document.getElementById("supportMsg");
+  if (!subject || !body) {
+    setSettingsMsg(msg, "Subject and message are required.", "error");
+    return;
+  }
+  setSettingsMsg(msg, "Submitting…", null);
+  try {
+    await createTicket({
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
+      subject,
+      body,
+    });
+    document.getElementById("ticketSubject").value = "";
+    document.getElementById("ticketBody").value = "";
+    setSettingsMsg(msg, "Ticket submitted. We'll be in touch soon.", "success");
+    loadMyTickets();
+  } catch {
+    setSettingsMsg(msg, "Could not submit — run supabase-phase3.sql", "error");
+  }
+};
+
+async function loadMyTickets() {
+  const list = document.getElementById("ticketList");
+  if (!list) return;
+  try {
+    const tickets = await fetchMyTickets(currentUser.id);
+    if (!tickets.length) {
+      list.innerHTML = `<p class="settings-hint">No tickets yet.</p>`;
+      return;
+    }
+    list.innerHTML = tickets.map((t) => `
+      <article class="ticket-card">
+        <strong>${escapeHtml(t.subject)}</strong>
+        <span class="ticket-card__status ticket-card__status--${t.status}">${escapeHtml(t.status)}</span>
+        <p>${escapeHtml(t.body)}</p>
+        <time>${new Date(t.created_at).toLocaleDateString()}</time>
+      </article>`).join("");
+  } catch {
+    list.innerHTML = `<p class="settings-hint">Support tickets unavailable.</p>`;
+  }
+}
 
 window.savePayments = async function () {
   const currency = document.getElementById("settingCurrency")?.value.trim();

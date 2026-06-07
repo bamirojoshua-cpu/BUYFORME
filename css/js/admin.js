@@ -5,6 +5,8 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { fetchAllTickets, updateTicketStatus } from "./api/tickets.js";
+import { renderAnalyticsCharts } from "./admin-analytics.js";
 
 /* ─── STATE ─── */
 let currentAdmin  = null;
@@ -13,6 +15,7 @@ let allShoppers   = [];
 let allBuyers     = [];
 let allReviews    = [];
 let allBroadcasts = [];
+let allTickets    = [];
 let platformSettings = {};
 
 /* ─── INIT ─── */
@@ -67,13 +70,14 @@ window.showSection = function (id, btn) {
     payments: "Payments & Finance", disputes: "Disputes",
     shoppers: "Shoppers Management", buyers: "Buyers Management",
     reviews: "Reviews Moderation", broadcast: "Broadcast",
-    settings: "Platform Settings"
+    tickets: "Support Tickets", settings: "Platform Settings"
   };
   document.getElementById("topbarTitle").textContent = titles[id] || id;
 
   // Lazy render on first visit
   if (id === "payments")  renderPaymentsSection();
   if (id === "disputes")  renderDisputesSection();
+  if (id === "tickets")   renderTicketsSection();
   if (id === "shoppers")  renderShoppersSection();
   if (id === "buyers")    renderBuyersSection();
   if (id === "reviews")   renderReviewsSection();
@@ -89,6 +93,7 @@ async function loadAllData() {
     loadReviews(),
     loadBroadcasts(),
     loadPayouts(),
+    loadTickets(),
   ]);
   renderOverview();
   renderOrdersTable();
@@ -125,6 +130,50 @@ async function loadReviews() {
   if (error) { console.error("loadReviews error:", error); return; }
   allReviews = data || [];
 }
+
+async function loadTickets() {
+  try {
+    allTickets = await fetchAllTickets();
+  } catch (e) {
+    console.error("loadTickets:", e);
+    allTickets = [];
+  }
+}
+
+function renderTicketsSection() {
+  const el = document.getElementById("ticketsTableBody");
+  if (!el) return;
+  if (!allTickets.length) {
+    el.innerHTML = `<tr class="empty-row"><td colspan="5">No support tickets — run supabase-phase3.sql</td></tr>`;
+    return;
+  }
+  el.innerHTML = allTickets.map((t) => `
+    <tr>
+      <td>${escapeHtml(t.subject)}</td>
+      <td class="td-muted">${escapeHtml(t.user_name || t.user_email || "—")}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td class="td-muted">${new Date(t.created_at).toLocaleDateString()}</td>
+      <td>
+        <select onchange="updateTicket('${t.id}', this.value)" class="admin-select-sm">
+          <option value="open" ${t.status === "open" ? "selected" : ""}>Open</option>
+          <option value="in_progress" ${t.status === "in_progress" ? "selected" : ""}>In progress</option>
+          <option value="resolved" ${t.status === "resolved" ? "selected" : ""}>Resolved</option>
+          <option value="closed" ${t.status === "closed" ? "selected" : ""}>Closed</option>
+        </select>
+      </td>
+    </tr>`).join("");
+}
+
+window.updateTicket = async function (id, status) {
+  try {
+    await updateTicketStatus(id, status);
+    await loadTickets();
+    renderTicketsSection();
+  } catch (e) {
+    console.error(e);
+    alert("Could not update ticket");
+  }
+};
 
 /* ─── BROADCASTS ─── */
 async function loadBroadcasts() {
@@ -219,11 +268,14 @@ function renderOverview() {
             <div class="activity-time">${timeAgo(e.time)}</div>
           </div>
         </div>`).join("");
+
+  renderAnalyticsCharts(allOrders);
 }
 
 function activityText(o) {
   const map = {
     pending:    `📋 ${o.buyer_name} requested "${o.product_name}"`,
+    quoted:     `💬 ${o.shopper_name} sent a quote for "${o.product_name}"`,
     accepted:   `✅ ${o.shopper_name} accepted "${o.product_name}"`,
     paid:       `💳 ${o.buyer_name} paid for "${o.product_name}"`,
     funded:     `🏦 Funds released to ${o.shopper_name} for "${o.product_name}"`,

@@ -1,1 +1,1 @@
-export const PAYSTACK_PUBLIC_KEY = "pk_test_753e443a4167a0afaa94ce4d0ba2a1c545682e71";
+export { PAYSTACK_PUBLIC_KEY, STRIPE_PUBLISHABLE_KEY } from "./runtime-config.js";

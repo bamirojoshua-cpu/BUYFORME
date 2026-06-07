@@ -1,7 +1,16 @@
 import { supabase } from "./supabase.js";
-import { PAYSTACK_PUBLIC_KEY } from "./config.js";
+import { PAYSTACK_PUBLIC_KEY, STRIPE_PUBLISHABLE_KEY } from "./config.js";
 import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
+import { fetchOrdersForBuyer } from "./api/orders.js";
+import {
+  preferredProvider,
+  startPaystackCheckout,
+  startStripeCheckout,
+  verifyPaystack,
+  verifyStripe,
+} from "./payments.js";
+import { t } from "./i18n/index.js";
 
 /* ─── STATE ─── */
 let currentUser = null;
@@ -15,15 +24,63 @@ let selectedShopperName = null;
 /* ─── STATUS CONFIG ─── */
 const statusConfig = {
     pending: { label: "Request Sent", class: "status-pending", step: 0 },
-    accepted: { label: "Accepted", class: "status-accepted", step: 1 },
-    paid: { label: "Paid", class: "status-paid", step: 2 },
-    purchased: { label: "Purchased", class: "status-purchased", step: 3 },
-    delivering: { label: "In Transit", class: "status-delivering", step: 4 },
-    delivered: { label: "Delivered", class: "status-delivered", step: 5 },
+    quoted: { label: "Quote Received", class: "status-accepted", step: 1 },
+    accepted: { label: "Accepted", class: "status-accepted", step: 2 },
+    paid: { label: "Paid", class: "status-paid", step: 3 },
+    purchased: { label: "Purchased", class: "status-purchased", step: 4 },
+    delivering: { label: "In Transit", class: "status-delivering", step: 5 },
+    delivered: { label: "Delivered", class: "status-delivered", step: 6 },
     cancelled: { label: "Cancelled", class: "status-cancelled", step: -1 }
 };
 
-const progressSteps = ["Request Sent", "Accepted", "Paid", "Purchased", "In Transit", "Delivered"];
+const progressSteps = ["Sent", "Quote", "Accepted", "Paid", "Purchased", "In Transit", "Delivered"];
+
+function hasPaystack() {
+    return PAYSTACK_PUBLIC_KEY && !PAYSTACK_PUBLIC_KEY.includes("your_");
+}
+
+function hasStripe() {
+    return STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY.startsWith("pk_");
+}
+
+function renderPaymentButtons(order, total) {
+    if (order.status !== "accepted") return "";
+
+    const currency = order.currency || "NGN";
+    const primary = preferredProvider(currency);
+    const paystackBtn = `
+        <button type="button" class="btn-pill ${primary === "paystack" ? "btn-pill--amber" : "btn-pill--secondary"}"
+            onclick="makePayment('${order.id}', '${(order.shopper_name || "").replace(/'/g, "\\'")}', ${total}, '${currency}')">
+            <i class="fas fa-credit-card"></i> ${t("orders.payPaystack", "Pay with Paystack")}
+        </button>`;
+    const stripeBtn = `
+        <button type="button" class="btn-pill ${primary === "stripe" ? "btn-pill--amber" : "btn-pill--secondary"}"
+            onclick="makeStripePayment('${order.id}')">
+            <i class="fab fa-stripe"></i> ${t("orders.payStripe", "Pay with card")}
+        </button>`;
+
+    if (primary === "paystack" && hasPaystack()) {
+        return paystackBtn + (hasStripe() ? stripeBtn : "");
+    }
+    if (hasStripe()) {
+        return stripeBtn + (hasPaystack() ? paystackBtn : "");
+    }
+    if (hasPaystack()) return paystackBtn;
+    return "";
+}
+
+function renderShipmentStrip(order) {
+    if (!["delivering", "delivered"].includes(order.status)) return "";
+    if (!order.tracking_number && !order.carrier) return "";
+
+    const carrier = order.carrier || "Carrier";
+    const tracking = order.tracking_number || "—";
+    return `
+        <div class="order-shipment-strip">
+            <i class="fas fa-truck" aria-hidden="true"></i>
+            <span><strong>${carrier}</strong> · ${tracking}</span>
+        </div>`;
+}
 
 /* ─── AUTH + INIT ─── */
 function buyerUid() {
@@ -43,6 +100,25 @@ async function init() {
 
     await loadOrders();
 
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("stripe_success") === "1") {
+        const orderId = params.get("order_id");
+        const sessionId = params.get("session_id");
+        if (orderId && sessionId) {
+            document.getElementById("processingOverlay")?.classList.add("show");
+            try {
+                await verifyStripe(orderId, sessionId);
+                showSuccessBanner();
+            } catch (e) {
+                console.error(e);
+                showBuyerToast("Payment verification failed — contact support");
+            }
+            document.getElementById("processingOverlay")?.classList.remove("show");
+            history.replaceState({}, "", "my-orders.html");
+            await loadOrders();
+        }
+    }
+
     document.addEventListener("bfm-order-updated", e => {
         const updated = e.detail;
         if (!updated?.id) return;
@@ -57,13 +133,12 @@ document.addEventListener("DOMContentLoaded", init);
 
 /* ─── LOAD ORDERS ─── */
 async function loadOrders() {
-    const { data, error } = await supabase
-        .from("requests").select("*")
-        .eq("buyer_id", buyerUid())
-        .order("created_at", { ascending: false });
-
-    if (error) { console.error("Load orders error:", error); allOrders = []; }
-    else { allOrders = data || []; }
+    try {
+        allOrders = await fetchOrdersForBuyer(buyerUid());
+    } catch (err) {
+        console.error("Load orders error:", err);
+        allOrders = [];
+    }
     renderOrders();
 }
 window.loadOrders = loadOrders;
@@ -109,8 +184,10 @@ function buildOrderCard(order) {
     const config = statusConfig[order.status] || statusConfig.pending;
     const stepIdx = config.step;
     const total = order.total_amount ? order.total_amount : order.budget * 1.15;
-    const canPay = order.status === "accepted";
+    const isQuoted = order.status === "quoted";
     const isDelivered = order.status === "delivered";
+    const quoteNote = isQuoted && order.quote_notes
+        ? `<p class="order-quote-note"><i class="fas fa-file-invoice"></i> ${order.quote_notes}</p>` : "";
 
     const progressHTML = order.status !== "cancelled" ? `
         <div class="order-progress">
@@ -141,64 +218,81 @@ function buildOrderCard(order) {
                 <span class="status-chip ${config.class}">${config.label}</span>
             </div>
             ${progressHTML}
+            ${quoteNote}
+            ${renderShipmentStrip(order)}
             <div class="order-actions">
-                ${canPay ? `
-                    <button type="button" class="btn-pill btn-pill--amber" onclick="makePayment('${order.id}', '${order.shopper_name}', ${total})">
-                        <i class="fas fa-credit-card"></i> Pay now
+                ${isQuoted ? `
+                    <button type="button" class="btn-pill btn-pill--primary" onclick="acceptQuote('${order.id}')">
+                        <i class="fas fa-check"></i> Accept quote
+                    </button>
+                    <button type="button" class="btn-pill btn-pill--secondary" onclick="rejectQuote('${order.id}')">
+                        Decline
                     </button>` : ""}
+                ${renderPaymentButtons(order, total)}
                 ${isDelivered ? `
                     <button type="button" class="btn-pill btn-pill--secondary" onclick="leaveReview('${order.shopper_id}', '${order.shopper_name}')">
                         <i class="fas fa-star"></i> Leave review
                     </button>` : ""}
+                <a href="tracking.html?order_id=${order.id}" class="btn-pill btn-pill--secondary">
+                    <i class="fas fa-location-dot"></i> ${t("orders.track", "Track order")}
+                </a>
                 <span class="order-date">${new Date(order.created_at).toLocaleDateString()}</span>
             </div>
         </div>`;
 }
 
-/* ─── PAYSTACK ─── */
-window.makePayment = function (orderId, shopperName, totalAmount) {
+/* ─── QUOTES ─── */
+window.acceptQuote = async function (orderId) {
+    const { error } = await supabase.from("requests").update({ status: "accepted" }).eq("id", orderId);
+    if (error) { showBuyerToast("Could not accept quote"); return; }
+    showBuyerToast("Quote accepted — you can pay when ready");
+    await loadOrders();
+};
+
+window.rejectQuote = async function (orderId) {
+    if (!confirm("Decline this quote?")) return;
+    const { error } = await supabase.from("requests").update({ status: "cancelled" }).eq("id", orderId);
+    if (error) { showBuyerToast("Could not decline quote"); return; }
+    await loadOrders();
+};
+
+/* ─── PAYMENTS ─── */
+window.makePayment = function (orderId, shopperName, totalAmount, orderCurrency) {
     if (paymentInProgress) return;
     paymentInProgress = true;
 
-    var handler = PaystackPop.setup({
-        key: PAYSTACK_PUBLIC_KEY,
+    startPaystackCheckout({
+        orderId,
         email: currentUser.email,
-        amount: Math.round(totalAmount * 100),
-        currency: "NGN",
-        ref: "BFM_" + orderId + "_" + Date.now(),
-
-        callback: function (response) {
+        totalAmount,
+        currency: orderCurrency,
+        onSuccess: (reference) => {
             document.getElementById("processingOverlay").classList.add("show");
-            handlePaymentSuccess(orderId, response.reference);
+            handlePaymentSuccess(orderId, reference);
         },
-
-        onClose: function () {
-            paymentInProgress = false;
-        }
+        onClose: () => { paymentInProgress = false; },
     });
+};
 
-    handler.openIframe();
+window.makeStripePayment = async function (orderId) {
+    if (paymentInProgress) return;
+    paymentInProgress = true;
+    try {
+        await startStripeCheckout(orderId);
+    } catch (e) {
+        console.error(e);
+        showBuyerToast("Stripe checkout unavailable — use Paystack or configure STRIPE_SECRET_KEY");
+        paymentInProgress = false;
+    }
 };
 
 async function handlePaymentSuccess(orderId, reference) {
     try {
-        const { data, error } = await supabase.functions.invoke("verify_paystack_payment", {
-            body: { order_id: orderId, reference }
-        });
+        await verifyPaystack(orderId, reference);
 
         document.getElementById("processingOverlay").classList.remove("show");
         paymentInProgress = false;
-
-        if (error) {
-            console.error("Payment verify function error:", error);
-            alert(
-                "Payment received but could not be verified on the server yet.\n\n" +
-                "Please contact support with ref: " + reference
-            );
-        } else {
-            showSuccessBanner();
-            // Realtime will re-render the card automatically
-        }
+        showSuccessBanner();
     } catch (err) {
         console.error("Unexpected payment update error:", err);
         document.getElementById("processingOverlay").classList.remove("show");

@@ -1,0 +1,109 @@
+/* BuyForMe Design System — Core tokens */
+
+:root {
+  /* Brand palette */
+  --bfm-charcoal: #0c0c0c;
+  --bfm-charcoal-soft: #1a1f1c;
+  --bfm-cream: #faf7f2;
+  --bfm-cream-dark: #f0ece4;
+  --bfm-white: #ffffff;
+
+  /* Accent */
+  --bfm-green: #1a9e6e;
+  --bfm-green-dark: #0d6e4a;
+  --bfm-green-deep: #0f5c36;
+  --bfm-green-light: #e6f7f1;
+  --bfm-green-muted: #bbf7d0;
+  --bfm-green-glow: rgba(26, 158, 110, 0.35);
+  --bfm-gold: #c9a84c;
+  --bfm-gold-light: #f5edd8;
+
+  /* Semantic */
+  --bfm-blue: #2563eb;
+  --bfm-blue-light: #dbeafe;
+  --bfm-amber: #d97706;
+  --bfm-amber-light: #fef3c7;
+  --bfm-red: #dc2626;
+  --bfm-red-light: #fee2e2;
+  --bfm-verified: #1877f2;
+
+  /* Text */
+  --bfm-text: #0f1c18;
+  --bfm-text-muted: #5a7268;
+  --bfm-text-soft: #8aa399;
+  --bfm-text-inverse: #faf7f2;
+
+  /* Surfaces */
+  --bfm-bg: #eef4f1;
+  --bfm-surface: #ffffff;
+  --bfm-surface-2: #f8fbf9;
+  --bfm-border: rgba(15, 42, 32, 0.08);
+  --bfm-border-strong: rgba(15, 42, 32, 0.14);
+
+  /* Layout */
+  --bfm-sidebar-w: 268px;
+  --bfm-sidebar-w-collapsed: 76px;
+  --bfm-nav-h: 64px;
+  --bfm-content-max: 1280px;
+  --bfm-page-max: 720px;
+
+  /* Radius */
+  --bfm-radius-xs: 8px;
+  --bfm-radius-sm: 12px;
+  --bfm-radius: 16px;
+  --bfm-radius-lg: 22px;
+  --bfm-radius-xl: 28px;
+  --bfm-radius-pill: 999px;
+
+  /* Shadows */
+  --bfm-shadow-xs: 0 1px 3px rgba(12, 26, 20, 0.04);
+  --bfm-shadow-sm: 0 2px 8px rgba(12, 26, 20, 0.06);
+  --bfm-shadow-md: 0 8px 28px rgba(12, 26, 20, 0.08);
+  --bfm-shadow-lg: 0 16px 48px rgba(12, 26, 20, 0.1);
+  --bfm-shadow-xl: 0 24px 64px rgba(12, 26, 20, 0.12);
+
+  /* Motion */
+  --bfm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --bfm-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --bfm-dur-fast: 0.15s;
+  --bfm-dur: 0.28s;
+  --bfm-dur-slow: 0.45s;
+
+  /* Typography scale */
+  --bfm-font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --bfm-font-ui: "Inter", "DM Sans", system-ui, -apple-system, sans-serif;
+  --bfm-font-accent: "Sora", var(--bfm-font-ui);
+
+  /* Legacy aliases (backward compat with buyer-theme) */
+  --green: var(--bfm-green);
+  --green-dark: var(--bfm-green-dark);
+  --green-deep: var(--bfm-green-deep);
+  --green-light: var(--bfm-green-light);
+  --green-muted: var(--bfm-green-muted);
+  --green-glow: var(--bfm-green-glow);
+  --gold: var(--bfm-gold);
+  --blue: var(--bfm-blue);
+  --blue-light: var(--bfm-blue-light);
+  --amber: var(--bfm-amber);
+  --amber-light: var(--bfm-amber-light);
+  --red: var(--bfm-red);
+  --red-light: var(--bfm-red-light);
+  --verified: var(--bfm-verified);
+  --text: var(--bfm-text);
+  --text-muted: var(--bfm-text-muted);
+  --text-soft: var(--bfm-text-soft);
+  --border: var(--bfm-border);
+  --border-strong: var(--bfm-border-strong);
+  --bg: var(--bfm-bg);
+  --surface: var(--bfm-surface);
+  --surface-2: var(--bfm-surface-2);
+  --radius: var(--bfm-radius);
+  --radius-lg: var(--bfm-radius-lg);
+  --radius-sm: var(--bfm-radius-sm);
+  --radius-pill: var(--bfm-radius-pill);
+  --shadow-sm: var(--bfm-shadow-sm);
+  --shadow-md: var(--bfm-shadow-md);
+  --shadow-lg: var(--bfm-shadow-lg);
+  --ease: var(--bfm-ease);
+  --dur: var(--bfm-dur);
+}

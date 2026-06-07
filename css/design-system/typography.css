@@ -1,0 +1,68 @@
+/* BuyForMe Design System — Typography */
+
+.bfm-display-xl {
+  font-family: var(--bfm-font-display);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--bfm-text);
+}
+
+.bfm-display-lg {
+  font-family: var(--bfm-font-display);
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--bfm-text);
+}
+
+.bfm-heading {
+  font-family: var(--bfm-font-accent);
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--bfm-text);
+}
+
+.bfm-subheading {
+  font-family: var(--bfm-font-ui);
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--bfm-text-muted);
+  line-height: 1.5;
+}
+
+.bfm-body {
+  font-family: var(--bfm-font-ui);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--bfm-text);
+}
+
+.bfm-caption {
+  font-family: var(--bfm-font-ui);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--bfm-text-soft);
+}
+
+.bfm-label {
+  font-family: var(--bfm-font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bfm-text-soft);
+}
+
+.bfm-overline {
+  font-family: var(--bfm-font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bfm-green);
+}

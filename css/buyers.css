@@ -1011,3 +1011,170 @@
     transform: none;
   }
 }
+
+/* ── Profile avatar upload ── */
+.profile-avatar-upload {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-avatar-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-weight: 700;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+}
+
+.profile-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Address book ── */
+.address-book {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.address-book-empty {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  padding: 12px 0;
+}
+
+.address-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.address-card--default {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+
+.address-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.address-card__badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green-dark);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.address-card p {
+  font-size: 0.875rem;
+  margin-bottom: 2px;
+}
+
+.address-card__meta {
+  color: var(--text-muted);
+  font-size: 0.8125rem !important;
+}
+
+.address-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.address-book-form {
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.address-book-form__title {
+  font-family: var(--bfm-font-accent);
+  font-size: 0.9375rem;
+  margin-bottom: 12px;
+}
+
+.notif-item--link {
+  cursor: pointer;
+  transition: background var(--dur);
+}
+
+.order-quote-note {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  background: var(--amber-light);
+  border-radius: var(--radius-sm);
+}
+
+.request-save-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.ticket-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  background: var(--surface-2);
+}
+
+.ticket-card__status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: 8px;
+  color: var(--green-dark);
+}
+
+.ticket-list time {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.buyer-sidebar__settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background var(--dur-fast);
+}
+
+.buyer-sidebar__settings:hover {
+  background: var(--green-light);
+  color: var(--green-dark);
+}

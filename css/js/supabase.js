@@ -5,11 +5,9 @@
    ============================================================= */
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/+esm";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./runtime-config.js";
 
-const SUPABASE_URL = "https://jbdfzrgxukwyepwqutdt.supabase.co";
-const SUPABASE_KEY = "sb_publishable_dkEYDXibAaRL0Lht6D3y6g_Tz9lbxTu";
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

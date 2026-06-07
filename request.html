@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Send Request | BuyForMe</title>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="description" content="Send a purchase request to your chosen shopper on BuyForMe.">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="css/buyer-theme.css">
     <link rel="stylesheet" href="css/buyer-shell.css">
@@ -64,6 +64,10 @@
                         <div class="form-group">
                             <label for="productName">Product name <span class="req">*</span></label>
                             <input type="text" id="productName" class="buyer-input" placeholder="e.g. iPhone 15 Pro, Zara puffer jacket" autocomplete="off">
+                            <div class="request-save-actions">
+                                <button type="button" class="bfm-btn bfm-btn--ghost bfm-btn--sm" id="saveWishlistBtn"><i class="fas fa-heart"></i> Save to wishlist</button>
+                                <button type="button" class="bfm-btn bfm-btn--ghost bfm-btn--sm" id="addCartBtn"><i class="fas fa-cart-plus"></i> Add to cart</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="storeName">Store or website</label>

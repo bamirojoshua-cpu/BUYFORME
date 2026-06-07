@@ -1,0 +1,44 @@
+/* Tracking page — 7-step progress + shipment panel */
+
+.steps-track--7 .step-label {
+  font-size: 0.58rem;
+  max-width: 48px;
+}
+
+.shipment-details {
+  margin: 20px 0;
+  padding: 18px;
+  background: var(--bfm-surface-2);
+  border: 1px solid var(--bfm-border);
+  border-radius: var(--bfm-radius);
+}
+
+.shipment-details h3 {
+  font-family: var(--bfm-font-accent);
+  font-size: 0.9375rem;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shipment-details__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.shipment-details__grid label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bfm-text-soft);
+  margin-bottom: 4px;
+}
+
+.shipment-details__grid span {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}

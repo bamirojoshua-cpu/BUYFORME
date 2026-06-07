@@ -1,0 +1,395 @@
+/* BuyForMe — Order tracking page */
+
+@import url("design-system/index.css");
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--bfm-font-ui);
+  background: var(--bfm-bg);
+  color: var(--bfm-text);
+  min-height: 100vh;
+}
+
+body.buyer-app {
+  background: var(--bfm-bg, var(--bg));
+}
+
+body.buyer-app .track-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 0 48px;
+}
+
+body.buyer-app .buyer-page-head {
+  margin-bottom: 8px;
+}
+
+/* ── Nav (legacy standalone pages) ── */
+.track-nav {
+  background: var(--bfm-surface);
+  border-bottom: 1px solid var(--bfm-border);
+  padding: 0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
+  height: var(--bfm-nav-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.track-nav .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--bfm-text-muted);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: var(--bfm-radius-pill);
+  transition: background var(--bfm-dur-fast), color var(--bfm-dur-fast);
+}
+
+.track-nav .back-btn:hover {
+  background: var(--bfm-green-light);
+  color: var(--bfm-green-dark);
+}
+
+/* ── Page ── */
+.track-page {
+  max-width: var(--bfm-page-max);
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+/* ── States ── */
+.track-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--bfm-text-muted);
+}
+
+.track-state .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--bfm-border);
+  border-top-color: var(--bfm-green);
+  border-radius: 50%;
+  animation: bfmSpin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+.track-state .icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+/* ── Tracking card ── */
+.tracking-card {
+  background: var(--bfm-surface);
+  border: 1px solid var(--bfm-border);
+  border-radius: var(--bfm-radius-xl);
+  box-shadow: var(--bfm-shadow-lg);
+  overflow: hidden;
+  animation: bfmSlideUp var(--bfm-dur-slow) var(--bfm-ease);
+}
+
+.tracking-card .card-inner {
+  padding: 28px;
+}
+
+.track-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.track-header h2 {
+  font-family: var(--bfm-font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.order-ref {
+  font-size: 0.8125rem;
+  color: var(--bfm-text-soft);
+  font-weight: 500;
+}
+
+/* ── Summary grid ── */
+.order-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bfm-surface-2);
+  border-radius: var(--bfm-radius);
+  margin-bottom: 28px;
+}
+
+.summary-item label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bfm-text-soft);
+  margin-bottom: 4px;
+}
+
+.summary-item span {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--bfm-text);
+}
+
+.summary-item.full {
+  grid-column: 1 / -1;
+}
+
+/* ── Progress steps ── */
+.progress-section h3,
+.timeline h3 {
+  font-family: var(--bfm-font-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--bfm-text-muted);
+  margin-bottom: 20px;
+  letter-spacing: -0.01em;
+}
+
+.steps-track {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 32px;
+  padding: 0 4px;
+}
+
+.progress-fill-line {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  right: 24px;
+  height: 3px;
+  background: var(--bfm-green);
+  border-radius: 2px;
+  width: 0;
+  transition: width 0.6s var(--bfm-ease);
+  z-index: 1;
+}
+
+.steps-track::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  right: 24px;
+  height: 3px;
+  background: var(--bfm-cream-dark);
+  border-radius: 2px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+}
+
+.step-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bfm-cream-dark);
+  color: var(--bfm-text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: background var(--bfm-dur), color var(--bfm-dur), box-shadow var(--bfm-dur);
+}
+
+.step.done .step-icon {
+  background: var(--bfm-green);
+  color: var(--bfm-white);
+}
+
+.step.current .step-icon {
+  background: var(--bfm-green);
+  color: var(--bfm-white);
+  box-shadow: 0 0 0 4px var(--bfm-green-glow);
+}
+
+.step-label {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--bfm-text-soft);
+  text-align: center;
+  max-width: 56px;
+}
+
+.step.done .step-label,
+.step.current .step-label {
+  color: var(--bfm-green-dark);
+  font-weight: 600;
+}
+
+/* ── Shopper row ── */
+.shopper-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bfm-surface-2);
+  border-radius: var(--bfm-radius);
+  margin-bottom: 28px;
+}
+
+.shopper-av {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bfm-green-light);
+  color: var(--bfm-green-dark);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.shopper-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shopper-info p {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.shopper-info span {
+  font-size: 0.8125rem;
+  color: var(--bfm-text-soft);
+}
+
+/* ── Timeline ── */
+.timeline {
+  border-top: 1px solid var(--bfm-border);
+  padding-top: 24px;
+}
+
+.tl-item {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 20px;
+  animation: bfmFadeIn var(--bfm-dur) var(--bfm-ease) backwards;
+}
+
+.tl-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bfm-green);
+  margin-top: 5px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--bfm-green-light);
+}
+
+.tl-dot.idle {
+  background: var(--bfm-text-soft);
+  box-shadow: none;
+}
+
+.tl-content p {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.tl-content span {
+  font-size: 0.8125rem;
+  color: var(--bfm-text-soft);
+}
+
+/* ── Payment banner ── */
+.payment-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--bfm-amber-light), var(--bfm-gold-light));
+  border-radius: var(--bfm-radius);
+  margin-bottom: 24px;
+  border: 1px solid rgba(201, 168, 76, 0.25);
+}
+
+.payment-banner p {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--bfm-charcoal-soft);
+}
+
+/* Legacy toast class alias — uses bfm-toast styles from design system */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  padding: 14px 22px;
+  background: var(--bfm-charcoal-soft);
+  color: var(--bfm-text-inverse);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--bfm-radius-pill);
+  box-shadow: var(--bfm-shadow-lg);
+  z-index: 9999;
+  opacity: 0;
+  transition: transform var(--bfm-dur) var(--bfm-ease), opacity var(--bfm-dur) var(--bfm-ease);
+}
+
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { background: var(--bfm-green-dark); }
+.toast.error { background: var(--bfm-red); }
+
+@media (max-width: 640px) {
+  .order-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-item.full {
+    grid-column: 1;
+  }
+
+  .step-label {
+    font-size: 0.62rem;
+  }
+
+  .track-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .payment-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

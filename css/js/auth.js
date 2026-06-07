@@ -12,6 +12,7 @@ import {
   shouldSkipAutoLoginRedirect,
   finishLoggedOutAuthUrl,
 } from "./auth-session.js";
+import { isEmail, required, minLength, validate as runValidators } from "./validators/forms.js";
 
 
 /* ─────────────────────────────────────────────
@@ -160,17 +161,15 @@ function validate() {
   const nameEl   = document.getElementById("fullName");
   const name     = nameEl ? nameEl.value.trim() : "";
 
-  if (!email || !email.includes("@")) {
-    showError("Please enter a valid email address.");
-    return false;
-  }
-  if (password.length < 6) {
-    showError("Password must be at least 6 characters.");
-    return false;
-  }
-  if (mode === "signup" && !name) {
-    showError("Please enter your full name.");
-    return false;
+  const emailErr = runValidators(email, [required, isEmail]);
+  if (emailErr) { showError(emailErr); return false; }
+
+  const passErr = runValidators(password, [required, (v) => minLength(v, 6)]);
+  if (passErr) { showError(passErr === "This field is required." ? "Please enter your password." : passErr); return false; }
+
+  if (mode === "signup") {
+    const nameErr = required(name);
+    if (nameErr) { showError("Please enter your full name."); return false; }
   }
   return true;
 }

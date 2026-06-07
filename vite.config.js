@@ -2,9 +2,22 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { cpSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join, resolve } from "path";
+import { execSync } from "child_process";
 
 /** Relative base works on GitHub Pages (/BUYFORME/) and localhost. */
 const PROD_BASE = "./";
+
+function generateRuntimeConfig() {
+  return {
+    name: "generate-runtime-config",
+    buildStart() {
+      execSync("node scripts/generate-runtime-config.js", {
+        cwd: __dirname,
+        stdio: "inherit",
+      });
+    },
+  };
+}
 
 function renameDashboardHtml(out) {
   const devHtml = join(out, "shopper-dashboard.dev.html");
@@ -57,6 +70,9 @@ function copyLegacyAssets() {
         "my-orders.html",
         "chat.html",
         "admin.html",
+        "tracking.html",
+        "wishlist.html",
+        "cart.html",
       ]) {
         const src = join(__dirname, file);
         if (existsSync(src)) {
@@ -97,6 +113,7 @@ export default defineConfig(({ command }) => {
     /* Dev: /  |  Build: relative ./assets so login → dashboard works everywhere */
     base: isBuild ? PROD_BASE : "/",
     plugins: [
+      generateRuntimeConfig(),
       react({ include: /\.(jsx|tsx)$/ }),
       stripReactRefreshFromLegacyHtml(),
       copyLegacyAssets(),

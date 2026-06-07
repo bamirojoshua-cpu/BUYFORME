@@ -9,8 +9,16 @@ import {
   getUnreadMap,
 } from "./chat-local.js";
 import { playMessageNotification } from "./app-sounds.js";
+import {
+  initNotificationCenter,
+  pushNotification,
+  renderNotificationList,
+  clearNotificationCenter,
+  stopNotificationCenter,
+  updateNotificationDot,
+} from "./notification-center.js";
 
-const STORAGE_KEY = "bfm_buyer_notifications";
+const LEGACY_STORAGE_KEY = "bfm_buyer_notifications";
 
 let buyerUser = null;
 let toastFn = (msg) => console.log(msg);
@@ -20,6 +28,7 @@ let started = false;
 let drawerUiBound = false;
 
 const ORDER_STATUS_MSG = {
+  quoted: (p) => `New quote for "${p}" — review in My Orders`,
   accepted: (p) => `Your request for "${p}" was accepted`,
   paid: (p) => `Payment confirmed for "${p}"`,
   purchased: (p) => `Your shopper bought "${p}"`,
@@ -46,75 +55,13 @@ export function buyerNotificationsEnabled() {
   return buyerUser.notifications !== false;
 }
 
-function escapeHtml(text) {
-  return String(text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function formatNotifTime(ts) {
-  const d = new Date(ts);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-function getNotifications() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch {
-    return [];
-  }
-}
-
-export function addBuyerNotification(message) {
-  const n = getNotifications();
-  n.unshift({ message, time: Date.now() });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(n.slice(0, 50)));
-  updateBuyerNotifDot();
+export async function addBuyerNotification(message, meta = {}) {
+  if (!buyerUser?.uid) return;
+  await pushNotification(message, { type: meta.type || "info", link: meta.link, title: meta.title });
+  updateNotificationDot();
   if (document.getElementById("buyerNotifDrawer")?.classList.contains("is-open")) {
-    renderBuyerNotificationsList();
+    renderNotificationList("buyerNotifDrawerList");
   }
-}
-
-function updateBuyerNotifDot() {
-  const show = getNotifications().length > 0;
-  document.querySelectorAll("#buyerNotifDot, #buyerNotifDotMobile").forEach(dot => {
-    dot.classList.toggle("show", show);
-  });
-}
-
-function renderBuyerNotificationsList() {
-  const list = document.getElementById("buyerNotifDrawerList");
-  if (!list) return;
-  const items = getNotifications();
-
-  if (items.length === 0) {
-    list.innerHTML = `
-      <div class="notif-empty">
-        <div class="notif-empty-icon"><i class="fas fa-bell-slash" aria-hidden="true"></i></div>
-        <p>You're all caught up</p>
-        <span>New messages and order updates appear here</span>
-      </div>`;
-    return;
-  }
-
-  list.innerHTML = items
-    .map(
-      item => `
-    <article class="notif-item">
-      <div class="notif-item-icon"><i class="fas fa-bell" aria-hidden="true"></i></div>
-      <div class="notif-item-body">
-        <p>${escapeHtml(item.message)}</p>
-        <time>${formatNotifTime(item.time)}</time>
-      </div>
-    </article>`
-    )
-    .join("");
 }
 
 function injectNotifDrawer() {
@@ -143,7 +90,6 @@ function injectNotifDrawer() {
 
 function initNotifDrawerUi() {
   injectNotifDrawer();
-  updateBuyerNotifDot();
   if (drawerUiBound) return;
   drawerUiBound = true;
 
@@ -151,19 +97,17 @@ function initNotifDrawerUi() {
   document.getElementById("buyerNotifBellMobile")?.addEventListener("click", openBuyerNotifications);
   document.getElementById("buyerNotifDrawerBackdrop")?.addEventListener("click", closeBuyerNotifications);
   document.getElementById("buyerNotifDrawerClose")?.addEventListener("click", closeBuyerNotifications);
-  document.getElementById("buyerNotifClearBtn")?.addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEY);
-    updateBuyerNotifDot();
-    renderBuyerNotificationsList();
+  document.getElementById("buyerNotifClearBtn")?.addEventListener("click", async () => {
+    await clearNotificationCenter();
     toastFn("Notifications cleared");
   });
-  document.addEventListener("keydown", e => {
+  document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeBuyerNotifications();
   });
 }
 
 window.openBuyerNotifications = function () {
-  renderBuyerNotificationsList();
+  renderNotificationList("buyerNotifDrawerList");
   const drawer = document.getElementById("buyerNotifDrawer");
   if (!drawer) return;
   drawer.classList.add("is-open");
@@ -184,9 +128,7 @@ async function requestBrowserPermission() {
   if (typeof Notification === "undefined" || Notification.permission !== "default") return;
   try {
     await Notification.requestPermission();
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 }
 
 function maybeBrowserNotify(title, body) {
@@ -195,9 +137,7 @@ function maybeBrowserNotify(title, body) {
   if (document.visibilityState === "visible") return;
   try {
     new Notification(title, { body, icon: "images/logo.png" });
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 }
 
 function onGlobalMessage(msg) {
@@ -211,7 +151,11 @@ function onGlobalMessage(msg) {
     playMessageNotification();
     const name = msg.sender_name || "Shopper";
     const preview = getPreviewText(msg.content || "");
-    addBuyerNotification(`Message from ${name}: "${preview}"`);
+    addBuyerNotification(`Message from ${name}: "${preview}"`, {
+      type: "message",
+      title: "New message",
+      link: `chat.html?partner=${encodeURIComponent(partnerUid)}`,
+    });
     toastFn(`New message from ${name}`);
     maybeBrowserNotify(`Message from ${name}`, preview);
     document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
@@ -238,13 +182,17 @@ function subscribeOrders() {
         table: "requests",
         filter: `buyer_id=eq.${buyerUser.uid}`,
       },
-      payload => {
+      (payload) => {
         const updated = payload.new;
         const product = updated.product_name || "your order";
         const msgFn = ORDER_STATUS_MSG[updated.status];
         if (msgFn && buyerNotificationsEnabled()) {
           const text = msgFn(product);
-          addBuyerNotification(text);
+          addBuyerNotification(text, {
+            type: "order",
+            title: "Order update",
+            link: `tracking.html?order_id=${encodeURIComponent(updated.id)}`,
+          });
           toastFn(text);
           maybeBrowserNotify("Order update", text);
         }
@@ -278,12 +226,25 @@ export async function refreshBuyerBadges() {
  * @param {object} user — buyer profile from users table
  * @param {{ toast?: (msg: string) => void }} options
  */
-export function initBuyerNotifications(user, options = {}) {
+export async function initBuyerNotifications(user, options = {}) {
   if (!user?.uid) return;
   buyerUser = user;
   if (options.toast) toastFn = options.toast;
 
   initNotifDrawerUi();
+
+  await initNotificationCenter({
+    userId: buyerUser.uid,
+    legacyStorageKey: LEGACY_STORAGE_KEY,
+    listId: "buyerNotifDrawerList",
+    dotSelectors: ["#buyerNotifDot", "#buyerNotifDotMobile"],
+    emptyHtml: `
+      <div class="notif-empty">
+        <div class="notif-empty-icon"><i class="fas fa-bell-slash" aria-hidden="true"></i></div>
+        <p>You're all caught up</p>
+        <span>New messages and order updates appear here</span>
+      </div>`,
+  });
 
   if (started) {
     document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
@@ -306,5 +267,6 @@ export function stopBuyerNotifications() {
     supabase.removeChannel(ordersChannel);
     ordersChannel = null;
   }
+  stopNotificationCenter();
   started = false;
 }

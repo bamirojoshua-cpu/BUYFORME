@@ -1,5 +1,7 @@
 /* BuyForMe — shared buyer design system (matches shopper dashboard polish) */
 
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&family=Sora:wght@500;600;700&display=swap");
+@import url("design-system/index.css");
 @import url("verified-badge.css");
 
 .buyer-app,
@@ -9,39 +11,10 @@
   box-sizing: border-box;
 }
 
+/* Buyer-specific layout tokens (extends design system) */
 :root {
-  --green: #1a9e6e;
-  --green-dark: #127a54;
-  --green-deep: #0f5c36;
-  --green-light: #e6f7f1;
-  --green-muted: #bbf7d0;
-  --green-glow: rgba(26, 158, 110, 0.35);
-  --blue: #3b82f6;
-  --blue-light: #dbeafe;
-  --amber: #f59e0b;
-  --amber-light: #fef3c7;
-  --red: #ef4444;
-  --red-light: #fee2e2;
-  --verified: #1877f2;
-  --text: #0f1c18;
-  --text-muted: #5a7268;
-  --text-soft: #8aa399;
-  --border: rgba(15, 42, 32, 0.08);
-  --border-strong: rgba(15, 42, 32, 0.14);
-  --bg: #eef4f1;
-  --surface: #ffffff;
-  --surface-2: #f8fbf9;
-  --sidebar-w: 268px;
-  --sidebar-w-collapsed: 76px;
-  --radius: 16px;
-  --radius-lg: 22px;
-  --radius-sm: 12px;
-  --radius-pill: 999px;
-  --shadow-sm: 0 2px 8px rgba(12, 26, 20, 0.06);
-  --shadow-md: 0 8px 28px rgba(12, 26, 20, 0.08);
-  --shadow-lg: 0 16px 48px rgba(12, 26, 20, 0.1);
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --dur: 0.28s;
+  --sidebar-w: var(--bfm-sidebar-w);
+  --sidebar-w-collapsed: var(--bfm-sidebar-w-collapsed);
 }
 
 @keyframes buyerFadeIn {
@@ -68,7 +41,7 @@
 }
 
 .buyer-page-head h1 {
-  font-family: "Sora", sans-serif;
+  font-family: var(--bfm-font-display);
   font-size: clamp(1.35rem, 3vw, 1.65rem);
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -91,7 +64,7 @@
 }
 
 .buyer-section-title {
-  font-family: "Sora", sans-serif;
+  font-family: var(--bfm-font-accent);
   font-size: 1.1rem;
   font-weight: 700;
   display: flex;
