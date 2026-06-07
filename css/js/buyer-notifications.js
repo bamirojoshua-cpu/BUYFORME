@@ -154,7 +154,7 @@ function onGlobalMessage(msg) {
     addBuyerNotification(`Message from ${name}: "${preview}"`, {
       type: "message",
       title: "New message",
-      link: `chat.html?partner=${encodeURIComponent(partnerUid)}`,
+      link: `chat.html?with=${encodeURIComponent(partnerUid)}`,
     });
     toastFn(`New message from ${name}`);
     maybeBrowserNotify(`Message from ${name}`, preview);

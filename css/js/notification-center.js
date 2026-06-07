@@ -29,11 +29,22 @@ let realtimeChannel = null;
  */
 export async function initNotificationCenter(options) {
   config = options;
-  cache = await fetchNotifications(options.userId);
+
+  try {
+    cache = await fetchNotifications(options.userId);
+  } catch (e) {
+    console.warn("fetchNotifications:", e);
+    cache = [];
+  }
 
   if (options.legacyStorageKey) {
-    await migrateLegacyNotifications(options.userId, options.legacyStorageKey);
-    cache = await fetchNotifications(options.userId);
+    migrateLegacyNotifications(options.userId, options.legacyStorageKey)
+      .then(() => fetchNotifications(options.userId))
+      .then((rows) => {
+        cache = rows;
+        updateNotificationDot();
+      })
+      .catch((e) => console.warn("Notification migration:", e));
   }
 
   updateNotificationDot();

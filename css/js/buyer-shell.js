@@ -401,7 +401,9 @@ export async function initBuyerShell(activeTab, options = {}) {
 
   await updateNavBadges();
   if (shellUser?.uid) {
-    await initBuyerNotifications(shellUser, { toast: showBuyerToast });
+    initBuyerNotifications(shellUser, { toast: showBuyerToast }).catch((e) => {
+      console.warn("Buyer notifications init:", e);
+    });
   }
 
   document.addEventListener("bfm-buyer-badges", () => {
