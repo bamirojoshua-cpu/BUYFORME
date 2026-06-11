@@ -6,6 +6,8 @@ import "../../css/call-ui.css";
 import "../../css/responsive.css";
 import "../../css/verified-badge.css";
 import "../../css/shopper-dashboard.css";
+import "../../css/pwa.css";
+import "../../css/js/pwa-register.js";
 
 const rootEl = document.getElementById("root");
 if (rootEl) {

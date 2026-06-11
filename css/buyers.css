@@ -415,6 +415,7 @@
   flex-direction: column;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
+  opacity: 1;
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color 0.2s;
   animation: cardIn 0.45s var(--ease) backwards;
 }
@@ -950,6 +951,13 @@
 /* Legacy aliases */
 .s-nav-btn { display: none; }
 .close-btn { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shopper-card {
+    animation: none;
+    opacity: 1;
+  }
+}
 
 /* ── Responsive ── */
 @media (max-width: 768px) {

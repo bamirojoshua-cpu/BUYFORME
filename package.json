@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "config": "node scripts/generate-runtime-config.js",
-    "dev": "node scripts/generate-runtime-config.js && vite",
-    "build": "node scripts/generate-runtime-config.js && vite build",
+    "check": "node scripts/check-syntax.js",
+    "pwa:tags": "node scripts/ensure-pwa-tags.js",
+    "dev": "node scripts/generate-runtime-config.js && node scripts/ensure-pwa-tags.js && node scripts/check-syntax.js && vite",
+    "build": "node scripts/generate-runtime-config.js && node scripts/ensure-pwa-tags.js && node scripts/check-syntax.js && vite build",
     "build:pages": "npm run build",
     "preview": "vite preview"
   },
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a9e6e">
+  <title>Offline | BuyForMe</title>
+  <link rel="icon" href="images/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/pwa.css">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: #faf8f3;
+      color: #1a1a1a;
+      padding: 1.5rem;
+    }
+    .offline-card {
+      max-width: 24rem;
+      text-align: center;
+      background: #fff;
+      border-radius: 1rem;
+      padding: 2rem 1.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+    .offline-card img {
+      width: 4rem;
+      height: 4rem;
+      border-radius: 50%;
+      margin-bottom: 1rem;
+    }
+    .offline-card h1 {
+      font-size: 1.35rem;
+      margin: 0 0 0.5rem;
+      color: #0d6e4a;
+    }
+    .offline-card p {
+      margin: 0 0 1.25rem;
+      color: #555;
+      line-height: 1.5;
+    }
+    .offline-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .offline-actions a,
+    .offline-actions button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 999px;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .btn-primary {
+      background: #1a9e6e;
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #e6f7f1;
+      color: #0d6e4a;
+    }
+  </style>
+</head>
+<body>
+  <main class="offline-card" role="main">
+    <img src="images/logo.png" alt="BuyForMe">
+    <h1>You’re offline</h1>
+    <p>BuyForMe needs an internet connection for orders, messages, and payments. Cached pages may still be available.</p>
+    <div class="offline-actions">
+      <button type="button" class="btn-primary" id="offlineRetry">Try again</button>
+      <a href="index.html" class="btn-secondary">Back to home</a>
+    </div>
+  </main>
+  <script>
+    document.getElementById("offlineRetry")?.addEventListener("click", () => {
+      if (navigator.onLine) window.location.reload();
+      else window.location.href = "index.html";
+    });
+    window.addEventListener("online", () => window.location.reload());
+  </script>
+</body>
+</html>
