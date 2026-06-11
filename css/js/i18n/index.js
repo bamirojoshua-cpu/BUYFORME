@@ -62,7 +62,7 @@ export function setLocale(code) {
 }
 
 export function t(key, fallback = "") {
-  return messages[locale]?.[key] ?? messages.en?.[key] ?? fallback || key;
+  return messages[locale]?.[key] ?? messages.en?.[key] ?? (fallback || key);
 }
 
 export function applyTranslations() {
