@@ -58,6 +58,22 @@ function bindBarActions(el) {
   });
 }
 
+/** Consistent bar markup — stacks cleanly on phones. */
+function barContentHtml({ title, subtitle = "", actionsHtml }) {
+  const subtitleBlock = subtitle
+    ? `<span class="bfm-pwa-bar__subtitle">${subtitle}</span>`
+    : "";
+  return `
+    <div class="bfm-pwa-bar__main">
+      <img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="40" height="40">
+      <div class="bfm-pwa-bar__text">
+        <strong>${title}</strong>
+        ${subtitleBlock}
+      </div>
+    </div>
+    <div class="bfm-pwa-bar__actions">${actionsHtml}</div>`;
+}
+
 function dismissInstallPrompt() {
   try {
     localStorage.setItem(INSTALL_DISMISS_KEY, "1");
@@ -156,12 +172,13 @@ function showIosInstallBar() {
 
   showBar(
     bar,
-    `<img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="32" height="32">
-     <div class="bfm-pwa-bar__text"><strong>Install BuyForMe</strong>${subtitle}</div>
-     <div class="bfm-pwa-bar__actions">
-       <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
-       <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="ios-install-guide">How to install</button>
-     </div>`
+    barContentHtml({
+      title: "Install BuyForMe",
+      subtitle,
+      actionsHtml: `
+        <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
+        <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="ios-install-guide">How to install</button>`,
+    })
   );
   bindBarActions(bar);
 
@@ -197,12 +214,13 @@ function setupInstallPrompt() {
 
     showBar(
       bar,
-      `<img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="32" height="32">
-       <div class="bfm-pwa-bar__text"><strong>Install BuyForMe</strong>Add to your home screen for quick access.</div>
-       <div class="bfm-pwa-bar__actions">
-         <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
-         <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="install">Install</button>
-       </div>`
+      barContentHtml({
+        title: "Install BuyForMe",
+        subtitle: "Add to your home screen for quick access.",
+        actionsHtml: `
+          <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
+          <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="install">Install</button>`,
+      })
     );
     bindBarActions(bar);
   });
@@ -239,12 +257,13 @@ function setupUpdatePrompt(registration) {
   const notifyUpdate = (waitingWorker) => {
     showBar(
       bar,
-      `<img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="32" height="32">
-       <div class="bfm-pwa-bar__text"><strong>Update available</strong>A new version of BuyForMe is ready.</div>
-       <div class="bfm-pwa-bar__actions">
-         <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-update">Later</button>
-         <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="reload">Refresh</button>
-       </div>`
+      barContentHtml({
+        title: "Update available",
+        subtitle: "A new version of BuyForMe is ready.",
+        actionsHtml: `
+          <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-update">Later</button>
+          <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="reload">Refresh</button>`,
+      })
     );
     bindBarActions(bar);
 
@@ -306,11 +325,12 @@ function setupOfflineReadyToast() {
 
   showBar(
     bar,
-    `<img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="32" height="32">
-     <div class="bfm-pwa-bar__text"><strong>Ready for offline</strong>Key pages are cached on this device.</div>
-     <div class="bfm-pwa-bar__actions">
-       <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="dismiss-offline-ready">OK</button>
-     </div>`
+    barContentHtml({
+      title: "Ready for offline",
+      subtitle: "Key pages are cached on this device.",
+      actionsHtml: `
+        <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary bfm-pwa-bar__btn--full" data-pwa-action="dismiss-offline-ready">OK</button>`,
+    })
   );
   bindBarActions(bar);
   bar.addEventListener("bfm-pwa-action", () => hideBar(bar), { once: true });
