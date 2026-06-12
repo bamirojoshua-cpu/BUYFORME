@@ -5,6 +5,7 @@
 
 import { supabase } from "../supabase.js";
 import { fetchPublicShopperBasic } from "./users.js";
+import { cacheFetch, cacheInvalidate, CacheTTL } from "../app-cache.js";
 
 /* ─── Status constants ─── */
 
@@ -88,15 +89,26 @@ export async function fetchOrderById(orderId) {
 }
 
 /** @param {string} buyerId */
-export async function fetchOrdersForBuyer(buyerId) {
-  const { data, error } = await supabase
-    .from("requests")
-    .select("*")
-    .eq("buyer_id", buyerId)
-    .order("created_at", { ascending: false });
+export async function fetchOrdersForBuyer(buyerId, opts = {}) {
+  return cacheFetch(
+    `orders:${buyerId}`,
+    CacheTTL.ORDERS,
+    async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("buyer_id", buyerId)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message || "Could not load orders.");
+      return data || [];
+    },
+    opts
+  );
+}
 
-  if (error) throw new Error(error.message || "Could not load orders.");
-  return data || [];
+/** Call after order mutations to refresh list cache. */
+export function invalidateOrdersCache(buyerId) {
+  cacheInvalidate(`orders:${buyerId}`);
 }
 
 /**

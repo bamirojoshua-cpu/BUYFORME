@@ -2,6 +2,7 @@ import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { fetchCart, removeFromCart, clearCart, groupCartByShopper } from "./api/cart.js";
 import { fetchPublicShopperBasic } from "./api/users.js";
 import { buildRequestRow, insertRequest, parseShopperFeePercent } from "./api/request-builder.js";
+import { invalidateOrdersCache } from "./api/orders.js";
 import { escapeHtml } from "./ui/index.js";
 
 let currentUser = null;
@@ -41,6 +42,7 @@ async function checkoutShopper(shopperId, items) {
   }
 
   await clearCart(currentUser.uid, shopperId);
+  invalidateOrdersCache(currentUser.uid);
   showBuyerToast(`${sent} request${sent > 1 ? "s" : ""} sent to ${shopper.name}`);
   document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
   render();
@@ -95,7 +97,7 @@ function render() {
 
   root.querySelectorAll("[data-remove]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      await removeFromCart(btn.dataset.remove);
+      await removeFromCart(btn.dataset.remove, currentUser.uid);
       cartItems = cartItems.filter((i) => i.id !== btn.dataset.remove);
       showBuyerToast("Removed from cart");
       document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
@@ -120,16 +122,25 @@ function render() {
   });
 }
 
-async function init() {
+export async function mountCartPage() {
   const profile = await initBuyerShell("cart", { title: "Cart" });
   if (!profile) return;
   currentUser = profile;
   try {
-    cartItems = await fetchCart(currentUser.uid);
+    cartItems = await fetchCart(currentUser.uid, {
+      onUpdate: (items) => {
+        cartItems = items;
+        render();
+      },
+    });
   } catch {
     cartItems = [];
   }
   render();
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  import("./buyer-router.js").then((r) => {
+    if (r.shouldAutoMountPage()) mountCartPage();
+  });
+});

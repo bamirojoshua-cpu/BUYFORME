@@ -1,12 +1,29 @@
 /**
  * BuyForMe PWA — service worker registration, install prompt, updates, connectivity.
+ * Android/Chrome: beforeinstallprompt. iOS Safari: manual Add to Home Screen guide.
  */
 
 const SW_URL = "./sw.js";
 const SW_SCOPE = "./";
+const INSTALL_DISMISS_KEY = "bfm-pwa-install-dismissed";
 
 let deferredInstallPrompt = null;
 let refreshing = false;
+
+function isIosDevice() {
+  const ua = navigator.userAgent;
+  if (/iphone|ipad|ipod/i.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+/** True when opened inside Instagram, Facebook, etc. — Add to Home Screen needs Safari. */
+function isIosInAppBrowser() {
+  if (!isIosDevice()) return false;
+  const ua = navigator.userAgent.toLowerCase();
+  if (/(fbav|fban|instagram|line\/|twitter|linkedinapp|snapchat|gsa\/)/i.test(ua)) return true;
+  if (/crios|fxios|edgios|opr\//i.test(ua)) return false;
+  return /applewebkit/i.test(ua) && !/safari/i.test(ua);
+}
 
 function createBar(id, attrs = {}) {
   let el = document.getElementById(id);
@@ -41,6 +58,129 @@ function bindBarActions(el) {
   });
 }
 
+function dismissInstallPrompt() {
+  try {
+    localStorage.setItem(INSTALL_DISMISS_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  hideBar(document.getElementById("bfmPwaInstallBar"));
+  closeIosInstallSheet();
+}
+
+function ensureIosInstallSheet() {
+  let sheet = document.getElementById("bfmIosInstallSheet");
+  if (sheet) return sheet;
+
+  sheet = document.createElement("div");
+  sheet.id = "bfmIosInstallSheet";
+  sheet.className = "bfm-ios-install-sheet";
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.setAttribute("aria-labelledby", "bfmIosInstallTitle");
+  sheet.setAttribute("aria-hidden", "true");
+  sheet.innerHTML = `
+    <div class="bfm-ios-install-sheet__backdrop" data-pwa-action="close-ios-sheet"></div>
+    <div class="bfm-ios-install-sheet__panel">
+      <button type="button" class="bfm-ios-install-sheet__close" data-pwa-action="close-ios-sheet" aria-label="Close">
+        <i class="fas fa-xmark" aria-hidden="true"></i>
+      </button>
+      <img class="bfm-ios-install-sheet__icon" src="images/pwa/icon-192.png" alt="" width="56" height="56">
+      <h2 id="bfmIosInstallTitle">Add BuyForMe to your Home Screen</h2>
+      <p class="bfm-ios-install-sheet__lead" id="bfmIosInstallLead"></p>
+      <ol class="bfm-ios-install-steps" id="bfmIosInstallSteps"></ol>
+      <button type="button" class="bfm-ios-install-sheet__done bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="close-ios-sheet">Got it</button>
+    </div>`;
+  document.body.appendChild(sheet);
+
+  sheet.querySelectorAll("[data-pwa-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.pwaAction;
+      if (action === "close-ios-sheet") closeIosInstallSheet();
+    });
+  });
+
+  return sheet;
+}
+
+function openIosInstallSheet() {
+  const sheet = ensureIosInstallSheet();
+  const inApp = isIosInAppBrowser();
+  const lead = sheet.querySelector("#bfmIosInstallLead");
+  const steps = sheet.querySelector("#bfmIosInstallSteps");
+
+  if (inApp) {
+    lead.textContent =
+      "Install works best in Safari. Open this page in Safari first, then add BuyForMe to your Home Screen.";
+    steps.innerHTML = `
+      <li><span class="bfm-ios-step-num">1</span><span>Copy this page link or tap <strong>⋯</strong> and choose <strong>Open in Safari</strong>.</span></li>
+      <li><span class="bfm-ios-step-num">2</span><span>In Safari, tap <strong>Share</strong> <i class="fas fa-arrow-up-from-bracket bfm-ios-share-icon" aria-hidden="true"></i> at the bottom of the screen.</span></li>
+      <li><span class="bfm-ios-step-num">3</span><span>Scroll the menu and tap <strong>Add to Home Screen</strong> <i class="fas fa-plus-square bfm-ios-share-icon" aria-hidden="true"></i>.</span></li>
+      <li><span class="bfm-ios-step-num">4</span><span>Tap <strong>Add</strong> in the top-right corner.</span></li>`;
+  } else {
+    lead.textContent = "Install BuyForMe like a native app — it opens full screen from your Home Screen.";
+    steps.innerHTML = `
+      <li><span class="bfm-ios-step-num">1</span><span>Tap <strong>Share</strong> <i class="fas fa-arrow-up-from-bracket bfm-ios-share-icon" aria-hidden="true"></i> in Safari’s toolbar (bottom on iPhone, top on iPad).</span></li>
+      <li><span class="bfm-ios-step-num">2</span><span>Scroll down and tap <strong>Add to Home Screen</strong> <i class="fas fa-plus-square bfm-ios-share-icon" aria-hidden="true"></i>.</span></li>
+      <li><span class="bfm-ios-step-num">3</span><span>Confirm the name <strong>BuyForMe</strong>, then tap <strong>Add</strong>.</span></li>`;
+  }
+
+  sheet.setAttribute("aria-hidden", "false");
+  sheet.classList.add("is-open");
+  document.body.classList.add("bfm-ios-install-open");
+}
+
+function closeIosInstallSheet() {
+  const sheet = document.getElementById("bfmIosInstallSheet");
+  if (!sheet) return;
+  sheet.classList.remove("is-open");
+  sheet.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("bfm-ios-install-open");
+}
+
+function showIosInstallBar() {
+  if (!isIosDevice() || isPwaInstalled()) return;
+  try {
+    if (localStorage.getItem(INSTALL_DISMISS_KEY) === "1") return;
+  } catch {
+    /* ignore */
+  }
+
+  const bar = createBar("bfmPwaInstallBar", { pwaInstall: "1" });
+  if (bar.classList.contains("is-visible")) return;
+
+  const inApp = isIosInAppBrowser();
+  const subtitle = inApp
+    ? "Open in Safari, then add to Home Screen."
+    : "Tap Share, then Add to Home Screen.";
+
+  showBar(
+    bar,
+    `<img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="32" height="32">
+     <div class="bfm-pwa-bar__text"><strong>Install BuyForMe</strong>${subtitle}</div>
+     <div class="bfm-pwa-bar__actions">
+       <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
+       <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="ios-install-guide">How to install</button>
+     </div>`
+  );
+  bindBarActions(bar);
+
+  bar.addEventListener(
+    "bfm-pwa-action",
+    (event) => {
+      const { action } = event.detail;
+      if (action === "dismiss-install") {
+        dismissInstallPrompt();
+        return;
+      }
+      if (action === "ios-install-guide") {
+        openIosInstallSheet();
+      }
+    },
+    { once: false }
+  );
+}
+
 function setupInstallPrompt() {
   const bar = createBar("bfmPwaInstallBar", { pwaInstall: "1" });
 
@@ -48,8 +188,12 @@ function setupInstallPrompt() {
     event.preventDefault();
     deferredInstallPrompt = event;
 
-    if (window.matchMedia("(display-mode: standalone)").matches) return;
-    if (localStorage.getItem("bfm-pwa-install-dismissed") === "1") return;
+    if (isPwaInstalled()) return;
+    try {
+      if (localStorage.getItem(INSTALL_DISMISS_KEY) === "1") return;
+    } catch {
+      /* ignore */
+    }
 
     showBar(
       bar,
@@ -66,8 +210,7 @@ function setupInstallPrompt() {
   bar.addEventListener("bfm-pwa-action", async (event) => {
     const { action } = event.detail;
     if (action === "dismiss-install") {
-      localStorage.setItem("bfm-pwa-install-dismissed", "1");
-      hideBar(bar);
+      dismissInstallPrompt();
       return;
     }
     if (action === "install" && deferredInstallPrompt) {
@@ -81,8 +224,13 @@ function setupInstallPrompt() {
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     hideBar(bar);
+    closeIosInstallSheet();
     document.dispatchEvent(new CustomEvent("bfm-pwa-installed"));
   });
+
+  if (isIosDevice() && !deferredInstallPrompt) {
+    setTimeout(showIosInstallBar, 1500);
+  }
 }
 
 function setupUpdatePrompt(registration) {
@@ -184,7 +332,6 @@ async function registerServiceWorker() {
     setupUpdatePrompt(registration);
 
     if (registration.active && !navigator.serviceWorker.controller) {
-      // First SW install — optional offline-ready hint after activation
       navigator.serviceWorker.ready.then(() => {
         if (!sessionStorage.getItem("bfm-pwa-offline-ready-shown")) {
           sessionStorage.setItem("bfm-pwa-offline-ready-shown", "1");
@@ -199,11 +346,17 @@ async function registerServiceWorker() {
 
 /** Programmatic install (e.g. from settings). Returns false if unavailable. */
 export async function promptPwaInstall() {
-  if (!deferredInstallPrompt) return false;
-  deferredInstallPrompt.prompt();
-  const { outcome } = await deferredInstallPrompt.userChoice;
-  deferredInstallPrompt = null;
-  return outcome === "accepted";
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    return outcome === "accepted";
+  }
+  if (isIosDevice() && !isPwaInstalled()) {
+    openIosInstallSheet();
+    return true;
+  }
+  return false;
 }
 
 export function isPwaInstalled() {
@@ -215,7 +368,13 @@ export function isPwaInstalled() {
 }
 
 export function isPwaInstallAvailable() {
-  return Boolean(deferredInstallPrompt);
+  if (isPwaInstalled()) return false;
+  if (deferredInstallPrompt) return true;
+  return isIosDevice();
+}
+
+export function isIosPwaContext() {
+  return isIosDevice();
 }
 
 function init() {

@@ -35,6 +35,7 @@ import {
   stopAllCallSounds,
 } from "./app-sounds.js";
 import { showIncomingCallScreen, hideIncomingCallScreen } from "./call-ui.js";
+import { fetchAllPublicShoppers } from "./api/users.js";
 import { initBuyerShell } from "./buyer-shell.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
 import { registerBuyerChatHandlers, setActiveChatPartner } from "./buyer-notifications.js";
@@ -76,12 +77,12 @@ function normalizeShopperPartner(s) {
 }
 
 async function loadShopperDirectory() {
-  const { data, error } = await supabase.from("public_shoppers").select("*");
-  if (error) {
+  try {
+    const data = await fetchAllPublicShoppers();
+    shopperByUid = new Map((data || []).map((s) => [String(s.uid), normalizeShopperPartner(s)]));
+  } catch (error) {
     console.warn("loadShopperDirectory:", error);
-    return;
   }
-  shopperByUid = new Map((data || []).map(s => [String(s.uid), normalizeShopperPartner(s)]));
 }
 
 function getEnrichedPartner(uid, fallback = null) {
@@ -204,7 +205,42 @@ function setThreadVisible(visible) {
   }
 }
 
-async function init() {
+let chatPageAbort = null;
+
+function bindChatPageEvents() {
+  chatPageAbort?.abort();
+  chatPageAbort = new AbortController();
+  const { signal } = chatPageAbort;
+
+  document.getElementById("messageInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }, { signal });
+
+  document.getElementById("sendBtn")?.addEventListener("click", sendMessage, { signal });
+
+  document.getElementById("convSearch")?.addEventListener("input", (e) => {
+    filterConversations(e.target.value.trim());
+  }, { signal });
+
+  document.getElementById("convList")?.addEventListener("click", (e) => {
+    const item = e.target.closest(".conv-item[data-partner-id]");
+    if (!item) return;
+    openConversation(item.dataset.partnerId);
+  }, { signal });
+
+  document.getElementById("convList")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const item = e.target.closest(".conv-item[data-partner-id]");
+    if (!item) return;
+    e.preventDefault();
+    openConversation(item.dataset.partnerId);
+  }, { signal });
+}
+
+export async function mountChatPage() {
+  setupVoicePlayers();
+  bindChatPageEvents();
+
   const profile = await initBuyerShell("messages", { title: "Messages", chat: true });
   if (!profile) return;
   currentUser = profile;
@@ -220,6 +256,14 @@ async function init() {
   const withUid = new URLSearchParams(window.location.search).get("with");
   if (withUid) await openConversation(withUid);
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.body.addEventListener("click", () => unlockSounds(), { once: true });
+
+  import("./buyer-router.js").then((r) => {
+    if (r.shouldAutoMountPage()) mountChatPage();
+  });
+});
 
 async function handleInboxMessage(msg) {
   const partnerUid = getPartnerUidFromMessage(msg, currentUser.uid);
@@ -258,7 +302,12 @@ async function loadConversations() {
   const list = document.getElementById("convList");
   if (!list) return;
 
-  allConversations = await getConversationSummaries(currentUser.uid);
+  allConversations = await getConversationSummaries(currentUser.uid, {
+    onUpdate: (conversations) => {
+      allConversations = conversations;
+      getUnreadMap(currentUser.uid).then((unreadMap) => renderConvList(allConversations, unreadMap));
+    },
+  });
 
   if (allConversations.length === 0) {
     list.innerHTML = `<p class="conv-empty">No conversations yet.<br><br>Go to a shopper profile and tap <strong>Message</strong> to start chatting.</p>`;
@@ -884,34 +933,3 @@ function formatTime(ts) {
 function escapeHtml(text) {
   return (text || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  setupVoicePlayers();
-  init();
-
-  document.body.addEventListener("click", () => unlockSounds(), { once: true });
-
-  document.getElementById("messageInput")?.addEventListener("keydown", e => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-
-  document.getElementById("sendBtn")?.addEventListener("click", sendMessage);
-
-  document.getElementById("convSearch")?.addEventListener("input", e => {
-    filterConversations(e.target.value.trim());
-  });
-
-  document.getElementById("convList")?.addEventListener("click", e => {
-    const item = e.target.closest(".conv-item[data-partner-id]");
-    if (!item) return;
-    openConversation(item.dataset.partnerId);
-  });
-
-  document.getElementById("convList")?.addEventListener("keydown", e => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    const item = e.target.closest(".conv-item[data-partner-id]");
-    if (!item) return;
-    e.preventDefault();
-    openConversation(item.dataset.partnerId);
-  });
-});

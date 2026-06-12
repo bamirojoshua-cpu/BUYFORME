@@ -1,0 +1,186 @@
+/* BuyForMe — native-feel motion (tab transitions, nav feedback, loading) */
+
+@keyframes bfmPageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bfmPageExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.996);
+  }
+}
+
+@keyframes bfmNavProgress {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.65);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0.85;
+  }
+}
+
+@keyframes bfmNavPulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bfmStaggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bfm-page-enter {
+  animation: bfmPageEnter 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.bfm-page-exit {
+  animation: bfmPageExit 0.2s cubic-bezier(0.4, 0, 0.9, 1) forwards;
+  pointer-events: none;
+}
+
+.bfm-page-enter .buyer-animate-in,
+.bfm-page-enter .buyer-card,
+.bfm-page-enter .order-card,
+.bfm-page-enter .shopper-card,
+.bfm-page-enter .wc-shop-group {
+  animation: bfmStaggerIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.bfm-page-enter .buyer-animate-in:nth-child(2),
+.bfm-page-enter .buyer-card:nth-child(2),
+.bfm-page-enter .order-card:nth-child(2),
+.bfm-page-enter .shopper-card:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.bfm-page-enter .buyer-animate-in:nth-child(3),
+.bfm-page-enter .shopper-card:nth-child(3),
+.bfm-page-enter .order-card:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.bfm-page-enter .shopper-card:nth-child(n + 4) {
+  animation-delay: 0.1s;
+}
+
+#bfmNavProgress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 10080;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+#bfmNavProgress.is-active {
+  opacity: 1;
+}
+
+#bfmNavProgress::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--green), #34d399);
+  transform-origin: left center;
+  transform: scaleX(0);
+  border-radius: 0 2px 2px 0;
+}
+
+#bfmNavProgress.is-active::after {
+  animation: bfmNavProgress 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.buyer-nav a,
+.buyer-bottom-nav a {
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.buyer-nav a:active,
+.buyer-bottom-nav a:active {
+  transform: scale(0.94);
+}
+
+.buyer-nav a.bfm-nav-just-active i,
+.buyer-bottom-nav a.bfm-nav-just-active i {
+  animation: bfmNavPulse 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.buyer-main-inner {
+  will-change: opacity, transform;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.buyer-main-inner--chat.bfm-page-enter {
+  animation: bfmPageEnter 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bfm-page-enter,
+  .bfm-page-exit,
+  .bfm-page-enter .buyer-animate-in,
+  .bfm-page-enter .buyer-card,
+  .bfm-page-enter .order-card,
+  .bfm-page-enter .shopper-card,
+  .bfm-page-enter .wc-shop-group,
+  #bfmNavProgress.is-active::after,
+  .buyer-nav a.bfm-nav-just-active i,
+  .buyer-bottom-nav a.bfm-nav-just-active i {
+    animation: none !important;
+  }
+
+  .bfm-page-exit {
+    opacity: 0;
+  }
+
+  .buyer-nav a:active,
+  .buyer-bottom-nav a:active {
+    transform: none;
+  }
+}

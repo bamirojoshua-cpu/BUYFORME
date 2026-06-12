@@ -1165,24 +1165,3 @@
   font-size: 0.75rem;
   color: var(--text-soft);
 }
-
-.buyer-sidebar__settings {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: background var(--dur-fast);
-}
-
-.buyer-sidebar__settings:hover {
-  background: var(--green-light);
-  color: var(--green-dark);
-}

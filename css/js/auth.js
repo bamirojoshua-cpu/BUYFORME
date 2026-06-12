@@ -11,6 +11,7 @@ import {
   clearAuthSession,
   shouldSkipAutoLoginRedirect,
   finishLoggedOutAuthUrl,
+  clearLogoutGracePeriod,
 } from "./auth-session.js";
 import { isEmail, required, minLength, validate as runValidators } from "./validators/forms.js";
 
@@ -55,7 +56,6 @@ async function redirectIfAlreadyLoggedIn() {
   }
 
   if (shouldSkipAutoLoginRedirect()) {
-    await clearAuthSession(supabase);
     return;
   }
 
@@ -235,6 +235,7 @@ async function handleAuth() {
       }
 
       // Email confirmation OFF → route immediately
+      clearLogoutGracePeriod();
       routeUser(selectedRole, "none");
 
     } else {
@@ -242,6 +243,13 @@ async function handleAuth() {
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+
+      if (!data.user?.id) {
+        showError("Login failed. Please try again.");
+        btn.disabled = false;
+        btn.textContent = "Login";
+        return;
+      }
 
       const profile = await fetchUserProfile(data.user.id);
 
@@ -252,6 +260,7 @@ async function handleAuth() {
         return;
       }
 
+      clearLogoutGracePeriod();
       routeUser(profile.role, profile.verification_status);
     }
 

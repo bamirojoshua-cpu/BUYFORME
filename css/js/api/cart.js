@@ -1,13 +1,21 @@
 import { supabase } from "../supabase.js";
+import { cacheFetch, cacheInvalidate, CacheTTL } from "../app-cache.js";
 
-export async function fetchCart(buyerId) {
-  const { data, error } = await supabase
-    .from("cart_items")
-    .select("*")
-    .eq("buyer_id", buyerId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
+export async function fetchCart(buyerId, opts = {}) {
+  return cacheFetch(
+    `cart:${buyerId}`,
+    CacheTTL.CART,
+    async () => {
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select("*")
+        .eq("buyer_id", buyerId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    opts
+  );
 }
 
 export async function addToCart(buyerId, item) {
@@ -17,17 +25,20 @@ export async function addToCart(buyerId, item) {
     .select()
     .single();
   if (error) throw error;
+  cacheInvalidate(`cart:${buyerId}`);
   return data;
 }
 
-export async function updateCartItem(id, patch) {
+export async function updateCartItem(id, patch, buyerId) {
   const { error } = await supabase.from("cart_items").update(patch).eq("id", id);
   if (error) throw error;
+  if (buyerId) cacheInvalidate(`cart:${buyerId}`);
 }
 
-export async function removeFromCart(id) {
+export async function removeFromCart(id, buyerId) {
   const { error } = await supabase.from("cart_items").delete().eq("id", id);
   if (error) throw error;
+  if (buyerId) cacheInvalidate(`cart:${buyerId}`);
 }
 
 export async function clearCart(buyerId, shopperId = null) {
@@ -35,6 +46,7 @@ export async function clearCart(buyerId, shopperId = null) {
   if (shopperId) q = q.eq("shopper_id", shopperId);
   const { error } = await q;
   if (error) throw error;
+  cacheInvalidate(`cart:${buyerId}`);
 }
 
 export async function cartCount(buyerId) {

@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view-transition" content="same-origin">
     <meta name="theme-color" content="#1a9e6e">
     <title>Messages | BuyForMe</title>
     <meta name="description" content="Chat with your personal shoppers on BuyForMe.">
@@ -28,11 +29,16 @@
 <body class="buyer-app buyer-app--chat" data-buyer-tab="messages">
 
     <div id="buyer-content" class="buyer-main-inner buyer-main-inner--chat">
+        <header class="chat-page-head">
+            <h1 class="chat-page-head__title">Messages</h1>
+            <p class="chat-page-head__desc">Chat with your personal shoppers — photos, voice notes, or calls</p>
+        </header>
+
         <div class="chat-layout">
 
             <aside class="conv-sidebar" id="convSidebar" aria-label="Conversations">
                 <header class="conv-sidebar__head">
-                    <h1 class="conv-sidebar__title"><i class="fas fa-message" aria-hidden="true"></i> Messages</h1>
+                    <h2 class="conv-sidebar__title"><i class="fas fa-comments" aria-hidden="true"></i> Conversations</h2>
                 </header>
                 <div class="conv-search-wrap">
                     <i class="fas fa-magnifying-glass conv-search__icon" aria-hidden="true"></i>
@@ -49,8 +55,7 @@
                     <div class="chat-empty-state__icon" aria-hidden="true">
                         <i class="fas fa-comments"></i>
                     </div>
-                    <h2>Your messages</h2>
-                    <p>Select a conversation on the left, or message a shopper from their profile.</p>
+                    <p>Select a conversation to reply</p>
                     <a href="buyers.html" class="btn-pill btn-pill--secondary chat-empty-state__cta">
                         <i class="fas fa-compass" aria-hidden="true"></i> Discover shoppers
                     </a>

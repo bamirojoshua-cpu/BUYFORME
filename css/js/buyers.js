@@ -4,9 +4,10 @@
 
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
-import { nameWithVerifiedBadge } from "./verified-badge.js";
+import { nameWithVerifiedBadge, plainNameFromElement } from "./verified-badge.js";
 import { initBuyerShell, showBuyerToast, performBuyerLogout, updateShellUserDisplay } from "./buyer-shell.js";
 import { createTicket, fetchMyTickets } from "./api/tickets.js";
+import { fetchAllPublicShoppers } from "./api/users.js";
 import { isEmail, required, validate as runValidators } from "./validators/forms.js";
 
 let currentUser = { id: "", name: "Buyer", email: "", role: "buyer" };
@@ -142,23 +143,44 @@ async function initAuth() {
   mapProfile(profile);
 
   updateNavUser();
-  renderFilters();
-  showGridLoading();
-  await loadShoppers();
-  switchTab("profile");
+  if (!document.getElementById("filterPills")?.children.length) {
+    renderFilters();
+  }
+
+  const grid = document.getElementById("shopperGrid");
+  const hasCards = grid?.querySelector(".shopper-card:not(.shopper-card--skeleton)");
+  if (!hasCards) {
+    showGridLoading();
+    await loadShoppers();
+  } else if (allShoppers.length) {
+    renderFeatured();
+    renderShoppers();
+  }
 
   if (new URLSearchParams(window.location.search).get("settings") === "1") {
+    switchTab("profile");
     toggleSettings();
   }
 }
 
 async function loadShoppers() {
-  const { data, error } = await supabase.from("public_shoppers").select("*");
-
-  if (error) {
+  try {
+    allShoppers = await fetchAllPublicShoppers({
+      onUpdate: (data) => {
+        allShoppers = data;
+        renderFeatured();
+        renderShoppers();
+      },
+    });
+    renderFeatured();
+    renderShoppers();
+    const grid = document.getElementById("shopperGrid");
+    grid?.classList.remove("is-loading");
+    grid?.removeAttribute("aria-busy");
+  } catch (error) {
     console.error("Failed to load shoppers:", error);
     const grid = document.getElementById("shopperGrid");
-    if (grid) {
+    if (grid && !allShoppers.length) {
       grid.classList.remove("is-loading");
       grid.innerHTML = `
         <div class="empty-state">
@@ -168,12 +190,7 @@ async function loadShoppers() {
           <button type="button" onclick="location.reload()">Refresh</button>
         </div>`;
     }
-    return;
   }
-
-  allShoppers = data || [];
-  renderFeatured();
-  renderShoppers();
 }
 
 function parseFee(feeStr) {
@@ -433,13 +450,17 @@ window.goToProfile = function (uid) {
 
 window.toggleSettings = function () {
   const overlay = document.getElementById("settingsOverlay");
-  const open = overlay.classList.toggle("open");
-  overlay.setAttribute("aria-hidden", open ? "false" : "true");
+  if (!overlay) return;
+  const willOpen = !overlay.classList.contains("open");
+  if (willOpen) switchTab("profile");
+  overlay.classList.toggle("open", willOpen);
+  overlay.setAttribute("aria-hidden", willOpen ? "false" : "true");
 };
 
 window.closeSettings = function (e) {
   if (e.target === document.getElementById("settingsOverlay")) {
     const overlay = document.getElementById("settingsOverlay");
+    if (!overlay) return;
     overlay.classList.remove("open");
     overlay.setAttribute("aria-hidden", "true");
   }
@@ -493,6 +514,10 @@ window.switchTab = function (tab) {
         </button>
       </div>
       <p class="settings-hint">Alerts for new messages, order updates, and activity in the notification bell.</p>
+      <div id="pwaInstallRow" class="settings-toggle-row" hidden>
+        <span>Install BuyForMe on this device</span>
+        <button type="button" class="bfm-btn bfm-btn--secondary bfm-btn--sm" id="pwaInstallBtn">Install app</button>
+      </div>
       <button type="button" class="btn-save" onclick="saveProfile()"><i class="fas fa-check"></i> Save changes</button>
       <p class="settings-msg" id="profileMsg" role="status"></p>`;
     document.getElementById("buyerNotifToggle")?.addEventListener("click", function () {
@@ -500,6 +525,18 @@ window.switchTab = function (tab) {
       this.setAttribute("aria-pressed", this.classList.contains("on"));
     });
     document.getElementById("profileAvatarInput")?.addEventListener("change", handleAvatarSelect);
+    import("./pwa-register.js")
+      .then(({ isPwaInstallAvailable, isPwaInstalled, promptPwaInstall, isIosPwaContext }) => {
+        const row = document.getElementById("pwaInstallRow");
+        const btn = document.getElementById("pwaInstallBtn");
+        if (!row || !btn) return;
+        if (isPwaInstallAvailable() && !isPwaInstalled()) {
+          row.hidden = false;
+          btn.textContent = isIosPwaContext() ? "Add to Home Screen" : "Install app";
+          btn.addEventListener("click", () => promptPwaInstall());
+        }
+      })
+      .catch(() => {});
   } else if (tab === "shipping") {
     form.innerHTML = `
       <p class="settings-hint" style="margin-bottom:14px">Save delivery addresses for faster checkout on future orders.</p>
@@ -779,8 +816,12 @@ window.savePayments = async function () {
 
 window.handleLogout = performBuyerLogout;
 
-document.addEventListener("DOMContentLoaded", () => {
-  initAuth();
+let buyersPageAbort = null;
+
+function bindBuyersPageEvents() {
+  buyersPageAbort?.abort();
+  buyersPageAbort = new AbortController();
+  const { signal } = buyersPageAbort;
 
   const searchBar = document.getElementById("searchBar");
   if (searchBar) {
@@ -791,13 +832,13 @@ document.addEventListener("DOMContentLoaded", () => {
         searchTerm = e.target.value.toLowerCase().trim();
         renderShoppers();
       }, 200);
-    });
+    }, { signal });
   }
 
   document.getElementById("sortSelect")?.addEventListener("change", (e) => {
     sortBy = e.target.value;
     renderShoppers();
-  });
+  }, { signal });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -807,5 +848,16 @@ document.addEventListener("DOMContentLoaded", () => {
         overlay.setAttribute("aria-hidden", "true");
       }
     }
+  }, { signal });
+}
+
+export async function mountBuyersPage() {
+  bindBuyersPageEvents();
+  await initAuth();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  import("./buyer-router.js").then((r) => {
+    if (r.shouldAutoMountPage()) mountBuyersPage();
   });
 });

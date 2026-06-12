@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view-transition" content="same-origin">
     <meta name="theme-color" content="#1a9e6e">
     <title>Discover Shoppers | BuyForMe</title>
     <meta name="description" content="Browse verified personal shoppers on BuyForMe. Shop Turkey, China, UK, USA and more with trusted buyers worldwide.">
@@ -94,35 +95,6 @@
 
             <div class="shopper-grid" id="shopperGrid" aria-busy="true"></div>
         </section>
-    </div>
-
-    <div class="settings-overlay" id="settingsOverlay" onclick="closeSettings(event)" aria-hidden="true">
-        <aside class="settings-panel" role="dialog" aria-labelledby="settingsTitle" onclick="event.stopPropagation()">
-            <div class="settings-panel__head">
-                <div>
-                    <p class="settings-panel__eyebrow">Your account</p>
-                    <h2 id="settingsTitle">Settings</h2>
-                </div>
-                <button type="button" class="settings-close" onclick="toggleSettings()" aria-label="Close settings">
-                    <i class="fas fa-xmark"></i>
-                </button>
-            </div>
-            <nav class="settings-tabs" aria-label="Settings sections">
-                <button type="button" class="settings-tab active" data-tab="profile" onclick="switchTab('profile')">
-                    <i class="fas fa-user"></i> Profile
-                </button>
-                <button type="button" class="settings-tab" data-tab="shipping" onclick="switchTab('shipping')">
-                    <i class="fas fa-location-dot"></i> Shipping
-                </button>
-                <button type="button" class="settings-tab" data-tab="support" onclick="switchTab('support')">
-                    <i class="fas fa-life-ring"></i> Support
-                </button>
-                <button type="button" class="settings-tab" data-tab="payments" onclick="switchTab('payments')">
-                    <i class="fas fa-wallet"></i> Payments
-                </button>
-            </nav>
-            <div class="settings-form" id="settingsForm"></div>
-        </aside>
     </div>
 
     <script type="module" src="css/js/buyers.js"></script>

@@ -4,6 +4,7 @@
    ============================================================= */
 
 import { supabase } from "./supabase.js";
+import { cacheFetch, cacheInvalidate, CacheTTL } from "./app-cache.js";
 
 export const INBOX_EVENT_MSG  = "chat_msg";
 export const INBOX_EVENT_CALL = "call_invite";
@@ -130,7 +131,16 @@ export async function getMessages(convId, myUserId = null) {
   return data || [];
 }
 
-export async function getConversationSummaries(myUserId) {
+export async function getConversationSummaries(myUserId, opts = {}) {
+  return cacheFetch(
+    `conversations:${myUserId}`,
+    CacheTTL.CONVERSATIONS,
+    () => fetchConversationSummariesRaw(myUserId),
+    opts
+  );
+}
+
+async function fetchConversationSummariesRaw(myUserId) {
   const me = String(myUserId);
   const { data, error } = await supabase
     .from("messages")
@@ -303,6 +313,9 @@ export async function sendChatMessage(supabaseClient, message) {
   message.content = await prepareMessageContent(message);
 
   const saved = await insertMessage(message);
+
+  cacheInvalidate(`conversations:${senderId}`);
+  cacheInvalidate(`conversations:${receiverId}`);
 
   try {
     await broadcastToUser(supabaseClient, receiverId, INBOX_EVENT_MSG, saved);

@@ -93,7 +93,7 @@ const PWA_MANIFEST = {
   lang: "en",
   dir: "ltr",
   id: "./",
-  start_url: "./index.html",
+  start_url: "./buyers.html",
   scope: "./",
   display: "standalone",
   display_override: ["standalone", "minimal-ui", "browser"],
@@ -213,7 +213,7 @@ export default defineConfig(({ command }) => {
           skipWaiting: false,
           clientsClaim: true,
           cleanupOutdatedCaches: true,
-          mode: "development",
+          mode: "production",
           globIgnores: [
             "**/phone-mockup.png",
             "**/Buyforme logo.png",

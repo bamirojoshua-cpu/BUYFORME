@@ -12,7 +12,18 @@ function escapeAttr(s) {
 async function load() {
   const grid = document.getElementById("wishlistGrid");
   try {
-    const items = await fetchWishlist(currentUser.uid);
+    const items = await fetchWishlist(currentUser.uid, {
+      onUpdate: (fresh) => loadWithItems(fresh),
+    });
+    await loadWithItems(items);
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = `<div class="wc-empty"><p>Could not load wishlist. Run supabase-phase3.sql if tables are missing.</p></div>`;
+  }
+}
+
+async function loadWithItems(items) {
+  const grid = document.getElementById("wishlistGrid");
     if (!items.length) {
       grid.innerHTML = `
         <div class="wc-empty buyer-card" style="grid-column:1/-1">
@@ -41,7 +52,7 @@ async function load() {
 
     grid.querySelectorAll("[data-remove]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        await removeFromWishlist(btn.dataset.remove);
+        await removeFromWishlist(btn.dataset.remove, currentUser.uid);
         showBuyerToast("Removed from wishlist");
         load();
         document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
@@ -69,13 +80,9 @@ async function load() {
         document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
       });
     });
-  } catch (err) {
-    console.error(err);
-    grid.innerHTML = `<div class="wc-empty"><p>Could not load wishlist. Run supabase-phase3.sql if tables are missing.</p></div>`;
-  }
 }
 
-async function init() {
+export async function mountWishlistPage() {
   const profile = await initBuyerShell("wishlist", { title: "Wishlist" });
   if (!profile) return;
   currentUser = profile;
@@ -85,4 +92,8 @@ async function init() {
   if (params.get("wishlist") === "added") showBuyerToast("Saved to wishlist");
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  import("./buyer-router.js").then((r) => {
+    if (r.shouldAutoMountPage()) mountWishlistPage();
+  });
+});

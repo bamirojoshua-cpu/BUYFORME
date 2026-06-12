@@ -1,7 +1,45 @@
-/* Buyer auth + shopper directory helpers (profile, request, chat) */
+/**
+ * Buyer auth session helpers + profile cache for fast tab switches.
+ */
 
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
+import { cacheFetch, CacheTTL } from "./app-cache.js";
+
+const PROFILE_KEY = "bfm-buyer-profile";
+const PROFILE_TTL_MS = 5 * 60 * 1000;
+
+export function getCachedBuyerProfile() {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    const { profile, ts } = JSON.parse(raw);
+    if (!profile?.uid || Date.now() - ts > PROFILE_TTL_MS) return null;
+    return profile;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedBuyerProfile(profile) {
+  if (!profile?.uid) return;
+  try {
+    sessionStorage.setItem(
+      PROFILE_KEY,
+      JSON.stringify({ profile, ts: Date.now() })
+    );
+  } catch {
+    /* quota */
+  }
+}
+
+export function clearCachedBuyerProfile() {
+  try {
+    sessionStorage.removeItem(PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export async function requireBuyerSession() {
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -12,6 +50,11 @@ export async function requireBuyerSession() {
   if (!session) {
     window.location.assign("auth.html");
     return null;
+  }
+
+  const cached = getCachedBuyerProfile();
+  if (cached?.uid === session.user.id) {
+    return { session, profile: cached };
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -39,21 +82,29 @@ export async function requireBuyerSession() {
     return null;
   }
 
+  setCachedBuyerProfile(profile);
   return { session, profile };
 }
 
-export async function fetchPublicShopper(uid) {
+export async function fetchPublicShopper(uid, opts = {}) {
   if (!uid) return null;
 
-  const { data, error } = await supabase
-    .from("public_shoppers")
-    .select("*")
-    .eq("uid", uid)
-    .maybeSingle();
+  return cacheFetch(
+    `shopper:${uid}`,
+    CacheTTL.SHOPPER,
+    async () => {
+      const { data, error } = await supabase
+        .from("public_shoppers")
+        .select("*")
+        .eq("uid", uid)
+        .maybeSingle();
 
-  if (error) {
-    console.error("public_shoppers error:", error);
-    throw new Error(error.message || "Could not load shopper profile.");
-  }
-  return data;
+      if (error) {
+        console.error("public_shoppers error:", error);
+        throw new Error(error.message || "Could not load shopper profile.");
+      }
+      return data;
+    },
+    opts
+  );
 }

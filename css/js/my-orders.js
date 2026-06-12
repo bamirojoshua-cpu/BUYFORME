@@ -2,7 +2,7 @@ import { supabase } from "./supabase.js";
 import { PAYSTACK_PUBLIC_KEY, STRIPE_PUBLISHABLE_KEY } from "./config.js";
 import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
-import { fetchOrdersForBuyer } from "./api/orders.js";
+import { fetchOrdersForBuyer, invalidateOrdersCache } from "./api/orders.js";
 import {
   preferredProvider,
   startPaystackCheckout,
@@ -87,57 +87,75 @@ function buyerUid() {
     return currentUser?.uid || currentUser?.id || null;
 }
 
-async function init() {
-    const profile = await initBuyerShell("orders", { title: "My Orders" });
-    if (!profile) return;
-    currentUser = profile;
+let ordersPageAbort = null;
 
-    if (!buyerUid()) {
-        console.error("My Orders: missing buyer uid on profile", profile);
-        showBuyerToast("Could not load your account. Try signing in again.");
-        return;
-    }
+function bindOrdersPageEvents() {
+  ordersPageAbort?.abort();
+  ordersPageAbort = new AbortController();
+  const { signal } = ordersPageAbort;
 
-    await loadOrders();
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("stripe_success") === "1") {
-        const orderId = params.get("order_id");
-        const sessionId = params.get("session_id");
-        if (orderId && sessionId) {
-            document.getElementById("processingOverlay")?.classList.add("show");
-            try {
-                await verifyStripe(orderId, sessionId);
-                showSuccessBanner();
-            } catch (e) {
-                console.error(e);
-                showBuyerToast("Payment verification failed — contact support");
-            }
-            document.getElementById("processingOverlay")?.classList.remove("show");
-            history.replaceState({}, "", "my-orders.html");
-            await loadOrders();
-        }
-    }
-
-    document.addEventListener("bfm-order-updated", e => {
-        const updated = e.detail;
-        if (!updated?.id) return;
-        const idx = allOrders.findIndex(o => o.id === updated.id);
-        if (idx !== -1) allOrders[idx] = updated;
-        else allOrders.unshift(updated);
-        renderOrders();
-    });
+  document.addEventListener("bfm-order-updated", (e) => {
+    const updated = e.detail;
+    if (!updated?.id) return;
+    const idx = allOrders.findIndex((o) => o.id === updated.id);
+    if (idx !== -1) allOrders[idx] = updated;
+    else allOrders.unshift(updated);
+    renderOrders();
+  }, { signal });
 }
 
-document.addEventListener("DOMContentLoaded", init);
+export async function mountOrdersPage() {
+  bindOrdersPageEvents();
+  const profile = await initBuyerShell("orders", { title: "My Orders" });
+  if (!profile) return;
+  currentUser = profile;
+
+  if (!buyerUid()) {
+    console.error("My Orders: missing buyer uid on profile", profile);
+    showBuyerToast("Could not load your account. Try signing in again.");
+    return;
+  }
+
+  await loadOrders();
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("stripe_success") === "1") {
+    const orderId = params.get("order_id");
+    const sessionId = params.get("session_id");
+    if (orderId && sessionId) {
+      document.getElementById("processingOverlay")?.classList.add("show");
+      try {
+        await verifyStripe(orderId, sessionId);
+        showSuccessBanner();
+      } catch (e) {
+        console.error(e);
+        showBuyerToast("Payment verification failed — contact support");
+      }
+      document.getElementById("processingOverlay")?.classList.remove("show");
+      history.replaceState({}, "", "my-orders.html");
+      await loadOrders();
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  import("./buyer-router.js").then((r) => {
+    if (r.shouldAutoMountPage()) mountOrdersPage();
+  });
+});
 
 /* ─── LOAD ORDERS ─── */
 async function loadOrders() {
     try {
-        allOrders = await fetchOrdersForBuyer(buyerUid());
+        allOrders = await fetchOrdersForBuyer(buyerUid(), {
+            onUpdate: (orders) => {
+                allOrders = orders;
+                renderOrders();
+            },
+        });
     } catch (err) {
         console.error("Load orders error:", err);
-        allOrders = [];
+        if (!allOrders.length) allOrders = [];
     }
     renderOrders();
 }
@@ -245,6 +263,7 @@ function buildOrderCard(order) {
 window.acceptQuote = async function (orderId) {
     const { error } = await supabase.from("requests").update({ status: "accepted" }).eq("id", orderId);
     if (error) { showBuyerToast("Could not accept quote"); return; }
+    invalidateOrdersCache(buyerUid());
     showBuyerToast("Quote accepted — you can pay when ready");
     await loadOrders();
 };
@@ -253,6 +272,7 @@ window.rejectQuote = async function (orderId) {
     if (!confirm("Decline this quote?")) return;
     const { error } = await supabase.from("requests").update({ status: "cancelled" }).eq("id", orderId);
     if (error) { showBuyerToast("Could not decline quote"); return; }
+    invalidateOrdersCache(buyerUid());
     await loadOrders();
 };
 
@@ -267,7 +287,7 @@ window.makePayment = function (orderId, shopperName, totalAmount, orderCurrency)
         totalAmount,
         currency: orderCurrency,
         onSuccess: (reference) => {
-            document.getElementById("processingOverlay").classList.add("show");
+            document.getElementById("processingOverlay")?.classList.add("show");
             handlePaymentSuccess(orderId, reference);
         },
         onClose: () => { paymentInProgress = false; },
@@ -290,12 +310,12 @@ async function handlePaymentSuccess(orderId, reference) {
     try {
         await verifyPaystack(orderId, reference);
 
-        document.getElementById("processingOverlay").classList.remove("show");
+        document.getElementById("processingOverlay")?.classList.remove("show");
         paymentInProgress = false;
         showSuccessBanner();
     } catch (err) {
         console.error("Unexpected payment update error:", err);
-        document.getElementById("processingOverlay").classList.remove("show");
+        document.getElementById("processingOverlay")?.classList.remove("show");
         paymentInProgress = false;
         alert("Payment received but something went wrong. Contact support with ref: " + reference);
     }
@@ -332,12 +352,12 @@ window.leaveReview = function (shopperId, shopperName) {
     document.getElementById("reviewShopperName").textContent = shopperName;
     document.getElementById("reviewText").value = "";
     document.getElementById("reviewError").style.display = "none";
-    document.getElementById("reviewModal").classList.add("open");
+    document.getElementById("reviewModal")?.classList.add("open");
     setStars(0);
 };
 
 window.closeReviewModal = function () {
-    document.getElementById("reviewModal").classList.remove("open");
+    document.getElementById("reviewModal")?.classList.remove("open");
 };
 
 window.setStars = function (n) {

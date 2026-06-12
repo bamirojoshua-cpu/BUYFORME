@@ -6,6 +6,7 @@ import { nameWithVerifiedBadge } from "./verified-badge.js";
 import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { flagEmoji, countryCodeFromLocation } from "./country-flag.js";
 import { buildRequestRow, insertRequest, computeFees, PLATFORM_FEE_PERCENT } from "./api/request-builder.js";
+import { invalidateOrdersCache } from "./api/orders.js";
 import { addToWishlist } from "./api/wishlist.js";
 import { addToCart } from "./api/cart.js";
 
@@ -340,6 +341,8 @@ async function handleSubmit() {
       shopperFeePercent,
     });
     await insertRequest(row);
+    invalidateOrdersCache(currentUser.uid);
+    document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
   } catch (error) {
     console.error("Request error:", error);
     showError("Failed to send request. Please try again.");

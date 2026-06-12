@@ -80,3 +80,12 @@ export function finishLoggedOutAuthUrl() {
     window.history.replaceState({}, "", "auth.html");
   }
 }
+
+/** Clear post-logout grace period after a successful sign-in. */
+export function clearLogoutGracePeriod() {
+  try {
+    sessionStorage.removeItem("bfm-logout-at");
+  } catch {
+    /* ignore */
+  }
+}

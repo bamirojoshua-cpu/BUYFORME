@@ -7,6 +7,13 @@ import { initBuyerNotifications, refreshBuyerBadges, stopBuyerNotifications } fr
 import { wishlistCount } from "./api/wishlist.js";
 import { cartCount } from "./api/cart.js";
 import { initI18n, t, setLocale, getLocale } from "./i18n/index.js";
+import {
+  getCachedBuyerProfile,
+  setCachedBuyerProfile,
+  clearCachedBuyerProfile,
+} from "./buyer-session.js";
+import { warmBuyerCache, setCacheUserId, clearAppCache } from "./app-cache.js";
+import { ensureBuyerOverlays } from "./buyer-overlays.js";
 
 const NAV_ITEMS = [
   { key: "discover", href: "buyers.html", icon: "fa-compass", i18nKey: "nav.discover" },
@@ -34,6 +41,9 @@ export async function performBuyerLogout() {
 
   shellUser = null;
   delete document.body.dataset.shellInit;
+  clearCachedBuyerProfile();
+  clearAppCache();
+  setCacheUserId(null);
 
   await clearAuthSession(supabase);
   window.location.replace("auth.html?logged_out=1");
@@ -72,6 +82,13 @@ async function ensureBuyerAuth() {
     return false;
   }
 
+  const cached = getCachedBuyerProfile();
+  if (cached?.uid === session.user.id) {
+    shellUser = cached;
+    revalidateBuyerProfile(session.user.id);
+    return true;
+  }
+
   const { data: profile, error } = await supabase
     .from("users")
     .select("*")
@@ -83,18 +100,47 @@ async function ensureBuyerAuth() {
     return false;
   }
 
+  if (redirectForRole(profile)) return false;
+
+  shellUser = profile;
+  setCachedBuyerProfile(profile);
+  return true;
+}
+
+function redirectForRole(profile) {
   const role = String(profile.role || "").toLowerCase();
   if (role === "shopper") {
+    clearCachedBuyerProfile();
     window.location.assign(
       profile.verification_status?.toLowerCase() === "approved"
         ? getShopperDashboardHref()
         : "verify.html"
     );
-    return false;
+    return true;
   }
+  if (role === "admin") {
+    clearCachedBuyerProfile();
+    window.location.assign("admin.html");
+    return true;
+  }
+  return false;
+}
 
-  shellUser = profile;
-  return true;
+async function revalidateBuyerProfile(uid) {
+  try {
+    const { data: profile, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("uid", uid)
+      .maybeSingle();
+    if (error || !profile) return;
+    if (redirectForRole(profile)) return;
+    shellUser = profile;
+    setCachedBuyerProfile(profile);
+    updateShellUserDisplay(profile);
+  } catch {
+    /* background refresh */
+  }
 }
 
 function buildNavLinks(activeKey) {
@@ -112,8 +158,23 @@ function buildNavLinks(activeKey) {
   }).join("");
 }
 
+/** Keep page content inside .buyer-main so margin-left clears the fixed sidebar. */
+export function ensureBuyerContentInSlot() {
+  const content = document.getElementById("buyer-content");
+  const slot = document.getElementById("buyer-main-slot");
+  if (!content || !slot) return false;
+  if (content.parentElement !== slot) {
+    slot.appendChild(content);
+  }
+  content.classList.add("buyer-main-inner");
+  return true;
+}
+
 function injectShell(activeKey, title) {
-  if (document.getElementById("buyer-app-grid")) return;
+  if (document.getElementById("buyer-app-grid")) {
+    ensureBuyerContentInSlot();
+    return;
+  }
 
   const initial = (shellUser?.name || "B")[0].toUpperCase();
   const firstName = (shellUser?.name || "Buyer").split(" ")[0];
@@ -318,6 +379,21 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
+/** Update sidebar + bottom nav active state after soft tab navigation. */
+export function setBuyerNavActive(activeKey, title) {
+  NAV_ITEMS.forEach((item) => {
+    const isActive = item.key === activeKey;
+    document.querySelectorAll(
+      `.buyer-nav a[data-nav="${item.key}"], .buyer-bottom-nav a[href="${item.href}"]`
+    ).forEach((el) => {
+      el.classList.toggle("active", isActive);
+    });
+  });
+
+  const mobileTitle = document.querySelector(".buyer-mobile-title");
+  if (mobileTitle && title) mobileTitle.textContent = title;
+}
+
 async function updateNavBadges() {
   if (!shellUser?.uid) return;
 
@@ -352,10 +428,28 @@ async function updateNavBadges() {
 export async function initBuyerShell(activeTab, options = {}) {
   initI18n();
 
+  const titles = {
+    discover: "Discover",
+    orders: "My Orders",
+    messages: "Messages",
+    wishlist: "Wishlist",
+    cart: "Cart",
+    account: "Account",
+    profile: "Shopper Profile",
+    request: "Send Request",
+  };
+
   if (options.user) shellUser = options.user;
 
   if (document.body.dataset.shellInit === "1") {
-    await updateNavBadges();
+    ensureBuyerContentInSlot();
+    ensureBuyerOverlays();
+    if (shellUser?.uid) setCacheUserId(shellUser.uid);
+    setBuyerNavActive(
+      ["profile", "request"].includes(activeTab) ? "discover" : activeTab,
+      options.title || titles[activeTab] || "BuyForMe"
+    );
+    updateNavBadges().catch((e) => console.warn("Nav badges:", e));
     setupSidebarCollapse();
     applyStoredSidebarState();
     if (shellUser?.uid) {
@@ -377,21 +471,13 @@ export async function initBuyerShell(activeTab, options = {}) {
     console.warn("initBuyerShell: skipAuth without user — shell UI only");
   }
 
-  const titles = {
-    discover: "Discover",
-    orders: "My Orders",
-    messages: "Messages",
-    wishlist: "Wishlist",
-    cart: "Cart",
-    account: "Account",
-    profile: "Shopper Profile",
-    request: "Send Request",
-  };
-
   injectShell(
     ["profile", "request"].includes(activeTab) ? "discover" : activeTab,
     options.title || titles[activeTab] || "BuyForMe"
   );
+
+  ensureBuyerOverlays();
+  ensureBuyerContentInSlot();
 
   const content = document.getElementById("buyer-content");
   if (content) {
@@ -401,7 +487,12 @@ export async function initBuyerShell(activeTab, options = {}) {
 
   document.body.classList.add("buyer-app-body");
 
-  await updateNavBadges();
+  if (shellUser?.uid) {
+    setCacheUserId(shellUser.uid);
+    warmBuyerCache(shellUser.uid);
+  }
+
+  updateNavBadges().catch((e) => console.warn("Nav badges:", e));
   if (shellUser?.uid) {
     initBuyerNotifications(shellUser, { toast: showBuyerToast }).catch((e) => {
       console.warn("Buyer notifications init:", e);
@@ -411,6 +502,10 @@ export async function initBuyerShell(activeTab, options = {}) {
   document.addEventListener("bfm-buyer-badges", () => {
     updateNavBadges();
   });
+
+  import("./buyer-router.js")
+    .then((r) => r.initBuyerRouter(["profile", "request"].includes(activeTab) ? "discover" : activeTab))
+    .catch((e) => console.warn("Buyer router:", e));
 
   return shellUser;
 }

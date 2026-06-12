@@ -789,7 +789,7 @@
 .profile-mobile-cta {
   display: none;
   position: fixed;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  bottom: var(--buyer-bottom-nav-clear);
   left: 0;
   right: 0;
   z-index: 90;

@@ -18,6 +18,7 @@ const PWA_HEAD = `
 const PWA_SCRIPT = `    <script type="module" src="css/js/pwa-register.js"></script>\n`;
 
 const THEME_COLOR = `    <meta name="theme-color" content="#1a9e6e">`;
+const VIEW_TRANSITION = `    <meta name="view-transition" content="same-origin">`;
 
 const htmlFiles = readdirSync(root).filter(
   (f) =>
@@ -46,6 +47,14 @@ for (const file of htmlFiles) {
     const viewport = html.match(/<meta name="viewport"[^>]+>/);
     if (viewport) {
       html = html.replace(viewport[0], viewport[0] + "\n" + THEME_COLOR);
+      changed = true;
+    }
+  }
+
+  if (html.includes('class="buyer-app') && !html.includes("view-transition")) {
+    const viewport = html.match(/<meta name="viewport"[^>]+>/);
+    if (viewport) {
+      html = html.replace(viewport[0], viewport[0] + "\n" + VIEW_TRANSITION);
       changed = true;
     }
   }
