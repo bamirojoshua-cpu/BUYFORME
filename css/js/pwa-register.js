@@ -36,6 +36,9 @@ function createBar(id, attrs = {}) {
   Object.entries(attrs).forEach(([key, value]) => {
     el.dataset[key] = value;
   });
+  if (attrs.pwaInstall === "1") {
+    el.classList.add("bfm-pwa-bar--install");
+  }
   document.body.appendChild(el);
   return el;
 }
@@ -58,20 +61,35 @@ function bindBarActions(el) {
   });
 }
 
-/** Consistent bar markup — stacks cleanly on phones. */
-function barContentHtml({ title, subtitle = "", actionsHtml }) {
+/** Consistent bar markup — mobile dock layout for install prompts. */
+function barContentHtml({ title, subtitle = "", actionsHtml, dismissAction = "" }) {
   const subtitleBlock = subtitle
     ? `<span class="bfm-pwa-bar__subtitle">${subtitle}</span>`
     : "";
+  const dismissBtn = dismissAction
+    ? `<button type="button" class="bfm-pwa-bar__dismiss" data-pwa-action="${dismissAction}" aria-label="Dismiss">×</button>`
+    : "";
   return `
+    ${dismissBtn}
     <div class="bfm-pwa-bar__main">
-      <img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="40" height="40">
+      <img class="bfm-pwa-bar__icon" src="images/pwa/icon-192.png" alt="" width="44" height="44">
       <div class="bfm-pwa-bar__text">
         <strong>${title}</strong>
         ${subtitleBlock}
       </div>
     </div>
     <div class="bfm-pwa-bar__actions">${actionsHtml}</div>`;
+}
+
+function installBarActions({ primaryAction, primaryLabel, subtitle = "Get the app on your Home Screen.", dismissAction = "dismiss-install" }) {
+  return barContentHtml({
+    title: "Install BuyForMe",
+    subtitle,
+    dismissAction,
+    actionsHtml: `
+      <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="${primaryAction}">${primaryLabel}</button>
+      <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="${dismissAction}">Not now</button>`,
+  });
 }
 
 function dismissInstallPrompt() {
@@ -166,18 +184,14 @@ function showIosInstallBar() {
   if (bar.classList.contains("is-visible")) return;
 
   const inApp = isIosInAppBrowser();
-  const subtitle = inApp
-    ? "Open in Safari, then add to Home Screen."
-    : "Tap Share, then Add to Home Screen.";
-
   showBar(
     bar,
-    barContentHtml({
-      title: "Install BuyForMe",
-      subtitle,
-      actionsHtml: `
-        <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
-        <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="ios-install-guide">How to install</button>`,
+    installBarActions({
+      primaryAction: "ios-install-guide",
+      primaryLabel: "Add to Home Screen",
+      subtitle: inApp
+        ? "Open in Safari first, then add to Home Screen."
+        : "Get the app on your Home Screen.",
     })
   );
   bindBarActions(bar);
@@ -214,12 +228,9 @@ function setupInstallPrompt() {
 
     showBar(
       bar,
-      barContentHtml({
-        title: "Install BuyForMe",
-        subtitle: "Add to your home screen for quick access.",
-        actionsHtml: `
-          <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--ghost" data-pwa-action="dismiss-install">Not now</button>
-          <button type="button" class="bfm-pwa-bar__btn bfm-pwa-bar__btn--primary" data-pwa-action="install">Install</button>`,
+      installBarActions({
+        primaryAction: "install",
+        primaryLabel: "Install app",
       })
     );
     bindBarActions(bar);

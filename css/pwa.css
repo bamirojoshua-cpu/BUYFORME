@@ -1,31 +1,30 @@
 /* PWA install, update, and connectivity UI */
 
+.bfm-pwa-bar,
+.bfm-pwa-bar *,
+.bfm-pwa-bar *::before,
+.bfm-pwa-bar *::after {
+  box-sizing: border-box;
+}
+
 .bfm-pwa-bar {
   position: fixed;
   z-index: 10050;
-  left: max(12px, env(safe-area-inset-left, 0px));
-  right: max(12px, env(safe-area-inset-right, 0px));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  margin: 0 auto;
-  max-width: 24rem;
+  margin: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 18px;
+  gap: 14px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   background: #fff;
   color: #1a1a1a;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(26, 158, 110, 0.18);
-  transform: translateY(calc(100% + 20px));
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.14);
+  border-top: 1px solid rgba(26, 158, 110, 0.12);
+  transform: translateY(110%);
   opacity: 0;
   pointer-events: none;
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.28s ease;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.28s ease;
 }
 
 .bfm-pwa-bar.is-visible {
@@ -34,19 +33,55 @@
   pointer-events: auto;
 }
 
+/* Install prompt — full-width bottom dock on phones */
+.bfm-pwa-bar--install {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: none;
+  width: 100%;
+  border-radius: 20px 20px 0 0;
+  padding-top: 18px;
+}
+
+.bfm-pwa-bar__dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #f0f2f1;
+  color: #666;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .bfm-pwa-bar__main {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   min-width: 0;
+  padding-right: 28px;
 }
 
 .bfm-pwa-bar__icon {
   flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
   object-fit: cover;
+  box-shadow: 0 2px 10px rgba(26, 158, 110, 0.2);
 }
 
 .bfm-pwa-bar__text {
@@ -56,39 +91,42 @@
 
 .bfm-pwa-bar__text strong {
   display: block;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1.25;
-  color: #0d6e4a;
+  color: #0c1a14;
 }
 
 .bfm-pwa-bar__subtitle {
   display: block;
-  margin-top: 4px;
+  margin-top: 3px;
   font-size: 0.8125rem;
   line-height: 1.4;
-  color: #555;
+  color: #5a6b63;
 }
 
 .bfm-pwa-bar__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   width: 100%;
 }
 
 .bfm-pwa-bar__btn {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 44px;
+  display: block;
+  width: 100%;
+  margin: 0;
+  min-height: 48px;
   border: none;
   border-radius: 12px;
-  padding: 0.55rem 0.85rem;
-  font-size: 0.875rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   text-align: center;
+  -webkit-appearance: none;
+  appearance: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -102,16 +140,43 @@
 }
 
 .bfm-pwa-bar__btn--ghost {
-  background: #f3f4f3;
-  color: #444;
+  background: transparent;
+  color: #6b7280;
+  min-height: 40px;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .bfm-pwa-bar__btn--ghost:active {
-  background: #e8ebe8;
+  color: #374151;
 }
 
 .bfm-pwa-bar__btn--full {
-  flex: 1 1 100%;
+  width: 100%;
+}
+
+/* Update / offline toasts — compact floating card */
+.bfm-pwa-bar:not(.bfm-pwa-bar--install) {
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  max-width: 24rem;
+  margin: 0 auto;
+  border-radius: 16px;
+  border: 1px solid rgba(26, 158, 110, 0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.bfm-pwa-bar:not(.bfm-pwa-bar--install) .bfm-pwa-bar__actions {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.bfm-pwa-bar:not(.bfm-pwa-bar--install) .bfm-pwa-bar__btn {
+  flex: 1;
+  width: auto;
+  min-height: 44px;
+  font-size: 0.875rem;
 }
 
 .bfm-pwa-offline-strip {
@@ -135,46 +200,63 @@
   transform: translateY(0);
 }
 
-/* Wider phones / small tablets — single-row bar */
-@media (min-width: 520px) {
-  .bfm-pwa-bar {
+/* Buyer shell — install card floats above bottom nav */
+body.buyer-app-body .bfm-pwa-bar--install {
+  left: max(10px, env(safe-area-inset-left, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 8px);
+  width: auto;
+  max-width: 22rem;
+  margin: 0 auto;
+  border-radius: 16px;
+  border: 1px solid rgba(26, 158, 110, 0.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16);
+  padding-top: 16px;
+}
+
+body.buyer-app-body .bfm-pwa-bar:not(.bfm-pwa-bar--install) {
+  bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 10px);
+}
+
+/* Large screens — install becomes a floating card, not dock */
+@media (min-width: 768px) {
+  .bfm-pwa-bar--install {
     left: 50%;
     right: auto;
-    width: min(92vw, 28rem);
-    flex-direction: row;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: min(92vw, 26rem);
+    max-width: 26rem;
     border-radius: 16px;
-    transform: translateX(-50%) translateY(calc(100% + 20px));
+    border: 1px solid rgba(26, 158, 110, 0.15);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+    transform: translateX(-50%) translateY(calc(100% + 24px));
+    padding: 14px 16px 16px;
   }
 
-  .bfm-pwa-bar.is-visible {
+  .bfm-pwa-bar--install.is-visible {
     transform: translateX(-50%) translateY(0);
   }
 
-  .bfm-pwa-bar__main {
-    flex: 1;
-    align-items: center;
+  .bfm-pwa-bar--install .bfm-pwa-bar__actions {
+    flex-direction: row;
   }
 
-  .bfm-pwa-bar__actions {
-    flex: 0 0 auto;
+  .bfm-pwa-bar--install .bfm-pwa-bar__btn {
     width: auto;
-    flex-wrap: nowrap;
+    flex: 1;
+    min-height: 42px;
+    font-size: 0.875rem;
   }
 
-  .bfm-pwa-bar__btn {
-    flex: 0 0 auto;
-    min-height: 40px;
-    white-space: nowrap;
-    border-radius: 999px;
-    padding: 0.45rem 0.9rem;
-    font-size: 0.8rem;
+  .bfm-pwa-bar:not(.bfm-pwa-bar--install) {
+    left: 50%;
+    right: auto;
+    width: min(92vw, 28rem);
+    transform: translateX(-50%) translateY(calc(100% + 20px));
   }
 
-  .bfm-pwa-bar__btn--full {
-    flex: 0 0 auto;
+  .bfm-pwa-bar:not(.bfm-pwa-bar--install).is-visible {
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -186,15 +268,10 @@
 }
 
 @media (display-mode: standalone) {
+  .bfm-pwa-bar--install,
   .bfm-pwa-bar[data-pwa-install] {
-    display: none;
+    display: none !important;
   }
-}
-
-/* Above buyer bottom nav on shell pages */
-body.buyer-app-body .bfm-pwa-bar {
-  bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 10px);
-  max-width: min(calc(100vw - 24px), 24rem);
 }
 
 /* iOS Add to Home Screen guide */
