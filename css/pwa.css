@@ -200,27 +200,82 @@
   transform: translateY(0);
 }
 
-/* Buyer shell — install card floats above bottom nav */
-body.buyer-app-body .bfm-pwa-bar--install {
-  left: max(10px, env(safe-area-inset-left, 0px));
-  right: max(10px, env(safe-area-inset-right, 0px));
-  bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 8px);
-  width: auto;
-  max-width: 22rem;
-  margin: 0 auto;
-  border-radius: 16px;
-  border: 1px solid rgba(26, 158, 110, 0.15);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16);
-  padding-top: 16px;
+/* Buyer shell — mobile only: card above bottom nav */
+@media (max-width: 900px) {
+  body.buyer-app-body .bfm-pwa-bar--install {
+    left: max(10px, env(safe-area-inset-left, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 8px);
+    width: auto;
+    max-width: 22rem;
+    margin: 0 auto;
+    border-radius: 16px;
+    border: 1px solid rgba(26, 158, 110, 0.15);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16);
+    padding-top: 16px;
+    transform: translateY(calc(100% + 16px));
+  }
+
+  body.buyer-app-body .bfm-pwa-bar--install.is-visible {
+    transform: translateY(0);
+  }
+
+  body.buyer-app-body .bfm-pwa-bar:not(.bfm-pwa-bar--install) {
+    bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 10px);
+  }
 }
 
-body.buyer-app-body .bfm-pwa-bar:not(.bfm-pwa-bar--install) {
-  bottom: calc(var(--buyer-bottom-nav-clear, 96px) + 10px);
+/* Buyer shell — desktop: anchor bottom-right of main area (no bottom nav) */
+@media (min-width: 901px) {
+  body.buyer-app-body .bfm-pwa-bar--install {
+    left: auto;
+    right: max(24px, env(safe-area-inset-right, 0px));
+    bottom: max(24px, env(safe-area-inset-bottom, 0px));
+    width: min(22rem, calc(100vw - var(--sidebar-w, 268px) - var(--sidebar-float-gap, 14px) * 2 - 32px));
+    max-width: 22rem;
+    margin: 0;
+    border-radius: 16px;
+    border: 1px solid rgba(26, 158, 110, 0.15);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+    padding: 14px 16px 16px;
+    transform: translateY(calc(100% + 20px));
+  }
+
+  body.buyer-app-body .bfm-pwa-bar--install.is-visible {
+    transform: translateY(0);
+  }
+
+  body.buyer-app-body .bfm-pwa-bar--install .bfm-pwa-bar__actions {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  body.buyer-app-body .bfm-pwa-bar--install .bfm-pwa-bar__btn {
+    width: auto;
+    flex: 1;
+    min-height: 40px;
+    font-size: 0.875rem;
+  }
+
+  body.buyer-app-body .bfm-pwa-bar:not(.bfm-pwa-bar--install) {
+    left: 50%;
+    right: auto;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%) translateY(calc(100% + 20px));
+  }
+
+  body.buyer-app-body .bfm-pwa-bar:not(.bfm-pwa-bar--install).is-visible {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  body.buyer-app-body.buyer-sidebar-collapsed .bfm-pwa-bar--install {
+    width: min(22rem, calc(100vw - var(--sidebar-w-collapsed, 76px) - var(--sidebar-float-gap, 14px) * 2 - 32px));
+  }
 }
 
-/* Large screens — install becomes a floating card, not dock */
+/* Large screens (non-buyer pages) — install becomes a centered floating card */
 @media (min-width: 768px) {
-  .bfm-pwa-bar--install {
+  body:not(.buyer-app-body) .bfm-pwa-bar--install {
     left: 50%;
     right: auto;
     bottom: calc(20px + env(safe-area-inset-bottom, 0px));
@@ -233,15 +288,15 @@ body.buyer-app-body .bfm-pwa-bar:not(.bfm-pwa-bar--install) {
     padding: 14px 16px 16px;
   }
 
-  .bfm-pwa-bar--install.is-visible {
+  body:not(.buyer-app-body) .bfm-pwa-bar--install.is-visible {
     transform: translateX(-50%) translateY(0);
   }
 
-  .bfm-pwa-bar--install .bfm-pwa-bar__actions {
+  body:not(.buyer-app-body) .bfm-pwa-bar--install .bfm-pwa-bar__actions {
     flex-direction: row;
   }
 
-  .bfm-pwa-bar--install .bfm-pwa-bar__btn {
+  body:not(.buyer-app-body) .bfm-pwa-bar--install .bfm-pwa-bar__btn {
     width: auto;
     flex: 1;
     min-height: 42px;

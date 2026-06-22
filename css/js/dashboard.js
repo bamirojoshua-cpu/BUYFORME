@@ -107,7 +107,10 @@ export async function bootstrapShopperDashboard() {
   const { data: profile } = await supabase
     .from("users").select("*").eq("uid", currentUser.id).maybeSingle();
 
-  if (!profile || profile.role !== "shopper") { window.location.href = "auth.html"; return; }
+  if (!profile || profile.role !== "shopper") {
+    window.location.href = profile?.role === "buyer" ? "buyers.html" : "auth.html";
+    return;
+  }
   if (profile.verification_status?.toLowerCase() !== "approved") { window.location.href = "verify.html"; return; }
 
   currentProfile = profile;

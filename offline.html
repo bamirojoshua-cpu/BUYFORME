@@ -76,18 +76,24 @@
   <main class="offline-card" role="main">
     <img src="images/logo.png" alt="BuyForMe">
     <h1>You’re offline</h1>
-    <p>BuyForMe needs an internet connection for orders, messages, and payments. Cached pages may still be available.</p>
+    <p>BuyForMe needs an internet connection for orders, messages, and payments. Check your connection and try again.</p>
     <div class="offline-actions">
       <button type="button" class="btn-primary" id="offlineRetry">Try again</button>
-      <a href="index.html" class="btn-secondary">Back to home</a>
+      <a href="buyers.html" class="btn-secondary" id="offlineDiscover">Back to Discover</a>
+      <a href="index.html" class="btn-secondary">Marketing home</a>
     </div>
   </main>
   <script>
     document.getElementById("offlineRetry")?.addEventListener("click", () => {
       if (navigator.onLine) window.location.reload();
-      else window.location.href = "index.html";
+      else window.location.href = "buyers.html";
     });
     window.addEventListener("online", () => window.location.reload());
+    try {
+      if (sessionStorage.getItem("bfm-buyer-profile")) {
+        document.getElementById("offlineDiscover")?.focus();
+      }
+    } catch { /* ignore */ }
   </script>
 </body>
 </html>

@@ -190,6 +190,7 @@ export default defineConfig(({ command }) => {
       generateRuntimeConfig(),
       react({ include: /\.(jsx|tsx)$/ }),
       stripReactRefreshFromLegacyHtml(),
+      copyLegacyAssets(),
       VitePWA({
         registerType: "prompt",
         injectRegister: false,
@@ -210,6 +211,8 @@ export default defineConfig(({ command }) => {
           globPatterns: ["**/*.{html,js,css,png,svg,ico,webmanifest,woff2}"],
           navigateFallback: "offline.html",
           navigateFallbackDenylist: [/^\/api\//],
+          /* Match precached HTML for profile/chat/orders URLs with query strings */
+          ignoreURLParametersMatching: [/.*/],
           skipWaiting: false,
           clientsClaim: true,
           cleanupOutdatedCaches: true,
@@ -228,6 +231,15 @@ export default defineConfig(({ command }) => {
             {
               urlPattern: /\/runtime-config\.js$/i,
               handler: "NetworkOnly",
+            },
+            {
+              urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "jsdelivr-modules",
+                networkTimeoutSeconds: 8,
+                expiration: { maxEntries: 24, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              },
             },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -256,7 +268,6 @@ export default defineConfig(({ command }) => {
           ],
         },
       }),
-      copyLegacyAssets(),
       syncGithubPagesRoot(),
     ],
     root: ".",
