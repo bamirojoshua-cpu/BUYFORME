@@ -3,6 +3,7 @@
  */
 
 import { supabase } from "../supabase.js";
+import { invalidateOrdersCache } from "./orders.js";
 
 export const PLATFORM_FEE_PERCENT = 5;
 
@@ -65,7 +66,8 @@ export function buildRequestRow({ buyer, shopper, item, shopperFeePercent, statu
 /** @param {object} row */
 export async function insertRequest(row) {
   const { data, error } = await supabase.from("requests").insert(row).select().single();
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Could not send request.");
+  if (row?.buyer_id) invalidateOrdersCache(row.buyer_id);
   return data;
 }
 

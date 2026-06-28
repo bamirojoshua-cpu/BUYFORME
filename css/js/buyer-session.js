@@ -4,7 +4,6 @@
 
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
-import { cacheFetch, CacheTTL } from "./app-cache.js";
 
 const PROFILE_KEY = "bfm-buyer-profile";
 const PROFILE_TTL_MS = 5 * 60 * 1000;
@@ -86,25 +85,4 @@ export async function requireBuyerSession() {
   return { session, profile };
 }
 
-export async function fetchPublicShopper(uid, opts = {}) {
-  if (!uid) return null;
-
-  return cacheFetch(
-    `shopper:${uid}`,
-    CacheTTL.SHOPPER,
-    async () => {
-      const { data, error } = await supabase
-        .from("public_shoppers")
-        .select("*")
-        .eq("uid", uid)
-        .maybeSingle();
-
-      if (error) {
-        console.error("public_shoppers error:", error);
-        throw new Error(error.message || "Could not load shopper profile.");
-      }
-      return data;
-    },
-    opts
-  );
-}
+export { fetchPublicShopper } from "./api/users.js";

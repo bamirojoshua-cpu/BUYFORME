@@ -2,7 +2,6 @@ import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { fetchCart, removeFromCart, clearCart, groupCartByShopper } from "./api/cart.js";
 import { fetchPublicShopperBasic } from "./api/users.js";
 import { buildRequestRow, insertRequest, parseShopperFeePercent } from "./api/request-builder.js";
-import { invalidateOrdersCache } from "./api/orders.js";
 import { escapeHtml } from "./ui/index.js";
 
 let currentUser = null;
@@ -42,7 +41,6 @@ async function checkoutShopper(shopperId, items) {
   }
 
   await clearCart(currentUser.uid, shopperId);
-  invalidateOrdersCache(currentUser.uid);
   showBuyerToast(`${sent} request${sent > 1 ? "s" : ""} sent to ${shopper.name}`);
   document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
   render();

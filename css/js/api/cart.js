@@ -11,7 +11,7 @@ export async function fetchCart(buyerId, opts = {}) {
         .select("*")
         .eq("buyer_id", buyerId)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Could not load cart.");
       return data || [];
     },
     opts
@@ -24,20 +24,20 @@ export async function addToCart(buyerId, item) {
     .insert({ buyer_id: buyerId, ...item })
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Could not add to cart.");
   cacheInvalidate(`cart:${buyerId}`);
   return data;
 }
 
 export async function updateCartItem(id, patch, buyerId) {
   const { error } = await supabase.from("cart_items").update(patch).eq("id", id);
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Could not update cart.");
   if (buyerId) cacheInvalidate(`cart:${buyerId}`);
 }
 
 export async function removeFromCart(id, buyerId) {
   const { error } = await supabase.from("cart_items").delete().eq("id", id);
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Could not remove from cart.");
   if (buyerId) cacheInvalidate(`cart:${buyerId}`);
 }
 
@@ -45,7 +45,7 @@ export async function clearCart(buyerId, shopperId = null) {
   let q = supabase.from("cart_items").delete().eq("buyer_id", buyerId);
   if (shopperId) q = q.eq("shopper_id", shopperId);
   const { error } = await q;
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Could not clear cart.");
   cacheInvalidate(`cart:${buyerId}`);
 }
 

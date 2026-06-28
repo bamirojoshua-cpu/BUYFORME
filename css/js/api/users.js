@@ -7,6 +7,7 @@ import { cacheFetch, cacheInvalidate, CacheTTL } from "../app-cache.js";
 
 /** @param {string} uid */
 export async function fetchPublicShopper(uid, opts = {}) {
+  if (!uid) return null;
   return cacheFetch(
     `shopper:${uid}`,
     CacheTTL.SHOPPER,

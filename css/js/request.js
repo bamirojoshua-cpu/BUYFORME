@@ -6,7 +6,6 @@ import { nameWithVerifiedBadge } from "./verified-badge.js";
 import { initBuyerShell, showBuyerToast } from "./buyer-shell.js";
 import { flagEmoji, countryCodeFromLocation } from "./country-flag.js";
 import { buildRequestRow, insertRequest, computeFees, PLATFORM_FEE_PERCENT } from "./api/request-builder.js";
-import { invalidateOrdersCache } from "./api/orders.js";
 import { addToWishlist } from "./api/wishlist.js";
 import { addToCart } from "./api/cart.js";
 
@@ -341,7 +340,6 @@ async function handleSubmit() {
       shopperFeePercent,
     });
     await insertRequest(row);
-    invalidateOrdersCache(currentUser.uid);
     document.dispatchEvent(new CustomEvent("bfm-buyer-badges"));
   } catch (error) {
     console.error("Request error:", error);
@@ -478,6 +476,30 @@ function renderShopperPreview(shopper) {
   if (back) back.href = `shopper-profile.html?id=${encodeURIComponent(shopper.uid)}`;
 }
 
+function applyShareTargetParams() {
+  const params = new URLSearchParams(window.location.search);
+  const title = params.get("title")?.trim();
+  const text = params.get("text")?.trim();
+  const sharedUrl = params.get("url")?.trim();
+  if (!title && !text && !sharedUrl) return;
+
+  if (title && !$("productName")?.value) $("productName").value = title;
+
+  if (sharedUrl) {
+    try {
+      const host = new URL(sharedUrl).hostname.replace(/^www\./i, "");
+      if (host && !$("storeName")?.value) $("storeName").value = host;
+    } catch {
+      /* ignore invalid share URL */
+    }
+  }
+
+  const noteParts = [text, sharedUrl].filter(Boolean);
+  if (noteParts.length && !$("notes")?.value) {
+    $("notes").value = noteParts.join("\n");
+  }
+}
+
 async function init() {
   try {
     const buyer = await requireBuyerSession();
@@ -512,6 +534,7 @@ async function init() {
     renderShopperPreview(shopper);
     prefillBuyerDelivery(currentUser);
     loadDraft();
+    applyShareTargetParams();
     setWizardStep(1);
 
     $("wizardBack")?.addEventListener("click", goBack);

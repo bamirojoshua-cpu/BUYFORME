@@ -170,6 +170,13 @@ async function ensureStylesheets(hrefs) {
   await Promise.all(unique.map((href) => loadStylesheet(href).catch(() => {})));
 }
 
+function closeBuyerSettingsOverlay() {
+  const overlay = document.getElementById("settingsOverlay");
+  if (!overlay?.classList.contains("open")) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
 function pulseNav(tab) {
   const file = getFileForTab(tab);
   document.querySelectorAll(".buyer-nav a, .buyer-bottom-nav a").forEach((a) => {
@@ -265,6 +272,10 @@ export async function navigateBuyerTab(href, { replace = false, skipAnimation = 
       setActiveChatPartner(null);
     }
 
+    if (route.tab !== "discover") {
+      closeBuyerSettingsOverlay();
+    }
+
     const html = await fetchPageHtml(file);
     const parsed = parseBuyerPage(html);
     await ensureStylesheets(parsed.stylesheets);
@@ -340,7 +351,7 @@ function onPopState() {
   const { file, search, hash } = normalizePage(window.location.href);
   const route = routeForFile(file);
   if (!route) {
-    window.location.reload();
+    window.location.assign(`${file}${search}${hash}`);
     return;
   }
   navigateBuyerTab(`${file}${search}${hash}`, { replace: true });

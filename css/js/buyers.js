@@ -158,8 +158,7 @@ async function initAuth() {
   }
 
   if (new URLSearchParams(window.location.search).get("settings") === "1") {
-    switchTab("profile");
-    toggleSettings();
+    openSettingsFromQuery();
   }
 }
 
@@ -487,6 +486,10 @@ window.switchTab = function (tab) {
   const form = document.getElementById("settingsForm");
   if (!form) return;
 
+  abortSettingsTabListeners();
+  settingsTabAbort = new AbortController();
+  const { signal } = settingsTabAbort;
+
   if (tab === "profile") {
     const notifOn = currentUser.notifications !== false;
     const avInner = currentUser.avatar_url
@@ -523,17 +526,17 @@ window.switchTab = function (tab) {
     document.getElementById("buyerNotifToggle")?.addEventListener("click", function () {
       this.classList.toggle("on");
       this.setAttribute("aria-pressed", this.classList.contains("on"));
-    });
-    document.getElementById("profileAvatarInput")?.addEventListener("change", handleAvatarSelect);
+    }, { signal });
+    document.getElementById("profileAvatarInput")?.addEventListener("change", handleAvatarSelect, { signal });
     import("./pwa-register.js")
       .then(({ isPwaInstallAvailable, isPwaInstalled, promptPwaInstall, isIosPwaContext }) => {
         const row = document.getElementById("pwaInstallRow");
         const btn = document.getElementById("pwaInstallBtn");
-        if (!row || !btn) return;
+        if (!row || !btn || signal.aborted) return;
         if (isPwaInstallAvailable() && !isPwaInstalled()) {
           row.hidden = false;
           btn.textContent = isIosPwaContext() ? "Add to Home Screen" : "Install app";
-          btn.addEventListener("click", () => promptPwaInstall());
+          btn.addEventListener("click", () => promptPwaInstall(), { signal });
         }
       })
       .catch(() => {});
@@ -817,6 +820,35 @@ window.savePayments = async function () {
 window.handleLogout = performBuyerLogout;
 
 let buyersPageAbort = null;
+let settingsTabAbort = null;
+
+function abortSettingsTabListeners() {
+  settingsTabAbort?.abort();
+  settingsTabAbort = null;
+}
+
+export function closeBuyerSettings() {
+  const overlay = document.getElementById("settingsOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function openSettingsFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("settings") !== "1") return;
+
+  params.delete("settings");
+  const qs = params.toString();
+  const file = window.location.pathname.split("/").pop() || "buyers.html";
+  history.replaceState(history.state, "", `${file}${qs ? `?${qs}` : ""}${window.location.hash}`);
+
+  switchTab("profile");
+  const overlay = document.getElementById("settingsOverlay");
+  if (!overlay) return;
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+}
 
 function bindBuyersPageEvents() {
   buyersPageAbort?.abort();
@@ -853,6 +885,9 @@ function bindBuyersPageEvents() {
 
 export async function mountBuyersPage() {
   bindBuyersPageEvents();
+  if (new URLSearchParams(window.location.search).get("settings") !== "1") {
+    closeBuyerSettings();
+  }
   await initAuth();
 }
 

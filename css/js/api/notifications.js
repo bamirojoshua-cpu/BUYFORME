@@ -50,8 +50,9 @@ export async function fetchNotifications(userId, limit = 50) {
   if (error) {
     if (/relation.*does not exist|42P01/i.test(error.message || "")) {
       markTableMissing();
+      return readLocalFallback(userId);
     }
-    return readLocalFallback(userId);
+    throw new Error(error.message || "Could not load notifications.");
   }
 
   return (data || []).map(normalizeRow);
@@ -80,20 +81,21 @@ export async function createNotification(userId, payload) {
   if (error) {
     if (/relation.*does not exist|42P01/i.test(error.message || "")) {
       markTableMissing();
+      const local = readLocalFallback(userId);
+      const item = normalizeRow({
+        id: `local-${Date.now()}`,
+        body: payload.body,
+        title: payload.title,
+        type: payload.type || "info",
+        link: payload.link,
+        created_at: new Date().toISOString(),
+        is_read: false,
+      });
+      local.unshift(item);
+      writeLocalFallback(userId, local);
+      return item;
     }
-    const local = readLocalFallback(userId);
-    const item = normalizeRow({
-      id: `local-${Date.now()}`,
-      body: payload.body,
-      title: payload.title,
-      type: payload.type || "info",
-      link: payload.link,
-      created_at: new Date().toISOString(),
-      is_read: false,
-    });
-    local.unshift(item);
-    writeLocalFallback(userId, local);
-    return item;
+    throw new Error(error.message || "Could not create notification.");
   }
 
   return normalizeRow(data);

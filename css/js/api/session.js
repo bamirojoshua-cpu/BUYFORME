@@ -7,7 +7,8 @@ import { supabase } from "../supabase.js";
 
 /** @returns {Promise<import('@supabase/supabase-js').Session|null>} */
 export async function getSession() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) throw new Error(error.message || "Could not verify your session.");
   return session;
 }
 

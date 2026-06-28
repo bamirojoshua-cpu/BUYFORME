@@ -11,6 +11,8 @@
 import { supabase } from "./supabase.js";
 import { getShopperDashboardHref } from "./app-paths.js";
 import { clearAuthSession } from "./auth-session.js";
+import { clearCachedBuyerProfile } from "./buyer-session.js";
+import { clearAppCache } from "./app-cache.js";
 import { nameWithVerifiedBadge } from "./verified-badge.js";
 import {
   getConvId,
@@ -104,8 +106,14 @@ export async function bootstrapShopperDashboard() {
   if (!session) { window.location.href = "auth.html"; return; }
   currentUser = session.user;
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("users").select("*").eq("uid", currentUser.id).maybeSingle();
+
+  if (profileError) {
+    console.error("Profile error:", profileError);
+    showToast("Could not load your account. Please try again.", "error");
+    return;
+  }
 
   if (!profile || profile.role !== "shopper") {
     window.location.href = profile?.role === "buyer" ? "buyers.html" : "auth.html";
@@ -1646,6 +1654,8 @@ window.handleLogout = async function () {
     console.warn("unsubscribeInbox:", e);
   }
 
+  clearCachedBuyerProfile();
+  clearAppCache();
   await clearAuthSession(supabase);
   window.location.replace("auth.html?logged_out=1");
 };
